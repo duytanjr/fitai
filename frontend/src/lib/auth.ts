@@ -23,6 +23,19 @@ export interface User {
   is_active: boolean;
 }
 
+export interface ProfileData {
+  age: number | null;
+  gender: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  activity_level: string | null;
+  fitness_goal: string | null;
+  dietary_restrictions: string | null;
+  is_complete: boolean;
+}
+
+export type ProfileUpdateRequest = Partial<Omit<ProfileData, "is_complete">>;
+
 export const authApi = {
   login: async (data: LoginRequest): Promise<LoginResponse> => {
     // FastAPI OAuth2 expects form-encoded body
@@ -41,7 +54,7 @@ export const authApi = {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err?.detail ?? "Login failed");
+      throw new Error(err?.detail ?? "Đăng nhập thất bại");
     }
     return response.json();
   },
@@ -49,4 +62,9 @@ export const authApi = {
   register: (data: RegisterRequest) => apiClient.post<User>("/auth/register", data),
 
   me: () => apiClient.get<User>("/users/me"),
+
+  getProfile: () => apiClient.get<ProfileData>("/profile"),
+
+  updateProfile: (data: ProfileUpdateRequest) =>
+    apiClient.put<ProfileData>("/profile", data),
 };
