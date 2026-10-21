@@ -1,0 +1,99 @@
+# ==============================================================================
+# Environment Variables & Secrets
+# ==============================================================================
+.env
+.env.*
+.env*.local
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.cert
+*.crt
+
+# ==============================================================================
+# Operating System & IDE
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ==============================================================================
+# Logs & Process Artifacts
+# ==============================================================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==============================================================================
+# Python / Backend
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Linters, Type Checkers & Tool Caches
+.mypy_cache/
+.ruff_cache/
+
+# Packaging & Distribution
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# ==============================================================================
+# Node.js & Next.js / Frontend
+# ==============================================================================
+node_modules/
+.next/
+out/
+.vercel/
+.turbo/
+.pnp
+.pnp.*
+next-env.d.ts
+*.tsbuildinfo
+
+# ==============================================================================
+# Databases & Docker Volumes (Chroma, Postgres, SQLite)
+# ==============================================================================
+postgres_data/
+chroma_data/
+chroma/
+data/
+*.sqlite
+*.sqlite3
+*.db
