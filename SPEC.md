@@ -128,29 +128,29 @@ Quản trị viên ── Quản lý tài liệu tri thức ── Cập nhật 
 
 ```mermaid
 flowchart LR
-  U[Người dùng] --> FE[Giao diện Web/Mobile]
-  FE --> API[Backend API]
+  U[Người dùng (Browser)] -->|Gọi /api/v1/...| FE[Next.js Frontend (Port 3000)]
+  FE -->|Reverse Proxy / rewrites| API[FastAPI Backend (Port 8000)]
   API --> AG[AI Agent / Orchestrator]
-  AG --> LLM[Mô hình LLM]
+  AG --> LLM[Google Gemini (1.5 Pro / Flash)]
   AG --> T1[Công cụ: Tính TDEE/macro]
   AG --> T2[Công cụ: Tra cứu món ăn]
   AG --> T3[Công cụ: Lập thực đơn]
   AG --> T4[Công cụ: Lập lịch tập]
   AG --> T5[Công cụ: Đọc/ghi hồ sơ và nhật ký]
   AG --> RAG[Truy xuất RAG]
-  RAG --> VDB[(Vector Database)]
-  API --> DB[(CSDL quan hệ)]
+  RAG --> VDB[(ChromaDB)]
+  API --> DB[(PostgreSQL)]
   ADM[Quản trị viên] --> API
   ING[Pipeline nạp tài liệu] --> VDB
 ```
 
 **Các tầng:**
 
-1. **Giao diện (Frontend):** web (React/Next.js) hoặc ứng dụng di động; màn hình chat, hồ sơ, nhật ký, thống kê.
-2. **Backend API:** FastAPI (Python) hoặc tương đương; xác thực, nghiệp vụ, điều phối agent.
-3. **AI Agent:** nhận câu hỏi, quyết định gọi công cụ nào, tổng hợp câu trả lời (có thể dùng LangChain/LangGraph hoặc tự xây vòng lặp agent).
-4. **Tri thức:** vector database (Chroma, Qdrant, FAISS, ...) chứa tài liệu dinh dưỡng và thể thao.
-5. **Dữ liệu ứng dụng:** PostgreSQL/SQLite chứa người dùng, nhật ký, thực phẩm, bài tập.
+1. **Giao diện (Frontend):** Next.js (App Router, TypeScript, TailwindCSS); các màn hình chat, hồ sơ, nhật ký, thống kê. Next.js đóng vai trò **Reverse Proxy** (thông qua cấu hình `rewrites` trong `next.config.ts`) chuyển tiếp các yêu cầu `/api/v1/*` từ trình duyệt sang backend trong mạng nội bộ Docker. Thiết kế này giúp **tránh hoàn toàn vấn đề CORS** và che giấu địa chỉ container nội bộ với client.
+2. **Backend API:** FastAPI (Python); xác thực JWT, nghiệp vụ, điều phối agent.
+3. **AI Agent & LLM:** Sử dụng mô hình **Google Gemini** (`gemini-1.5-pro` hoặc `gemini-1.5-flash`) thông qua `langchain-google-genai` và LangChain; nhận câu hỏi, quyết định gọi công cụ, truy xuất RAG và tổng hợp câu trả lời tư vấn.
+4. **Tri thức:** Vector database **ChromaDB** chứa tài liệu dinh dưỡng và thể thao đã được phân đoạn và vector hóa.
+5. **Dữ liệu ứng dụng:** **PostgreSQL** lưu trữ người dùng, hồ sơ, các phiên chat (`chat_sessions`), lịch sử tin nhắn (`chat_messages`), nhật ký ăn uống và luyện tập.
 
 ### 3.2. Thiết kế AI agent và các công cụ (tool)
 
@@ -215,7 +215,8 @@ Tài liệu (PDF/Word/Web) → Trích xuất văn bản → Làm sạch
 | `exercises` | id, tên, nhóm cơ, dụng cụ, mô tả, mức độ |
 | `workout_logs` | id, user_id, ngày, exercise_id, số hiệp, số lần, mức tạ |
 | `body_metrics` | id, user_id, ngày, cân nặng, số đo |
-| `conversations` / `messages` | id, user_id, vai trò, nội dung, nguồn trích dẫn, thời gian |
+| `chat_sessions` | id (UUID), user_id (UUID, FK -> users), title, created_at |
+| `chat_messages` | id (UUID), session_id (UUID, FK -> chat_sessions), role ("user" / "assistant"), content, created_at |
 | `documents` | id, tên, loại, trạng thái lập chỉ mục |
 
 ### 3.5. Thiết kế API chính
@@ -243,25 +244,25 @@ Tài liệu (PDF/Word/Web) → Trích xuất văn bản → Làm sạch
 8. **Tiến độ:** biểu đồ theo thời gian, báo cáo tuần.
 9. **Trang quản trị:** quản lý tài liệu, món ăn, bài tập.
 
-### 3.7. Công nghệ đề xuất
+### 3.7. Công nghệ đề xuất và thực tế sử dụng
 
-| Thành phần | Lựa chọn gợi ý |
+| Thành phần | Công nghệ lựa chọn thực tế |
 | --- | --- |
-| Frontend | React/Next.js hoặc Streamlit (nếu cần làm nhanh bản demo) |
+| Frontend | Next.js (App Router, TypeScript, TailwindCSS) tích hợp Reverse Proxy cho API tránh CORS |
 | Backend | Python, FastAPI |
-| Agent/RAG | LangChain hoặc LangGraph, LlamaIndex |
-| LLM | API LLM thương mại hoặc mô hình mã nguồn mở chạy cục bộ (Qwen, Llama, ...) |
-| Embedding | Mô hình embedding đa ngôn ngữ (ví dụ họ BGE-M3, multilingual-e5) |
-| Vector DB | Chroma / Qdrant / FAISS |
-| CSDL | PostgreSQL hoặc SQLite |
-| Triển khai | Docker, cloud hoặc máy chủ cá nhân |
+| Agent/RAG | LangChain, langchain-google-genai |
+| LLM | Google Gemini (Gemini 1.5 Pro, Gemini 1.5 Flash) |
+| Embedding | Google Generative AI Embeddings / HuggingFace đa ngôn ngữ |
+| Vector DB | ChromaDB |
+| CSDL | PostgreSQL 16 (Alembic migration) |
+| Triển khai | Docker & Docker Compose |
 
 ### 3.8. Đối chiếu chức năng với thiết kế
 
 | Nhóm chức năng | Thành phần thiết kế đảm bảo |
 | --- | --- |
 | Hồ sơ, chỉ số cơ thể (FR1–3) | `profiles`, công cụ `calc_body_metrics` |
-| Tư vấn hội thoại (FR4–7) | Agent, RAG, guardrails, `messages` |
+| Tư vấn hội thoại (FR4–7) | Agent (Gemini), RAG, guardrails, `chat_sessions`, `chat_messages` |
 | Dinh dưỡng (FR8–11) | `foods`, `lookup_food`, `plan_meals`, `meal_logs` |
 | Thể dục (FR12–14) | `exercises`, `plan_workout`, `workout_logs` |
 | Theo dõi tiến độ (FR15–17) | `body_metrics`, `get_progress`, màn hình Tiến độ |
