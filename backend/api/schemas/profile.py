@@ -72,3 +72,22 @@ class ProfileOut(BaseModel):
             dietary_restrictions=profile.dietary_restrictions,
             is_complete=complete,
         )
+
+
+class ProfileMetricsOut(BaseModel):
+    """Schema trả về cho endpoint GET /profile/metrics.
+    
+    Khi hồ sơ đầy đủ (is_complete=True): trả về đầy đủ các chỉ số tính toán.
+    Khi hồ sơ chưa đủ (is_complete=False): trả về missing_fields và các chỉ số là None.
+    """
+    is_complete: bool
+    missing_fields: list[str] = []
+    bmi: Optional[float] = None
+    bmi_category: Optional[str] = None
+    bmr: Optional[float] = None
+    tdee: Optional[float] = None
+    target_calories: Optional[int] = None
+    calorie_floor_applied: Optional[bool] = None
+    protein_g: Optional[int] = None
+    fat_g: Optional[int] = None
+    carb_g: Optional[int] = None
