@@ -8,7 +8,7 @@ interface ChatState {
 
   setSessions: (sessions: ChatSession[]) => void;
   addSession: (session: ChatSession) => void;
-  setCurrentSession: (sessionId: string) => void;
+  setCurrentSession: (sessionId: string | null) => void;
   setMessages: (sessionId: string, messages: ChatMessage[]) => void;
   appendMessage: (sessionId: string, message: ChatMessage) => void;
 }

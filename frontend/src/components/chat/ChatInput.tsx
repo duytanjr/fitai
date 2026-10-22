@@ -17,12 +17,14 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault();
     const trimmed = value.trim();
-    if (!trimmed || loading) return;
+    if (!trimmed || loading || disabled) return;
 
     setLoading(true);
-    setValue("");
     try {
       await onSend(trimmed);
+      setValue(""); // Chỉ xóa ô nhập khi gửi thành công
+    } catch {
+      // Giữ lại nội dung ô nhập để người dùng gửi lại nếu lỗi
     } finally {
       setLoading(false);
       textareaRef.current?.focus();

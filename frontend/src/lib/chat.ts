@@ -14,20 +14,22 @@ export interface ChatMessage {
   created_at: string;
 }
 
-export interface SendMessageRequest {
-  content: string;
+export interface SendChatRequest {
+  message: string;
+  session_id?: string;
+}
+
+export interface SendChatResponse {
+  session_id: string;
+  reply: string;
 }
 
 export const chatApi = {
-  createSession: () => apiClient.post<ChatSession>("/chat/sessions", {}),
+  sendMessage: (data: SendChatRequest) =>
+    apiClient.post<SendChatResponse>("/chat", data),
 
   getSessions: () => apiClient.get<ChatSession[]>("/chat/sessions"),
 
-  getMessages: (sessionId: string) =>
+  getSessionMessages: (sessionId: string) =>
     apiClient.get<ChatMessage[]>(`/chat/sessions/${sessionId}/messages`),
-
-  sendMessage: (sessionId: string, content: string) =>
-    apiClient.post<ChatMessage>(`/chat/sessions/${sessionId}/messages`, {
-      content,
-    }),
 };
