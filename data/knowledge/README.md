@@ -33,3 +33,35 @@ Khi muốn bổ sung một tài liệu tri thức vào hệ thống, thực hi�
    * `source_url`: Đường dẫn nguồn hoặc DOI (nếu có, nếu không để trống).
    * `license_note`: Giấy phép sử dụng hoặc ghi chú bản quyền (nếu chưa rõ để trống).
    * `notes`: Ghi chú đối tượng áp dụng hoặc phạm vi khuyến nghị.
+3. **Nạp vào ChromaDB:** chạy script nạp (xem mục 3).
+
+---
+
+## 3. Nạp tài liệu vào ChromaDB
+
+Thư mục `data/` được mount chỉ đọc vào container backend tại `/app/data`.
+
+```bash
+# Nạp / cập nhật (chạy lại nhiều lần không nhân đôi; đoạn không đổi sẽ không embedding lại)
+docker exec fitai_backend python scripts/ingest_knowledge.py
+
+# Xem trước kết quả làm sạch và chia đoạn, không gọi API, không ghi DB
+docker exec fitai_backend python scripts/ingest_knowledge.py --dry-run
+
+# Xoá collection và nạp lại từ đầu
+docker exec fitai_backend python scripts/ingest_knowledge.py --reset
+
+# Thử truy xuất (không gọi LLM): in top-k kèm điểm tương đồng cosine
+docker exec fitai_backend python scripts/rag_smoke.py "Nên ăn bao nhiêu protein khi giảm cân?"
+```
+
+> ⚠️ **Đổi model embedding (`EMBEDDING_MODEL`) thì BẮT BUỘC chạy ingest với `--reset`.**
+> Vector của các model khác nhau không so sánh được với nhau; script sẽ từ chối nạp
+> vào collection được tạo bằng model khác.
+
+Ghi chú:
+* Số trang lưu trong metadata là **số trang PDF (đếm từ 1)**, không phải số in trên giấy.
+* Bảng (Table N) được dựng lại thành từng hàng dạng `tên cột: giá trị` và gắn cờ `is_table`;
+  bảng không dựng lại được hàng/cột sẽ không được nạp (script in rõ bảng nào).
+* Điểm truy xuất = độ tương đồng cosine (1 − khoảng cách); ngưỡng lọc cấu hình bằng
+  `RAG_SIMILARITY_THRESHOLD`.

@@ -36,12 +36,20 @@ class Settings(BaseSettings):
 
     # Google Gemini AI
     GOOGLE_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-1.5-pro"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    # Đổi model embedding thì phải chạy lại ingest với --reset (vector cũ không còn so sánh được)
+    EMBEDDING_MODEL: str = "models/gemini-embedding-001"
 
     # ChromaDB
     CHROMA_HOST: str = "localhost"
     CHROMA_PORT: int = 8000
     CHROMA_COLLECTION_NAME: str = "fitai_knowledge"
+
+    # RAG
+    KNOWLEDGE_DIR: str = "data/knowledge"
+    RAG_TOP_K: int = 5
+    # Ngưỡng độ tương đồng cosine (1 - khoảng cách); tạm thời, chốt sau khi chạy rag_smoke
+    RAG_SIMILARITY_THRESHOLD: float = 0.65
 
     # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []

@@ -39,6 +39,7 @@ services:
         condition: service_started
     volumes:
       - ./backend:/app          # hot-reload in development
+      - ./data:/app/data:ro     # kho tri thức RAG (chỉ đọc)
     command: >
       uvicorn main:app
         --host 0.0.0.0
@@ -66,13 +67,14 @@ services:
 
   # ── ChromaDB Vector Store ────────────────────────────────────────────────────
   chromadb:
-    image: chromadb/chroma:latest
+    # Ghim cùng phiên bản với chromadb-client trong backend/requirements.txt
+    image: chromadb/chroma:1.5.9
     container_name: fitai_chromadb
     restart: unless-stopped
     ports:
       - "8001:8000"
     volumes:
-      - chroma_data:/chroma/chroma
+      - chroma_data:/data       # Chroma 1.x lưu dữ liệu tại /data (persist_path)
 
   # ── pgAdmin (optional dev tool) ──────────────────────────────────────────────
   pgadmin:
