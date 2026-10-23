@@ -93,7 +93,11 @@ next-env.d.ts
 postgres_data/
 chroma_data/
 chroma/
-data/
 *.sqlite
 *.sqlite3
 *.db
+
+# ==============================================================================
+# Knowledge Base (RAG)
+# ==============================================================================
+data/knowledge/raw/*.pdf
