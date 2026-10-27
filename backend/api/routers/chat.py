@@ -29,16 +29,18 @@ async def send_chat_message(
     - Tạo session mới nếu không truyền session_id.
     - Kiểm tra quyền sở hữu nếu truyền session_id (404 nếu không khớp).
     - Nạp 10 tin nhắn trước đó làm ngữ cảnh hội thoại.
-    - Cá nhân hóa system prompt từ hồ sơ và chỉ số của user.
-    - Lưu tin nhắn vào DB chỉ khi AI phản hồi thành công.
+    - Cá nhân hóa system prompt từ hồ sơ; agent tự gọi search_knowledge (RAG) và
+      calc_body_metrics (đọc hồ sơ của chính user này).
+    - Trả kèm `sources`: các đoạn tài liệu đã dùng (tối đa 5, bỏ trùng tài liệu + trang).
+    - Lưu tin nhắn (kèm sources) vào DB chỉ khi AI phản hồi thành công.
     """
     service = ChatService(db)
-    session_id, reply = await service.handle_chat(
+    session_id, reply, sources = await service.handle_chat(
         user_id=current_user.id,
         message=body.message,
         session_id=body.session_id,
     )
-    return ChatResponse(session_id=session_id, reply=reply)
+    return ChatResponse(session_id=session_id, reply=reply, sources=sources)
 
 
 @router.get("/sessions", response_model=list[ChatSessionOut])

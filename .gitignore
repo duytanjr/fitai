@@ -101,3 +101,6 @@ chroma/
 # Knowledge Base (RAG)
 # ==============================================================================
 data/knowledge/raw/*.pdf
+
+# Bản xuất mẫu để rà soát RAG (không commit)
+data/knowledge/_review/

@@ -8,8 +8,7 @@ from fastapi import HTTPException, status
 
 from models.chat import ChatSession, ChatMessage
 from models.profile import UserProfile
-from services.ai_agents.fitness_advisor import fitness_agent, ChatAgentException
-from services.metrics_service import calculate_user_metrics
+from services.ai_agents.fitness_advisor import AgentToolContext, ChatAgentException, fitness_agent
 
 
 class ChatService:
@@ -23,14 +22,14 @@ class ChatService:
         user_id: uuid.UUID,
         message: str,
         session_id: Optional[uuid.UUID] = None,
-    ) -> tuple[uuid.UUID, str]:
+    ) -> tuple[uuid.UUID, str, list[dict]]:
         """Xử lý luồng chat chuẩn:
 
         1. Kiểm tra quyền session (nếu có); nếu mới tạo UUID mới.
         2. Lấy 10 tin nhắn gần nhất TRƯỚC tin hiện tại làm ngữ cảnh.
-        3. Đọc hồ sơ và tính toán chỉ số sức khỏe (nếu đủ).
+        3. Đọc hồ sơ (chỉ thông tin cơ bản; con số chỉ số do công cụ calc_body_metrics tính).
         4. Gọi agent AI (không giữ transaction DB mở trong lúc chờ LLM).
-        5. Chỉ khi gọi AI thành công mới lưu cả tin user và tin AI trong 1 transaction.
+        5. Chỉ khi gọi AI thành công mới lưu cả tin user và tin AI (kèm sources) trong 1 transaction.
         """
         is_new_session = False
         target_session_id = session_id
@@ -67,11 +66,8 @@ class ChatService:
             for m in reversed(recent_msgs):
                 history.append({"role": m.role, "content": m.content})
 
-        # ── Bước 3: Lấy hồ sơ và chỉ số sức khỏe của user ─────────────────────
-        profile_stmt = select(UserProfile).where(UserProfile.user_id == user_id)
-        profile_res = await self.db.execute(profile_stmt)
-        profile = profile_res.scalar_one_or_none()
-
+        # ── Bước 3: Lấy hồ sơ của user (KHÔNG đưa chỉ số tính toán vào prompt) ──
+        profile = await self._load_profile(user_id)
         profile_data = None
         if profile is not None:
             profile_data = {
@@ -82,46 +78,21 @@ class ChatService:
                 "activity_level": profile.activity_level,
                 "fitness_goal": profile.fitness_goal,
                 "dietary_restrictions": profile.dietary_restrictions,
-                "metrics": None,
             }
-            # Kiểm tra xem có đủ 6 trường cốt lõi để tính metrics không
-            required_fields = ["age", "gender", "height_cm", "weight_kg", "activity_level", "fitness_goal"]
-            if all(getattr(profile, f, None) is not None for f in required_fields):
-                try:
-                    m = calculate_user_metrics(
-                        age=profile.age,
-                        gender=profile.gender,
-                        height_cm=profile.height_cm,
-                        weight_kg=profile.weight_kg,
-                        activity_level=profile.activity_level,
-                        fitness_goal=profile.fitness_goal,
-                    )
-                    profile_data["metrics"] = {
-                        "is_complete": True,
-                        "bmi": m.bmi,
-                        "bmi_category": m.bmi_category,
-                        "bmr": m.bmr,
-                        "tdee": m.tdee,
-                        "target_calories": m.target_calories,
-                        "calorie_floor_applied": m.calorie_floor_applied,
-                        "protein_g": m.protein_g,
-                        "fat_g": m.fat_g,
-                        "carb_g": m.carb_g,
-                    }
-                except Exception:
-                    profile_data["metrics"] = {"is_complete": False}
-            else:
-                profile_data["metrics"] = {"is_complete": False}
 
         # ── Bước 4: Gọi FitnessAdvisorAgent ────────────────────────────────────
+        # Công cụ calc_body_metrics chỉ đọc được hồ sơ của user_id lấy từ JWT
+        tool_context = AgentToolContext(load_profile=lambda: self._load_profile(user_id))
         try:
             ai_reply = await fitness_agent.chat(
                 history=history,
                 user_message=message,
                 profile_data=profile_data,
+                tool_context=tool_context,
             )
         except ChatAgentException as e:
             raise HTTPException(status_code=e.status_code, detail=e.message)
+        sources = tool_context.sources
 
         # ── Bước 5: Lưu cả tin user và tin AI trong 1 transaction an toàn ──────
         try:
@@ -146,6 +117,7 @@ class ChatService:
                 session_id=target_session_id,
                 role="assistant",
                 content=ai_reply,
+                sources=sources or None,
                 created_at=now + timedelta(microseconds=50),
             )
             self.db.add(user_msg)
@@ -161,7 +133,11 @@ class ChatService:
                 detail="Không thể lưu lịch sử cuộc trò chuyện. Vui lòng thử lại sau.",
             )
 
-        return target_session_id, ai_reply
+        return target_session_id, ai_reply, sources
+
+    async def _load_profile(self, user_id: uuid.UUID) -> Optional[UserProfile]:
+        res = await self.db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+        return res.scalar_one_or_none()
 
     async def get_user_sessions(self, user_id: uuid.UUID) -> list[ChatSession]:
         """Lấy danh sách các phiên chat của user, mới nhất xếp trước."""

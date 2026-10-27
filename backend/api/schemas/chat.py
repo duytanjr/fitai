@@ -28,10 +28,19 @@ class ChatMessageCreate(BaseModel):
         return trimmed
 
 
+class SourceOut(BaseModel):
+    """Một nguồn trích dẫn (đoạn tài liệu RAG) của câu trả lời AI."""
+    title: str
+    authors_org: Optional[str] = None
+    year: Optional[int | str] = None
+    page: Optional[int] = Field(None, description="Số trang PDF (đếm từ 1)")
+
+
 class ChatResponse(BaseModel):
     """Kết quả trả về từ chatbot."""
     session_id: uuid.UUID
     reply: str
+    sources: list[SourceOut] = Field(default_factory=list)
 
 
 class ChatSessionOut(BaseModel):
@@ -49,6 +58,13 @@ class ChatMessageOut(BaseModel):
     session_id: uuid.UUID
     role: str
     content: str
+    sources: list[SourceOut] = Field(default_factory=list)
     created_at: datetime
+
+    @field_validator("sources", mode="before")
+    @classmethod
+    def null_sources_to_empty(cls, v):
+        # Tin nhắn user và tin nhắn cũ (trước FR5) có sources = NULL
+        return v or []
 
     model_config = {"from_attributes": True}

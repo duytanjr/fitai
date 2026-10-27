@@ -133,6 +133,7 @@ export function ChatView() {
         session_id: res.session_id,
         role: "assistant",
         content: res.reply,
+        sources: res.sources ?? [],
         created_at: new Date().toISOString(),
       };
 
@@ -245,6 +246,7 @@ export function ChatView() {
                   key={msg.id}
                   role={msg.role}
                   content={msg.content}
+                  sources={msg.sources}
                   createdAt={msg.created_at}
                 />
               ))}

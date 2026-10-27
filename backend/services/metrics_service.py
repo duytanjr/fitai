@@ -230,3 +230,47 @@ def calculate_user_metrics(
         fat_g=fat_g,
         carb_g=carb_g,
     )
+
+
+# ── Tóm tắt chỉ số từ hồ sơ (dùng cho API và công cụ calc_body_metrics của agent) ──
+REQUIRED_METRICS_FIELDS = [
+    "age",
+    "gender",
+    "height_cm",
+    "weight_kg",
+    "activity_level",
+    "fitness_goal",
+]
+
+
+def profile_metrics_summary(profile) -> dict:
+    """Tính chỉ số từ một đối tượng hồ sơ (có các thuộc tính như UserProfile) hoặc None.
+
+    Hồ sơ chưa đủ trường bắt buộc → {"is_complete": False, "missing_fields": [...]}.
+    """
+    if profile is None:
+        return {"is_complete": False, "missing_fields": list(REQUIRED_METRICS_FIELDS)}
+    missing = [f for f in REQUIRED_METRICS_FIELDS if getattr(profile, f, None) is None]
+    if missing:
+        return {"is_complete": False, "missing_fields": missing}
+    m = calculate_user_metrics(
+        age=profile.age,
+        gender=profile.gender,
+        height_cm=profile.height_cm,
+        weight_kg=profile.weight_kg,
+        activity_level=profile.activity_level,
+        fitness_goal=profile.fitness_goal,
+    )
+    return {
+        "is_complete": True,
+        "missing_fields": [],
+        "bmi": m.bmi,
+        "bmi_category": m.bmi_category,
+        "bmr": m.bmr,
+        "tdee": m.tdee,
+        "target_calories": m.target_calories,
+        "calorie_floor_applied": m.calorie_floor_applied,
+        "protein_g": m.protein_g,
+        "fat_g": m.fat_g,
+        "carb_g": m.carb_g,
+    }

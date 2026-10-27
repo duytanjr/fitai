@@ -7,18 +7,9 @@ from models.user import User
 from models.profile import UserProfile
 from api.dependencies.auth import get_current_user
 from api.schemas.profile import ProfileOut, ProfileUpdate, ProfileMetricsOut
-from services.metrics_service import calculate_user_metrics
+from services.metrics_service import REQUIRED_METRICS_FIELDS, calculate_user_metrics
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
-
-REQUIRED_METRICS_FIELDS = [
-    "age",
-    "gender",
-    "height_cm",
-    "weight_kg",
-    "activity_level",
-    "fitness_goal",
-]
 
 
 @router.get("", response_model=ProfileOut)

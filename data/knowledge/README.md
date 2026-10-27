@@ -55,6 +55,15 @@ docker exec fitai_backend python scripts/ingest_knowledge.py --reset
 docker exec fitai_backend python scripts/rag_smoke.py "Nên ăn bao nhiêu protein khi giảm cân?"
 ```
 
+**Thử truy xuất với câu hỏi tuỳ ý** (`rag_smoke.py`, không gọi LLM): truyền một hoặc nhiều
+câu hỏi trong dấu ngoặc kép; `-k` chọn số đoạn trả về, `--snippet` độ dài trích đoạn.
+Dấu `✓` đánh dấu đoạn qua ngưỡng `RAG_SIMILARITY_THRESHOLD` hiện tại.
+
+```bash
+docker exec fitai_backend python scripts/rag_smoke.py "câu hỏi của bạn"
+docker exec fitai_backend python scripts/rag_smoke.py -k 3 --snippet 200 "câu hỏi 1" "câu hỏi 2"
+```
+
 > ⚠️ **Đổi model embedding (`EMBEDDING_MODEL`) thì BẮT BUỘC chạy ingest với `--reset`.**
 > Vector của các model khác nhau không so sánh được với nhau; script sẽ từ chối nạp
 > vào collection được tạo bằng model khác.

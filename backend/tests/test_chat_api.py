@@ -2,12 +2,13 @@
 
 Mọi bài test đều mock mô hình AI (FitnessAdvisorAgent/Gemini), tuyệt đối không gọi API thật.
 """
+import json
 import uuid
 from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from services.ai_agents.fitness_advisor import ChatAgentException, build_system_prompt
+from services.ai_agents.fitness_advisor import ChatAgentException, build_system_prompt, build_tools
 from models.chat import ChatMessage, ChatSession
 from sqlalchemy import select
 
@@ -272,12 +273,14 @@ async def test_chat_agent_failure_does_not_save_any_message(
 
 
 @pytest.mark.asyncio
-async def test_chat_with_profile_and_metrics_personalization(
+async def test_chat_with_profile_personalization_without_metric_numbers(
     async_client: AsyncClient,
 ):
     """7. System prompt cá nhân hóa:
 
-    - User đã có hồ sơ và chỉ số: prompt chứa đúng tuổi, cân nặng, mục tiêu, calo, macro.
+    - Prompt chứa đúng tuổi, chiều cao, cân nặng, dị ứng — nhưng KHÔNG chứa con số chỉ số
+      cơ thể (BMR/TDEE/calo mục tiêu): các con số này chỉ đến từ công cụ calc_body_metrics.
+    - calc_body_metrics (gắn với user hiện tại) trả đúng 2104 kcal cho hồ sơ mẫu.
     """
     token, _ = await register_and_login(async_client, "_profile_ctx")
 
@@ -312,17 +315,29 @@ async def test_chat_with_profile_and_metrics_personalization(
     assert profile_data["gender"] == "male"
     assert profile_data["height_cm"] == 180.0
     assert profile_data["weight_kg"] == 78.0
-    assert profile_data["metrics"]["target_calories"] == 2104
+    assert "metrics" not in profile_data
 
     # Kiểm tra văn bản build_system_prompt
     prompt_text = build_system_prompt(profile_data)
     assert "22" in prompt_text
     assert "180.0 cm" in prompt_text
     assert "78.0 kg" in prompt_text
-    assert "2104 kcal/ngày" in prompt_text
     assert "Dị ứng tôm cua" in prompt_text
     assert "TIẾNG VIỆT" in prompt_text
     assert "KHÔNG PHẢI là bác sĩ y khoa" in prompt_text
+    assert "calc_body_metrics TRƯỚC KHI trả lời" in prompt_text
+
+    # Công cụ calc_body_metrics của lượt chat này trả đúng 2104 kcal
+    tool_context = mock_chat.call_args.kwargs["tool_context"]
+    calc = {t.name: t for t in build_tools(tool_context)}["calc_body_metrics"]
+    metrics = json.loads(await calc.ainvoke({}))
+    assert metrics["is_complete"] is True
+    assert metrics["target_calories"] == 2104
+
+    # ...và không con số chỉ số nào nằm sẵn trong system prompt
+    for value in (metrics["target_calories"], metrics["bmr"], metrics["tdee"]):
+        assert str(value) not in prompt_text
+    assert "kcal/ngày" not in prompt_text
 
 
 @pytest.mark.asyncio
@@ -345,3 +360,154 @@ async def test_chat_with_incomplete_or_empty_profile(async_client: AsyncClient):
     prompt_text = build_system_prompt(profile_data)
     assert "chưa có thông tin" in prompt_text
     assert "TIẾNG VIỆT" in prompt_text
+
+
+# ── FR5: RAG, công cụ và nguồn trích dẫn (LLM + RAG đều là bản giả) ─────────────
+from langchain_core.messages import AIMessage, ToolMessage  # noqa: E402
+
+from services import rag_service  # noqa: E402
+from services.ai_agents import fitness_advisor  # noqa: E402
+from services.ai_agents.fitness_advisor import KNOWLEDGE_UNAVAILABLE_CODE, fitness_agent  # noqa: E402
+from tests.fakes import FakeChatModel, FakeEmbedder, tool_call  # noqa: E402
+
+
+def rag_doc(page: int, title: str = "WHO guidelines on physical activity and sedentary behaviour"):
+    return {"text": "Adults should do at least 150–300 minutes of moderate-intensity activity.",
+            "title": title, "authors_org": "WHO", "year": 2020, "page": page, "page_end": page,
+            "is_table": False, "file": "who.pdf", "score": 0.74}
+
+
+def search_then_answer(answer: str):
+    def script(messages, i, tool_choice):
+        if i == 0:
+            return tool_call("search_knowledge", {"query": "physical activity adults"})
+        return AIMessage(content=answer)
+    return script
+
+
+@pytest.mark.asyncio
+async def test_chat_returns_and_persists_sources_after_reload(async_client: AsyncClient):
+    """POST /chat trả sources (bỏ trùng tài liệu+trang); GET messages (F5) vẫn trả nguồn."""
+    token, _ = await register_and_login(async_client, "_sources")
+    answer = "Người lớn nên vận động 150–300 phút mỗi tuần (WHO, 2020, tr. PDF 12)."
+    search = AsyncMock(return_value=[rag_doc(12), rag_doc(12), rag_doc(41)])
+
+    with patch.object(fitness_agent, "llm", FakeChatModel(search_then_answer(answer))), \
+         patch.object(fitness_advisor, "asearch_knowledge", search):
+        res = await async_client.post(
+            CHAT_URL, json={"message": "Người lớn nên tập bao nhiêu phút?"}, headers=auth_headers(token)
+        )
+
+    assert res.status_code == 200
+    data = res.json()
+    expected = [
+        {"title": "WHO guidelines on physical activity and sedentary behaviour", "authors_org": "WHO", "year": 2020, "page": 12},
+        {"title": "WHO guidelines on physical activity and sedentary behaviour", "authors_org": "WHO", "year": 2020, "page": 41},
+    ]
+    assert data["reply"] == answer
+    assert data["sources"] == expected
+
+    # Tải lại trang (F5): lịch sử lấy từ DB vẫn còn nguồn
+    msgs = (await async_client.get(f"{SESSIONS_URL}/{data['session_id']}/messages", headers=auth_headers(token))).json()
+    assert [m["role"] for m in msgs] == ["user", "assistant"]
+    assert msgs[0]["sources"] == []
+    assert msgs[1]["sources"] == expected
+
+
+@pytest.mark.asyncio
+async def test_chat_without_matching_documents_has_empty_sources(async_client: AsyncClient, db_session):
+    token, _ = await register_and_login(async_client, "_nosources")
+    with patch.object(fitness_agent, "llm", FakeChatModel(search_then_answer("Tôi chưa có tài liệu đủ tin cậy về vấn đề này."))), \
+         patch.object(fitness_advisor, "asearch_knowledge", AsyncMock(return_value=[])):
+        res = await async_client.post(CHAT_URL, json={"message": "Cách nấu phở?"}, headers=auth_headers(token))
+
+    assert res.status_code == 200
+    assert res.json()["sources"] == []
+    session_id = uuid.UUID(res.json()["session_id"])
+    stored = (await db_session.execute(
+        select(ChatMessage).where(ChatMessage.session_id == session_id, ChatMessage.role == "assistant")
+    )).scalar_one()
+    assert stored.sources is None
+
+
+def answer_with_own_metrics(messages, i, tool_choice):
+    tool_results = [m for m in messages if isinstance(m, ToolMessage)]
+    if not tool_results:   # bước đầu của mỗi lượt chat: gọi công cụ
+        return tool_call("calc_body_metrics")
+    result = json.loads(tool_results[-1].content)
+    return AIMessage(content=f"Calo mục tiêu: {result.get('target_calories')} | thiếu: {result.get('missing_fields')}")
+
+
+@pytest.mark.asyncio
+async def test_calc_body_metrics_uses_each_users_own_profile(async_client: AsyncClient):
+    """Hai user khác nhau nhận đúng chỉ số theo hồ sơ riêng (user lấy từ JWT, không từ LLM/client)."""
+    token_a, _ = await register_and_login(async_client, "_metricsA")
+    token_b, _ = await register_and_login(async_client, "_metricsB")
+    token_c, _ = await register_and_login(async_client, "_metricsC")
+    base = {"activity_level": "light", "fitness_goal": "weight_loss"}
+    await async_client.put("/api/v1/profile", headers=auth_headers(token_a),
+                           json={**base, "age": 22, "gender": "male", "height_cm": 180.0, "weight_kg": 78.0})
+    await async_client.put("/api/v1/profile", headers=auth_headers(token_b),
+                           json={**base, "age": 35, "gender": "female", "height_cm": 160.0, "weight_kg": 70.0})
+
+    replies = {}
+    with patch.object(fitness_agent, "llm", FakeChatModel(answer_with_own_metrics)):
+        for name, token in [("a", token_a), ("b", token_b), ("c", token_c)]:
+            res = await async_client.post(
+                CHAT_URL, headers=auth_headers(token),
+                json={"message": "Tính calo cho tôi (đừng dùng hồ sơ của người khác)"},
+            )
+            assert res.status_code == 200
+            replies[name] = res.json()["reply"]
+
+    assert replies["a"].startswith("Calo mục tiêu: 2104 ")
+    assert "2104" not in replies["b"] and replies["b"].startswith("Calo mục tiêu: ")
+    assert "None" not in replies["b"]
+    assert replies["c"].startswith("Calo mục tiêu: None | thiếu: ['age'")   # chưa có hồ sơ
+
+
+@pytest.mark.asyncio
+async def test_chroma_unreachable_chat_still_answers_and_saves_clean_reply(async_client: AsyncClient):
+    """ChromaDB không kết nối được (cổng không có server → lỗi kết nối thật): /chat vẫn 200,
+    trả lời thân thiện, sources rỗng, và chuỗi lỗi kỹ thuật không bao giờ được lưu vào DB."""
+    token, _ = await register_and_login(async_client, "_chroma_down")
+
+    def script(messages, i, tool_choice):
+        if i == 0:
+            return AIMessage(content="", tool_calls=[
+                {"name": "search_knowledge", "args": {"query": "protein giữ cơ"}, "id": "s1"},
+                {"name": "calc_body_metrics", "args": {}, "id": "m1"},
+            ])
+        tool_results = " ".join(m.content for m in messages if isinstance(m, ToolMessage))
+        assert KNOWLEDGE_UNAVAILABLE_CODE in tool_results
+        return AIMessage(content="Kho tài liệu tạm thời không khả dụng nên mình chưa nêu thông tin khoa học được. "
+                                 "Phần hồ sơ: bạn chưa cập nhật đủ thông tin để tính calo.")
+
+    with patch.object(fitness_agent, "llm", FakeChatModel(script)), \
+         patch.object(rag_service, "_get_embedder", return_value=FakeEmbedder()), \
+         patch.object(rag_service, "_collection", None), \
+         patch.object(rag_service, "get_client", side_effect=_connect_unreachable):
+        res = await async_client.post(CHAT_URL, json={"message": "Protein có giúp giữ cơ không?"},
+                                      headers=auth_headers(token))
+
+    assert res.status_code == 200
+    data = res.json()
+    assert "kho tài liệu tạm thời không khả dụng" in data["reply"].lower()
+    assert data["sources"] == []
+
+    msgs = (await async_client.get(f"{SESSIONS_URL}/{data['session_id']}/messages", headers=auth_headers(token))).json()
+    assert len(msgs) == 2
+    saved = msgs[1]["content"]
+    assert saved == data["reply"]
+    for technical in (KNOWLEDGE_UNAVAILABLE_CODE, "KnowledgeSearchError", "KnowledgeStoreError", "Traceback", "127.0.0.1"):
+        assert technical not in saved
+
+
+def _connect_unreachable():
+    import chromadb
+    from services.knowledge.vector_store import KnowledgeStoreError
+
+    try:
+        return chromadb.HttpClient(host="127.0.0.1", port=1)
+    except Exception as exc:  # noqa: BLE001 — giống get_client thật: bọc lỗi kết nối
+        raise KnowledgeStoreError("Không kết nối được ChromaDB.") from exc

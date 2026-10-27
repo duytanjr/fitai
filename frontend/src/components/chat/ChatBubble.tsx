@@ -1,13 +1,23 @@
 import { cn } from "@/lib/utils";
+import type { ChatSource } from "@/lib/chat";
 
 interface ChatBubbleProps {
   role: "user" | "assistant";
   content: string;
+  sources?: ChatSource[];
   createdAt?: string;
 }
 
-export function ChatBubble({ role, content, createdAt }: ChatBubbleProps) {
+function formatSource(source: ChatSource): string {
+  const parts = [source.title];
+  if (source.year) parts.push(String(source.year));
+  if (source.page) parts.push(`tr. PDF ${source.page}`);
+  return parts.join(", ");
+}
+
+export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProps) {
   const isUser = role === "user";
+  const showSources = !isUser && !!sources && sources.length > 0;
 
   return (
     <div className={cn("flex w-full gap-3", isUser ? "justify-end" : "justify-start")}>
@@ -34,6 +44,18 @@ export function ChatBubble({ role, content, createdAt }: ChatBubbleProps) {
               {i < content.split("\n").length - 1 && <br />}
             </span>
           ))}
+
+          {/* Nguồn trích dẫn (FR5) — chỉ hiện khi câu trả lời có dùng tài liệu */}
+          {showSources && (
+            <div className="mt-3 border-t border-gray-100 pt-2 text-xs text-gray-500">
+              <p className="font-semibold text-gray-600">Tài liệu tham khảo</p>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                {sources!.map((source, i) => (
+                  <li key={`${source.title}-${source.page}-${i}`}>{formatSource(source)}</li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
 
         {createdAt && (
