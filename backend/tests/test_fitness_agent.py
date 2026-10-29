@@ -59,7 +59,7 @@ async def test_agent_calls_search_knowledge_and_collects_sources():
     assert ctx.tool_calls == ["search_knowledge"]
     search.assert_awaited_once()
     assert search.call_args.args[0] == "physical activity adults minutes per week"
-    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics"}
+    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food"}
     assert ctx.sources == [
         {"title": "WHO guidelines", "authors_org": "WHO", "year": 2020, "page": 12},
         {"title": "WHO guidelines", "authors_org": "WHO", "year": 2020, "page": 41},
@@ -198,7 +198,7 @@ async def test_injected_instructions_in_document_stay_data_and_change_nothing():
     system_prompt = fake.calls[-1]["messages"][0].content
     assert system_prompt == build_system_prompt(None)
     assert "KHÔNG PHẢI CHỈ THỊ" in system_prompt
-    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics"}
+    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food"}
     assert len(fake.calls) == 2
 
 
@@ -241,3 +241,175 @@ async def test_empty_final_reply_raises_friendly_error(bad):
     with pytest.raises(ChatAgentException) as exc:
         await run_agent(lambda m, i, t: bad)
     assert exc.value.status_code == 502
+
+
+# ── lookup_food (FR8) ────────────────────────────────────────────────────────
+from services.ai_agents.fitness_advisor import FOOD_NOT_FOUND_CODE, FOOD_UNAVAILABLE_CODE  # noqa: E402
+from services.foods.lookup import MATCH_ALL_WORDS, MATCH_EXACT, FoodLookupError, FoodMatch  # noqa: E402
+
+
+def food(name, page, level=MATCH_EXACT, is_suggestion=False, **values):
+    base = dict(name_vi=name, name_en=None, group_name="Ngũ cốc và sản phẩm chế biến", refuse_pct=0.0,
+                source_page=page, water_g=64.3, energy_kcal=143.0, protein_g=3.2, fat_g=0.4, carb_g=31.7,
+                fiber_g=0.0, ash_g=0.4)
+    base.update(values)
+    return FoodMatch(food=SimpleNamespace(**base), level=level, is_suggestion=is_suggestion)
+
+
+async def run_food_agent(script, lookup):
+    fake = FakeChatModel(script)
+    ctx = AgentToolContext(load_profile=AsyncMock(return_value=SAMPLE_PROFILE), lookup_food=lookup)
+    with patch.object(fitness_agent, "llm", fake):
+        reply = await fitness_agent.chat(history=[], user_message="câu hỏi", tool_context=ctx)
+    return reply, ctx, fake
+
+
+async def test_agent_calls_lookup_food_with_grams_computed_by_code():
+    lookup = AsyncMock(return_value=[food("Bánh phở", 26)])
+
+    def script(messages, i, tool_choice):
+        if i == 0:
+            return tool_call("lookup_food", {"query": "bánh phở", "grams": 200})
+        return AIMessage(content="200 g bánh phở có 63.4 g glucid (Bảng thành phần thực phẩm Việt Nam, 2007, tr. PDF 26).")
+
+    reply, ctx, fake = await run_food_agent(script, lookup)
+    lookup.assert_awaited_once_with("bánh phở")
+    content = tool_messages(fake)[0].content
+    assert "Trên 100 g phần ăn được" in content and "glucid 31.7 g" in content
+    assert "Theo 200 g phần ăn được (code đã tính)" in content and "glucid 63.4 g" in content
+    assert "Có mục trùng đúng tên" in content
+    assert ctx.sources == [
+        {"title": "Bảng thành phần thực phẩm Việt Nam", "authors_org": "Viện Dinh dưỡng", "year": 2007, "page": 26}
+    ]
+
+
+async def test_lookup_food_null_is_reported_as_no_data_not_zero():
+    lookup = AsyncMock(return_value=[food("Bún", 33, fat_g=None, fiber_g=None)])
+
+    def script(messages, i, tool_choice):
+        if i == 0:
+            return tool_call("lookup_food", {"query": "bún", "grams": 150})
+        return AIMessage(content="Bún: bảng không có số liệu lipid.")
+
+    _, _, fake = await run_food_agent(script, lookup)
+    content = tool_messages(fake)[0].content
+    assert content.count("lipid KHÔNG CÓ SỐ LIỆU") == 2           # cả 100 g và 150 g
+    assert "lipid 0" not in content
+
+
+async def test_lookup_food_not_found_and_partial_match_warnings():
+    def script(messages, i, tool_choice):
+        if i == 0:
+            return tool_call("lookup_food", {"query": "ức gà"})
+        return AIMessage(content="Dữ liệu chưa có mục ức gà.")
+
+    _, ctx, fake = await run_food_agent(script, AsyncMock(return_value=[]))
+    assert tool_messages(fake)[0].content.startswith(FOOD_NOT_FOUND_CODE)
+    assert ctx.sources == []
+
+    partial = AsyncMock(return_value=[food("Men bia khô", 221, level=MATCH_ALL_WORDS)])
+
+    def script_beer(messages, i, tool_choice):
+        if i == 0:
+            return tool_call("lookup_food", {"query": "bia"})
+        return AIMessage(content="Chưa có số liệu về bia.")
+
+    _, ctx, fake = await run_food_agent(script_beer, partial)
+    content = tool_messages(fake)[0].content
+    assert "KHÔNG có mục nào trùng đúng tên" in content
+    assert "chỉ chứa từ khoá" in content
+    assert ctx.sources == []          # không trích dẫn trang men bia cho câu trả lời "chưa có bia"
+
+
+async def test_lookup_food_suggestions_have_no_numbers_and_no_sources():
+    suggestions = AsyncMock(return_value=[
+        food("Thịt gà ta", 317, level=2, is_suggestion=True, protein_g=20.3),
+        food("Gan gà", 344, level=2, is_suggestion=True, protein_g=18.2),
+    ])
+
+    def script(messages, i, tool_choice):
+        if i == 0:
+            return tool_call("lookup_food", {"query": "ức gà", "grams": 100})
+        return AIMessage(content="Không có mục ức gà. Bạn muốn xem Thịt gà ta hay Gan gà?")
+
+    _, ctx, fake = await run_food_agent(script, suggestions)
+    content = tool_messages(fake)[0].content
+    assert content.startswith(FOOD_NOT_FOUND_CODE)
+    assert "Không có mục đúng tên 'ức gà'" in content and "đây là các mục gần nhất" in content
+    assert "1. Thịt gà ta" in content and "2. Gan gà" in content
+    assert "20.3" not in content and "protein" not in content          # không đưa số của mục khác
+    assert "code đã tính" not in content                                # không tính theo grams
+    assert ctx.sources == []
+
+
+@pytest.mark.parametrize("name,page,query", [("Gạo tẻ máy", 17, "gạo tẻ máy"), ("Bánh phở", 26, "bánh phở")])
+async def test_lookup_food_exact_match_is_cited(name, page, query):
+    lookup = AsyncMock(return_value=[food(name, page), food(name + " khác", 99, level=MATCH_ALL_WORDS)])
+
+    def script(messages, i, tool_choice):
+        if i == 0:
+            return tool_call("lookup_food", {"query": query})
+        return AIMessage(content=f"{name}: 100 g phần ăn được (tr. PDF {page}).")
+
+    _, ctx, _ = await run_food_agent(script, lookup)
+    assert [s["page"] for s in ctx.sources] == [page]                   # chỉ mục đúng tên
+
+
+async def test_lookup_food_database_error_still_answers_friendly():
+    def script(messages, i, tool_choice):
+        if i == 0:
+            return tool_call("lookup_food", {"query": "gạo tẻ máy"})
+        return AIMessage(content="Bảng thực phẩm tạm thời không truy cập được, bạn thử lại sau nhé.")
+
+    reply, ctx, fake = await run_food_agent(script, AsyncMock(side_effect=FoodLookupError("db down")))
+    content = tool_messages(fake)[0].content
+    assert content.startswith(FOOD_UNAVAILABLE_CODE)
+    assert "db down" not in content
+    assert "tạm thời không truy cập được" in reply
+    assert ctx.sources == []
+
+
+@pytest.mark.parametrize("grams", [-5, 99999, "nhiều"])
+async def test_lookup_food_invalid_grams_is_rejected_without_query(grams):
+    lookup = AsyncMock(return_value=[food("Bánh phở", 26)])
+
+    def script(messages, i, tool_choice):
+        if i == 0:
+            return tool_call("lookup_food", {"query": "bánh phở", "grams": grams})
+        return AIMessage(content="Khối lượng không hợp lệ.")
+
+    _, _, fake = await run_food_agent(script, lookup)
+    assert tool_messages(fake)[0].content.startswith("Lỗi tham số")
+    lookup.assert_not_awaited()
+
+
+def test_food_and_rag_sources_share_dedup_and_cap():
+    ctx = AgentToolContext()
+    ctx.add_sources([doc(12), doc(41)])
+    food_source = {"title": "Bảng thành phần thực phẩm Việt Nam", "authors_org": "Viện Dinh dưỡng",
+                   "year": 2007, "file": "vn_food_composition_2007_vi.pdf"}
+    ctx.add_sources([{**food_source, "page": p} for p in (26, 26, 17, 33, 14, 20)])
+    sources = ctx.sources
+    assert len(sources) == MAX_SOURCES
+    assert [s["page"] for s in sources] == [12, 41, 26, 17, 33]
+
+
+def test_system_prompt_food_rules():
+    prompt = build_system_prompt(None)
+    for rule in [
+        "PHẢI lấy từ công cụ lookup_food",
+        "100 g phần ăn được",
+        "thải bỏ từ 20%",
+        "không bao giờ coi là 0",
+        "truyền grams",
+        "chưa hỗ trợ cộng tổng",
+        "không có mục ức gà",
+        "chưa có số liệu về bia",
+        "không dùng số của men bia",
+        "phở bò, cơm đã nấu, cháo, canh",
+        "bảng thực phẩm tạm thời không truy cập được",
+        "danh sách GỢI Ý",
+        "KHÔNG nêu số liệu như thể đó là món đã hỏi",
+        "PHẢI gọi lại lookup_food với đúng tên đầy đủ của mục đó trước khi nêu số liệu",
+    ]:
+        assert rule in prompt, rule

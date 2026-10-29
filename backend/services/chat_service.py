@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from models.chat import ChatSession, ChatMessage
 from models.profile import UserProfile
 from services.ai_agents.fitness_advisor import AgentToolContext, ChatAgentException, fitness_agent
+from services.foods.lookup import search_foods
 
 
 class ChatService:
@@ -81,8 +82,12 @@ class ChatService:
             }
 
         # ── Bước 4: Gọi FitnessAdvisorAgent ────────────────────────────────────
-        # Công cụ calc_body_metrics chỉ đọc được hồ sơ của user_id lấy từ JWT
-        tool_context = AgentToolContext(load_profile=lambda: self._load_profile(user_id))
+        # Công cụ calc_body_metrics chỉ đọc được hồ sơ của user_id lấy từ JWT;
+        # lookup_food tra bảng foods bằng phiên DB của request (trong SAVEPOINT)
+        tool_context = AgentToolContext(
+            load_profile=lambda: self._load_profile(user_id),
+            lookup_food=lambda query: search_foods(self.db, query),
+        )
         try:
             ai_reply = await fitness_agent.chat(
                 history=history,

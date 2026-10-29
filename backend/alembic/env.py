@@ -18,6 +18,7 @@ from core.database import Base
 from models.user import User          # noqa: F401
 from models.profile import UserProfile  # noqa: F401
 from models.chat import ChatSession, ChatMessage  # noqa: F401
+from models.food import Food  # noqa: F401
 
 # ─── Alembic Config ──────────────────────────────────────────────────
 config = context.config

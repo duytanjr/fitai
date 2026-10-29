@@ -6,7 +6,8 @@ from core.config import settings
 # Async engine
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.DEBUG,
+    echo=settings.SQL_ECHO,
+    hide_parameters=True,   # không ghi tham số (có thể chứa từ khoá người dùng) vào log/lỗi
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,

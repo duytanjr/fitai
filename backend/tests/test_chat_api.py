@@ -503,6 +503,70 @@ async def test_chroma_unreachable_chat_still_answers_and_saves_clean_reply(async
         assert technical not in saved
 
 
+async def _add_test_food(db_session):
+    from models.food import Food
+
+    db_session.add(Food(
+        code=99901, stt=99901, name_vi="Bánh thử nghiệm FitAI", name_search="banh thu nghiem fitai",
+        group_code=1, group_name="Ngũ cốc và sản phẩm chế biến", refuse_pct=0.0, source_page=999,
+        water_g=60.0, energy_kcal=150.0, protein_g=4.0, fat_g=None, carb_g=33.0, fiber_g=0.5, ash_g=0.5,
+    ))
+    await db_session.flush()
+
+
+def lookup_then_answer(messages, i, tool_choice):
+    tool_results = [m for m in messages if isinstance(m, ToolMessage)]
+    if not tool_results:
+        return tool_call("lookup_food", {"query": "banh thu nghiem fitai", "grams": 200})
+    return AIMessage(content="Kết quả: " + tool_results[-1].content.split("\n")[0][:60])
+
+
+@pytest.mark.asyncio
+async def test_chat_lookup_food_adds_food_source_and_persists(async_client: AsyncClient, db_session):
+    """lookup_food tra bảng foods THẬT (Postgres) qua phiên DB của request; nguồn thực phẩm
+    được trả về và lưu cùng tin nhắn AI."""
+    await _add_test_food(db_session)
+    token, _ = await register_and_login(async_client, "_food_src")
+    fake = FakeChatModel(lookup_then_answer)
+    with patch.object(fitness_agent, "llm", fake):
+        res = await async_client.post(CHAT_URL, json={"message": "200 g bánh thử nghiệm?"}, headers=auth_headers(token))
+
+    assert res.status_code == 200
+    expected = [{"title": "Bảng thành phần thực phẩm Việt Nam", "authors_org": "Viện Dinh dưỡng", "year": 2007, "page": 999}]
+    assert res.json()["sources"] == expected
+    tool_text = [m for m in fake.calls[-1]["messages"] if isinstance(m, ToolMessage)][0].content
+    assert "Theo 200 g phần ăn được (code đã tính)" in tool_text
+    assert "glucid 66 g" in tool_text and "lipid KHÔNG CÓ SỐ LIỆU" in tool_text
+
+    msgs = (await async_client.get(f"{SESSIONS_URL}/{res.json()['session_id']}/messages", headers=auth_headers(token))).json()
+    assert msgs[1]["sources"] == expected
+
+
+@pytest.mark.asyncio
+async def test_chat_food_database_error_still_answers_and_saves(async_client: AsyncClient, db_session, monkeypatch):
+    """Lỗi SQL thật khi tra foods (trong SAVEPOINT): /chat vẫn 200 và vẫn lưu được tin nhắn."""
+    from services.foods import lookup as lookup_module
+    from services.ai_agents.fitness_advisor import FOOD_UNAVAILABLE_CODE
+
+    token, _ = await register_and_login(async_client, "_food_dberr")
+    monkeypatch.setattr(lookup_module, "CANDIDATE_LIMIT", -1)   # LIMIT âm → Postgres báo lỗi
+
+    def script(messages, i, tool_choice):
+        tool_results = [m for m in messages if isinstance(m, ToolMessage)]
+        if not tool_results:
+            return tool_call("lookup_food", {"query": "gạo tẻ máy"})
+        assert tool_results[-1].content.startswith(FOOD_UNAVAILABLE_CODE)
+        return AIMessage(content="Bảng thực phẩm tạm thời không truy cập được, bạn thử lại sau nhé.")
+
+    with patch.object(fitness_agent, "llm", FakeChatModel(script)):
+        res = await async_client.post(CHAT_URL, json={"message": "Gạo tẻ máy bao nhiêu calo?"}, headers=auth_headers(token))
+
+    assert res.status_code == 200
+    assert res.json()["sources"] == []
+    msgs = (await async_client.get(f"{SESSIONS_URL}/{res.json()['session_id']}/messages", headers=auth_headers(token))).json()
+    assert len(msgs) == 2 and FOOD_UNAVAILABLE_CODE not in msgs[1]["content"]
+
+
 def _connect_unreachable():
     import chromadb
     from services.knowledge.vector_store import KnowledgeStoreError

@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "FitAI Backend"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    # In câu SQL ra log (mặc định tắt, tách khỏi DEBUG). Tham số luôn bị ẩn (hide_parameters)
+    SQL_ECHO: bool = False
     ENVIRONMENT: str = "development"
 
     API_V1_STR: str = "/api/v1"
