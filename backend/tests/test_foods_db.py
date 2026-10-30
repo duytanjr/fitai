@@ -5,6 +5,7 @@ các test này được SKIP kèm lý do.
 """
 import logging
 import uuid
+from datetime import date
 
 import pytest
 from sqlalchemy import func, select, text
@@ -18,7 +19,8 @@ from models.food import Food
 from models.profile import UserProfile
 from models.user import User
 from services.foods import lookup as lookup_module
-from services.foods.ingest import analyse, load_foods
+from models.meal_log import MealLog, MealType
+from services.foods.ingest import FoodsReferencedError, analyse, load_foods
 from services.foods.lookup import (
     MAX_QUERY_LENGTH,
     SUGGESTION_LIMIT,
@@ -50,7 +52,9 @@ async def foods_session():
         await conn.close()
         await engine.dispose()
         pytest.skip(f"Bảng foods chưa có ({type(exc).__name__}) — hãy chạy alembic upgrade head")
-    await session.execute(text("DELETE FROM foods"))   # chỉ trong transaction, sẽ rollback
+    # chỉ trong transaction, sẽ rollback; meal_logs trước vì FK RESTRICT tới foods
+    await session.execute(text("DELETE FROM meal_logs"))
+    await session.execute(text("DELETE FROM foods"))
     try:
         yield session
     finally:
@@ -149,6 +153,39 @@ async def test_reset_does_not_touch_other_tables(foods_session):
     await seed(foods_session, reset=True)
     assert await counts() == before
     assert await count_foods(foods_session) == len(FIXTURE_FOODS)
+
+
+async def _log_meal_for(session: AsyncSession, code: int) -> User:
+    user = User(email=f"foods_ref_{uuid.uuid4().hex[:8]}@fitai.vn", hashed_password=get_password_hash("x"))
+    session.add(user)
+    await session.flush()
+    food = (await session.execute(select(Food).where(Food.code == code))).scalar_one()
+    session.add(MealLog(user_id=user.id, food_id=food.id, eaten_on=date(2026, 10, 29), meal_type=MealType.SANG,
+                        grams=100, energy_kcal=food.energy_kcal))
+    await session.flush()
+    return user
+
+
+async def test_reset_refused_when_meal_logs_reference_foods(foods_session):
+    await seed(foods_session)
+    await _log_meal_for(foods_session, 1013)
+    with pytest.raises(FoodsReferencedError, match="--reset bị từ chối: 1 thực phẩm đang được 1 mục"):
+        await seed(foods_session, reset=True)
+    assert await count_foods(foods_session) == len(FIXTURE_FOODS)          # không xoá gì
+    assert (await foods_session.execute(select(func.count()).select_from(MealLog))).scalar_one() == 1
+
+
+async def test_reload_keeps_stale_codes_still_referenced(foods_session):
+    await seed(foods_session)
+    await _log_meal_for(foods_session, 1001)                               # "Gạo nếp cái" có nhật ký
+    before_id = (await foods_session.execute(select(Food.id).where(Food.code == 1013))).scalar_one()
+    stats = await seed(foods_session, foods=FIXTURE_FOODS[:3])             # 1001 không còn trong lần nạp
+    assert stats.kept_referenced == [1001]
+    assert stats.deleted_stale == len(FIXTURE_FOODS) - 3 - 1
+    codes = set((await foods_session.execute(select(Food.code))).scalars())
+    assert codes == {f.code for f in FIXTURE_FOODS[:3]} | {1001}
+    # upsert theo mã số giữ nguyên id → nhật ký vẫn trỏ đúng thực phẩm
+    assert (await foods_session.execute(select(Food.id).where(Food.code == 1013))).scalar_one() == before_id
 
 
 # ── Tra cứu ──────────────────────────────────────────────────────────────────

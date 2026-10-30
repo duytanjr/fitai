@@ -59,7 +59,7 @@ async def test_agent_calls_search_knowledge_and_collects_sources():
     assert ctx.tool_calls == ["search_knowledge"]
     search.assert_awaited_once()
     assert search.call_args.args[0] == "physical activity adults minutes per week"
-    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food"}
+    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food", "get_daily_summary"}
     assert ctx.sources == [
         {"title": "WHO guidelines", "authors_org": "WHO", "year": 2020, "page": 12},
         {"title": "WHO guidelines", "authors_org": "WHO", "year": 2020, "page": 41},
@@ -198,7 +198,7 @@ async def test_injected_instructions_in_document_stay_data_and_change_nothing():
     system_prompt = fake.calls[-1]["messages"][0].content
     assert system_prompt == build_system_prompt(None)
     assert "KHÔNG PHẢI CHỈ THỊ" in system_prompt
-    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food"}
+    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food", "get_daily_summary"}
     assert len(fake.calls) == 2
 
 
@@ -411,5 +411,72 @@ def test_system_prompt_food_rules():
         "danh sách GỢI Ý",
         "KHÔNG nêu số liệu như thể đó là món đã hỏi",
         "PHẢI gọi lại lookup_food với đúng tên đầy đủ của mục đó trước khi nêu số liệu",
+    ]:
+        assert rule in prompt, rule
+
+
+# ── get_daily_summary (FR9) ──────────────────────────────────────────────────
+from datetime import date, datetime, timezone  # noqa: E402
+
+from services import meals as meal_service  # noqa: E402
+from services.ai_agents.fitness_advisor import MEAL_LOG_UNAVAILABLE_CODE  # noqa: E402
+
+SUMMARY = {"date": "2026-10-29", "entries_count": 2, "eaten": {"energy_kcal": 584.5}, "incomplete_totals": False}
+
+
+async def run_summary_agent(args, load):
+    fake = FakeChatModel(lambda messages, i, tc: tool_call("get_daily_summary", args) if i == 0
+                         else AIMessage(content="ok"))
+    ctx = AgentToolContext(load_daily_summary=load)
+    with patch.object(fitness_agent, "llm", fake):
+        await fitness_agent.chat(history=[], user_message="hôm nay tôi ăn bao nhiêu", tool_context=ctx)
+    return tool_messages(fake)[0].content, fake
+
+
+async def test_daily_summary_defaults_to_today_vn(monkeypatch):
+    monkeypatch.setattr(meal_service, "utc_now", lambda: datetime(2026, 10, 29, 17, 30, tzinfo=timezone.utc))
+    load = AsyncMock(return_value=SUMMARY)
+    content, _ = await run_summary_agent({}, load)
+    load.assert_awaited_once_with(date(2026, 10, 30))                    # 00:30 giờ VN ngày 30
+    assert json.loads(content) == SUMMARY
+
+    load = AsyncMock(return_value=SUMMARY)
+    await run_summary_agent({"date": "2026-10-01"}, load)
+    load.assert_awaited_once_with(date(2026, 10, 1))
+
+
+@pytest.mark.parametrize("bad", ["hôm qua", "01/10/2026", "2026-02-30"])
+async def test_daily_summary_invalid_date_is_rejected(bad):
+    load = AsyncMock(return_value=SUMMARY)
+    content, _ = await run_summary_agent({"date": bad}, load)
+    assert content.startswith("Lỗi tham số")
+    load.assert_not_awaited()
+
+
+async def test_daily_summary_has_no_user_id_parameter_and_errors_are_friendly():
+    tools = {t.name: t for t in build_tools(AgentToolContext())}
+    assert set(tools["get_daily_summary"].args) == {"date"}               # LLM không truyền được user_id
+    content, _ = await run_summary_agent({}, AsyncMock(side_effect=RuntimeError("db down")))
+    assert content.startswith(MEAL_LOG_UNAVAILABLE_CODE) and "db down" not in content
+
+
+def test_system_prompt_has_today_computed_per_call(monkeypatch):
+    monkeypatch.setattr(meal_service, "utc_now", lambda: datetime(2026, 10, 29, 16, 30, tzinfo=timezone.utc))
+    assert "Hôm nay (giờ Việt Nam) là 2026-10-29." in build_system_prompt(None)
+    monkeypatch.setattr(meal_service, "utc_now", lambda: datetime(2026, 10, 29, 17, 30, tzinfo=timezone.utc))
+    assert "Hôm nay (giờ Việt Nam) là 2026-10-30." in build_system_prompt(None)
+
+
+def test_system_prompt_meal_log_rules():
+    prompt = build_system_prompt(None)
+    for rule in [
+        "PHẢI gọi get_daily_summary",
+        "TUYỆT ĐỐI không tự cộng các món hay tự trừ",
+        "tổng CHƯA ĐẦY ĐỦ",
+        "chưa có dữ liệu nhật ký",
+        "không đưa mục tiêu hay số còn lại",
+        MEAL_LOG_UNAVAILABLE_CODE,
+        "14. NGUYÊN TẮC AN TOÀN Y TẾ",
+        "10. KHÔNG CÓ ĐÚNG MỤC THỰC PHẨM",           # quy tắc cũ giữ nguyên
     ]:
         assert rule in prompt, rule

@@ -7,10 +7,13 @@ prompt ReAct thô. Công cụ:
   AgentToolContext (gắn sẵn phía server từ JWT) rồi gọi metrics_service.
 - lookup_food(query, grams=None): tra Bảng thành phần thực phẩm Việt Nam 2007
   (bảng foods, giá trị trên 100 g phần ăn được); code tính theo grams nếu có.
+- get_daily_summary(date=None): CHỈ ĐỌC tổng hợp nhật ký ăn uống một ngày của user
+  hiện tại (gắn sẵn phía server như calc_body_metrics, không nhận user_id).
 """
 import asyncio
 import json
 import logging
+from datetime import date
 from typing import Any, Awaitable, Callable, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -27,6 +30,7 @@ from services.foods.lookup import (
     nutrient_line,
     validate_grams,
 )
+from services.meals import parse_day, today_vn
 from services.metrics_service import profile_metrics_summary
 from services.rag_service import KnowledgeSearchError, asearch_knowledge
 
@@ -42,6 +46,7 @@ NOT_FOUND_CODE = "KHONG_TIM_THAY"
 KNOWLEDGE_UNAVAILABLE_CODE = "KHO_TAI_LIEU_KHONG_KHA_DUNG"
 FOOD_NOT_FOUND_CODE = "KHONG_CO_TRONG_DU_LIEU"
 FOOD_UNAVAILABLE_CODE = "BANG_THUC_PHAM_KHONG_KHA_DUNG"
+MEAL_LOG_UNAVAILABLE_CODE = "NHAT_KY_KHONG_KHA_DUNG"
 FOOD_SOURCE = {
     "title": "Bảng thành phần thực phẩm Việt Nam",
     "authors_org": "Viện Dinh dưỡng",
@@ -68,11 +73,16 @@ async def _no_food_lookup(query: str) -> list[FoodMatch]:
     raise FoodLookupError("Chưa cấu hình tra cứu thực phẩm cho lượt chat này.")
 
 
+async def _no_daily_summary(day: date) -> dict:
+    raise RuntimeError("Chưa cấu hình nhật ký bữa ăn cho lượt chat này.")
+
+
 class AgentToolContext:
     """Trạng thái công cụ của MỘT lượt chat của MỘT user.
 
     `load_profile` do server tạo sẵn (gắn user_id lấy từ JWT); LLM và client không
     thể chỉ định user khác. `lookup_food` tra bảng foods bằng phiên DB của request.
+    `load_daily_summary(day)` cũng gắn sẵn user_id từ JWT (chỉ đọc nhật ký của user đó).
     `sources` gom các đoạn search_knowledge (đã qua ngưỡng) và các thực phẩm
     lookup_food trả về trong lượt này.
     """
@@ -81,9 +91,11 @@ class AgentToolContext:
         self,
         load_profile: Callable[[], Awaitable[Any]] = _no_profile,
         lookup_food: Callable[[str], Awaitable[list[FoodMatch]]] = _no_food_lookup,
+        load_daily_summary: Callable[[date], Awaitable[dict]] = _no_daily_summary,
     ) -> None:
         self._load_profile = load_profile
         self._lookup_food = lookup_food
+        self._load_daily_summary = load_daily_summary
         self._sources: list[dict] = []
         self.tool_calls: list[str] = []
         self.knowledge_unavailable = False
@@ -93,6 +105,9 @@ class AgentToolContext:
 
     async def lookup_food(self, query: str) -> list[FoodMatch]:
         return await self._lookup_food(query)
+
+    async def load_daily_summary(self, day: date) -> dict:
+        return await self._load_daily_summary(day)
 
     def add_sources(self, results: list[dict]) -> None:
         self._sources.extend(results)
@@ -225,13 +240,34 @@ def build_tools(ctx: AgentToolContext) -> list[BaseTool]:
         ctx.add_sources([{**FOOD_SOURCE, "page": m.food.source_page} for m in matches if m.is_exact])
         return format_food_results(query, matches, grams_value)
 
-    return [search_knowledge_tool, calc_body_metrics_tool, lookup_food_tool]
+    @tool("get_daily_summary")
+    async def get_daily_summary_tool(date: Optional[str] = None) -> str:
+        """CHỈ ĐỌC nhật ký ăn uống của người dùng hiện tại trong MỘT ngày: tổng đã ăn
+        (năng lượng kcal, protein, lipid, glucid, xơ), mục tiêu và số còn lại.
+        `date`: tuỳ chọn, dạng YYYY-MM-DD theo giờ Việt Nam; bỏ trống = hôm nay."""
+        try:
+            day = parse_day(date)
+        except ValueError:
+            return "Lỗi tham số: date phải có dạng YYYY-MM-DD."
+        try:
+            summary = await ctx.load_daily_summary(day)
+        except Exception as exc:  # noqa: BLE001 — lỗi DB không được làm hỏng cả lượt chat
+            logger.error("get_daily_summary failed: %s", type(exc).__name__)
+            return (
+                f"{MEAL_LOG_UNAVAILABLE_CODE}: Nhật ký ăn uống tạm thời không truy cập được. "
+                "Không được tự ước lượng số đã ăn."
+            )
+        return json.dumps(summary, ensure_ascii=False)
+
+    return [search_knowledge_tool, calc_body_metrics_tool, lookup_food_tool, get_daily_summary_tool]
 
 
 # ── System prompt ────────────────────────────────────────────────────────────
-def build_system_prompt(profile_data: Optional[dict] = None) -> str:
+def build_system_prompt(profile_data: Optional[dict] = None, today: Optional[date] = None) -> str:
     """System prompt cá nhân hóa từ hồ sơ. KHÔNG chứa số liệu chỉ số cơ thể:
-    mọi con số BMI/BMR/TDEE/calo/macro phải lấy từ công cụ calc_body_metrics."""
+    mọi con số BMI/BMR/TDEE/calo/macro phải lấy từ công cụ calc_body_metrics.
+    `today` mặc định tính lại MỖI lần gọi (mỗi request) theo giờ Việt Nam."""
+    today = today or today_vn()
     if not profile_data:
         profile_section = "Người dùng chưa cung cấp thông tin hồ sơ sức khỏe."
     else:
@@ -281,6 +317,8 @@ def build_system_prompt(profile_data: Optional[dict] = None) -> str:
 
     return f"""Bạn là FitAI — Chuyên gia cố vấn thông minh về thể dục, thể hình và dinh dưỡng cá nhân hóa.
 
+Hôm nay (giờ Việt Nam) là {today.isoformat()}.
+
 {profile_section}
 
 QUY TẮC BẮT BUỘC KHI TƯ VẤN:
@@ -296,7 +334,8 @@ QUY TẮC BẮT BUỘC KHI TƯ VẤN:
 10. KHÔNG CÓ ĐÚNG MỤC THỰC PHẨM: nếu lookup_food trả {FOOD_NOT_FOUND_CODE}, hoặc báo không có mục nào trùng đúng tên (các mục chỉ chứa từ khoá), phải nói rõ dữ liệu KHÔNG có đúng thực phẩm người dùng hỏi, liệt kê các mục gần nhất (nếu có) và hỏi lại; TUYỆT ĐỐI không lấy số của mục khác thay cho nó. Ví dụ: hỏi "ức gà" mà chỉ có "Thịt gà ta", "Gan gà" thì nói không có mục ức gà và hỏi người dùng muốn xem mục nào; hỏi "bia" mà chỉ có "Men bia khô", "Men bia tươi" thì nói chưa có số liệu về bia (men bia là thứ khác) và không dùng số của men bia. Nhiều mục khớp mơ hồ thì hỏi lại người dùng muốn mục nào. Nếu lookup_food trả danh sách GỢI Ý (các mục gần nhất), nói rõ không có mục đúng tên người dùng hỏi, liệt kê các mục gợi ý, hỏi người dùng chọn mục nào và KHÔNG nêu số liệu như thể đó là món đã hỏi. Khi người dùng đã chọn một mục trong danh sách gợi ý hoặc danh sách các mục chỉ chứa từ khoá, PHẢI gọi lại lookup_food với đúng tên đầy đủ của mục đó trước khi nêu số liệu.
 11. MÓN ĂN HOÀN CHỈNH VÀ ĐỒ UỐNG CÓ CỒN: dữ liệu chỉ có nguyên liệu và một số sản phẩm chế biến sẵn; món ăn hoàn chỉnh (phở bò, cơm đã nấu, cháo, canh, món xào...) và bia, rượu CHƯA có. Khi được hỏi, nói rõ chưa có số liệu, không ước lượng.
 12. BẢNG THỰC PHẨM LỖI: nếu lookup_food trả {FOOD_UNAVAILABLE_CODE}, nói rõ bảng thực phẩm tạm thời không truy cập được và không đưa số liệu dinh dưỡng từ trí nhớ.
-13. NGUYÊN TẮC AN TOÀN Y TẾ:
+13. NHẬT KÝ ĂN UỐNG: khi người dùng hỏi hôm nay (hoặc một ngày cụ thể) đã ăn bao nhiêu calo, protein, chất béo, carb, hoặc còn bao nhiêu calo, PHẢI gọi get_daily_summary (hỏi ngày khác hôm nay thì truyền date dạng YYYY-MM-DD, tính từ ngày hôm nay ở trên) và chỉ dùng đúng số công cụ trả về; TUYỆT ĐỐI không tự cộng các món hay tự trừ. Công cụ đã có mục tiêu nên không cần gọi thêm calc_body_metrics cho câu hỏi này. Đã ăn ở "eaten", mục tiêu ở "target", còn lại ở "remaining" (số âm nghĩa là đã vượt mục tiêu, nói rõ là đã vượt). Nếu entries_count=0 thì nói chưa có dữ liệu nhật ký cho ngày đó. Nếu incomplete_totals=true thì nói rõ tổng CHƯA ĐẦY ĐỦ vì có incomplete_entries mục thiếu số liệu (xem missing_by_nutrient). Nếu is_complete=false thì chỉ nêu số đã ăn, nói cần hoàn tất hồ sơ (missing_fields) để so với mục tiêu, không đưa mục tiêu hay số còn lại. Nếu công cụ trả {MEAL_LOG_UNAVAILABLE_CODE} thì nói nhật ký tạm thời không truy cập được. Công cụ chỉ đọc: không ghi, sửa hay xoá được nhật ký; người dùng muốn ghi món thì hướng dẫn dùng trang "Nhật ký ăn uống".
+14. NGUYÊN TẮC AN TOÀN Y TẾ:
    - Bạn KHÔNG PHẢI là bác sĩ y khoa và KHÔNG ĐƯỢC chẩn đoán bệnh tật, không kê đơn thuốc.
    - Đối với các câu hỏi về bệnh lý, thuốc, triệu chứng đau đớn hay chấn thương, bạn PHẢI khuyên người dùng đến gặp bác sĩ hoặc cơ sở y tế chuyên khoa để được thăm khám.
 """

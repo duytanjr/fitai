@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { chatApi, type ChatMessage } from "@/lib/chat";
 import { useChatStore } from "@/store/chat-store";
@@ -220,10 +221,15 @@ export function ChatView() {
               — Tư vấn thể dục & dinh dưỡng thông minh
             </span>
           </div>
-          <div className="md:hidden">
-            <Button size="sm" variant="ghost" onClick={handleNewSession}>
-              + Cuộc trò chuyện mới
-            </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/meals" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+              Nhật ký ăn uống
+            </Link>
+            <div className="md:hidden">
+              <Button size="sm" variant="ghost" onClick={handleNewSession}>
+                + Cuộc trò chuyện mới
+              </Button>
+            </div>
           </div>
         </header>
 

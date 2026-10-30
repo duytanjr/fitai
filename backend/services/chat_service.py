@@ -10,6 +10,7 @@ from models.chat import ChatSession, ChatMessage
 from models.profile import UserProfile
 from services.ai_agents.fitness_advisor import AgentToolContext, ChatAgentException, fitness_agent
 from services.foods.lookup import search_foods
+from services.meals import daily_summary
 
 
 class ChatService:
@@ -83,10 +84,12 @@ class ChatService:
 
         # ── Bước 4: Gọi FitnessAdvisorAgent ────────────────────────────────────
         # Công cụ calc_body_metrics chỉ đọc được hồ sơ của user_id lấy từ JWT;
-        # lookup_food tra bảng foods bằng phiên DB của request (trong SAVEPOINT)
+        # lookup_food tra bảng foods bằng phiên DB của request (trong SAVEPOINT);
+        # get_daily_summary chỉ đọc nhật ký của chính user_id này
         tool_context = AgentToolContext(
             load_profile=lambda: self._load_profile(user_id),
             lookup_food=lambda query: search_foods(self.db, query),
+            load_daily_summary=lambda day: self._load_daily_summary(user_id, day),
         )
         try:
             ai_reply = await fitness_agent.chat(
@@ -139,6 +142,11 @@ class ChatService:
             )
 
         return target_session_id, ai_reply, sources
+
+    async def _load_daily_summary(self, user_id: uuid.UUID, day) -> dict:
+        # SAVEPOINT: lỗi DB ở đây không làm hỏng transaction lưu tin nhắn của lượt chat
+        async with self.db.begin_nested():
+            return await daily_summary(self.db, user_id, day)
 
     async def _load_profile(self, user_id: uuid.UUID) -> Optional[UserProfile]:
         res = await self.db.execute(select(UserProfile).where(UserProfile.user_id == user_id))

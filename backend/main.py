@@ -2,8 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
-from api.routers import auth, chat, users
+from core.log_filters import install_access_log_filter
+from api.routers import auth, chat, foods, meals, users
 from api.routers.profile import router as profile_router
+
+# Access log không ghi query string (có thể chứa từ khoá tìm thực phẩm của người dùng)
+install_access_log_filter()
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -27,6 +31,8 @@ app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(chat.router, prefix=settings.API_V1_STR)
 app.include_router(users.router, prefix=settings.API_V1_STR)
 app.include_router(profile_router, prefix=settings.API_V1_STR)
+app.include_router(foods.router, prefix=settings.API_V1_STR)
+app.include_router(meals.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", tags=["Health"])

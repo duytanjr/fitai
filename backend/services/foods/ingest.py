@@ -1,6 +1,8 @@
 """Nạp thực phẩm vào bảng foods — chạy lại không nhân đôi (upsert theo mã số).
 
---reset chỉ xoá các dòng của bảng foods (DELETE FROM foods), không đụng bảng khác.
+--reset chỉ xoá các dòng của bảng foods (DELETE FROM foods), không đụng bảng khác; nếu đã có
+nhật ký bữa ăn (meal_logs) tham chiếu tới foods thì từ chối, không xoá gì.
+Nạp thường giữ lại (và báo) các mã cũ không còn trong PDF nhưng còn được nhật ký tham chiếu.
 Kiểm tra chất lượng chỉ ĐÁNH DẤU (quality_flags), không sửa số liệu.
 """
 from __future__ import annotations
@@ -13,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.food import Food
+from models.meal_log import MealLog
 from services.foods.parser import NUTRIENT_FIELDS, FoodRecord, ParseResult, SkippedFood
 from services.foods.quality import (
     FLAG_ATWATER_MISMATCH,
@@ -39,7 +42,20 @@ class IngestStats:
     inserted: int = 0
     updated: int = 0
     deleted_stale: int = 0
+    kept_referenced: list[int] = field(default_factory=list)   # mã cũ giữ lại vì còn nhật ký tham chiếu
     reset_deleted: int = 0
+
+
+class FoodsReferencedError(RuntimeError):
+    """--reset bị từ chối: bảng foods đang được meal_logs tham chiếu (FK RESTRICT)."""
+
+    def __init__(self, foods: int, entries: int) -> None:
+        super().__init__(
+            f"--reset bị từ chối: {foods} thực phẩm đang được {entries} mục nhật ký bữa ăn (meal_logs) "
+            "tham chiếu. Không xoá gì. Hãy nạp thường (không --reset): upsert theo mã số giữ nguyên id."
+        )
+        self.foods = foods
+        self.entries = entries
 
 
 def food_row(food: FoodRecord, flags: dict[str, str]) -> dict:
@@ -83,11 +99,18 @@ def analyse(result: ParseResult) -> tuple[IngestStats, list[dict]]:
 async def load_foods(session: AsyncSession, rows: list[dict], stats: IngestStats, reset: bool = False) -> None:
     """Ghi vào bảng foods (không commit — người gọi quyết định).
 
-    reset=True: xoá toàn bộ dòng của bảng foods trước khi nạp (chỉ bảng foods).
+    reset=True: xoá toàn bộ dòng của bảng foods trước khi nạp (chỉ bảng foods). Ném
+    FoodsReferencedError (trước khi xoá) nếu có mục nhật ký tham chiếu tới foods.
     Không reset: upsert theo mã số và xoá các dòng có mã số không còn trong lần nạp này
-    (vd. thực phẩm thuộc nhóm đã bị loại).
+    (vd. thực phẩm thuộc nhóm đã bị loại), trừ các mã còn được nhật ký tham chiếu.
     """
+    referenced = set(
+        (await session.execute(select(Food.code).join(MealLog, MealLog.food_id == Food.id).distinct())).scalars()
+    )
     if reset:
+        if referenced:
+            entries = (await session.execute(select(func.count()).select_from(MealLog))).scalar_one()
+            raise FoodsReferencedError(len(referenced), entries)
         res = await session.execute(delete(Food))
         stats.reset_deleted = res.rowcount or 0
 
@@ -101,9 +124,11 @@ async def load_foods(session: AsyncSession, rows: list[dict], stats: IngestStats
     stats.inserted = len(codes - existing)
     stats.updated = len(codes & existing)
     stale = existing - codes
-    if stale:
-        await session.execute(delete(Food).where(Food.code.in_(stale)))
-    stats.deleted_stale = len(stale)
+    stats.kept_referenced = sorted(stale & referenced)
+    removable = stale - referenced
+    if removable:
+        await session.execute(delete(Food).where(Food.code.in_(removable)))
+    stats.deleted_stale = len(removable)
 
 
 # ── File mẫu để đối chiếu với PDF ───────────────────────────────────────────

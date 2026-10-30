@@ -6,7 +6,8 @@ Chạy bên trong Docker container (chạy lại nhiều lần không nhân đô
   docker exec fitai_backend python scripts/ingest_foods.py
   docker exec fitai_backend python scripts/ingest_foods.py --reset     # xoá các dòng bảng foods rồi nạp lại
 
---reset CHỈ xoá dữ liệu của bảng foods, không động tới bảng khác.
+--reset CHỈ xoá dữ liệu của bảng foods, không động tới bảng khác; bị từ chối (không xoá gì)
+nếu đã có nhật ký bữa ăn tham chiếu tới foods.
 """
 import argparse
 import asyncio
@@ -18,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.config import settings
-from services.foods.ingest import IngestStats, analyse, build_review_markdown, load_foods
+from services.foods.ingest import FoodsReferencedError, IngestStats, analyse, build_review_markdown, load_foods
 from services.foods.parser import extract_pdf_pages, parse_pages
 from services.foods.quality import ATWATER_TOLERANCE_KCAL, MASS_RANGE_G
 
@@ -57,6 +58,9 @@ def print_stats(stats: IngestStats, dry_run: bool) -> None:
         if stats.reset_deleted:
             print(f"🧹 --reset: đã xoá {stats.reset_deleted} dòng cũ của bảng foods")
         print(f"DB: {stats.inserted} thêm mới, {stats.updated} cập nhật, {stats.deleted_stale} dòng cũ đã xoá")
+        if stats.kept_referenced:
+            print(f"⚠️  Giữ lại {len(stats.kept_referenced)} mã cũ không còn trong PDF vì còn nhật ký bữa ăn "
+                  f"tham chiếu: {stats.kept_referenced}")
 
 
 async def write_db(rows: list[dict], stats: IngestStats, reset: bool) -> int:
@@ -98,7 +102,11 @@ def main() -> int:
             print(f"⚠️  Không ghi được file mẫu ({type(exc).__name__}): {args.sample_out}")
 
     if not args.dry_run:
-        total = asyncio.run(write_db(rows, stats, args.reset))
+        try:
+            total = asyncio.run(write_db(rows, stats, args.reset))
+        except FoodsReferencedError as exc:
+            print(f"❌ {exc}")
+            return 1
     print_stats(stats, args.dry_run)
     if not args.dry_run:
         print(f"✅ Bảng foods hiện có {total} dòng")

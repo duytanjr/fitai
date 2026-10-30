@@ -24,6 +24,9 @@ export function DashboardView() {
             <span className="text-lg font-semibold text-gray-900">FitAI</span>
           </div>
           <nav className="flex items-center gap-4">
+            <Link href="/meals" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+              Nhật ký ăn uống
+            </Link>
             <Link href="/chat" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
               Chat với AI
             </Link>
