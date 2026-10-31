@@ -396,3 +396,58 @@ async def test_get_daily_summary_tool_date_argument(client, foods, monkeypatch):
         await client.post("/api/v1/chat", headers=h, json={"message": "ngày 1/10 tôi ăn bao nhiêu"})
     content = [m for m in fake.calls[-1]["messages"] if isinstance(m, ToolMessage)][0].content
     assert json.loads(content)["eaten"]["energy_kcal"] == 143.0
+
+
+# ── Trạng thái, từ đồng nghĩa, từ mơ hồ trên /foods (dữ liệu thật, chỉ đọc) ───
+async def _real_food_count(db_session) -> int:
+    from sqlalchemy import func, select
+    return (await db_session.execute(select(func.count()).select_from(Food).where(Food.code < 99000))).scalar_one()
+
+
+async def test_food_search_returns_preparation(client, foods):
+    h = await login(client, "prep")
+    item = (await client.get(FOODS_URL, headers=h, params={"q": "Zqbánh phở thử"})).json()["items"][0]
+    assert item["preparation"] == "unknown" and item["matched_via"] is None
+    assert (await client.get(FOODS_URL, headers=h, params={"q": "zqbun"})).json()["status"] == "ok"
+
+
+async def test_food_search_ambiguous_bo_has_options_without_numbers(client, db_session):
+    if await _real_food_count(db_session) == 0:
+        pytest.skip("Bảng foods chưa có dữ liệu thật")
+    h = await login(client, "ambig")
+    data = (await client.get(FOODS_URL, headers=h, params={"q": "bơ"})).json()
+    assert data["status"] == "ambiguous" and data["items"] == []
+    meanings = data["ambiguity"]["meanings"]
+    assert [m["label"] for m in meanings] == ["quả bơ", "bơ động vật (butter)"]
+    assert [o["name_vi"] for o in meanings[0]["options"]] == ["Quả bơ vỏ xanh", "Quả bơ vỏ tím"]
+    assert all(set(o) == {"id", "name_vi", "group_name", "preparation"} for m in meanings for o in m["options"])
+
+    exact = (await client.get(FOODS_URL, headers=h, params={"q": "quả bơ vỏ xanh"})).json()
+    assert exact["status"] == "ok" and exact["items"][0]["name_vi"] == "Quả bơ vỏ xanh"
+    assert exact["items"][0]["match"] == "exact"
+
+
+async def test_food_search_synonym_shows_source_name(client, db_session):
+    if await _real_food_count(db_session) == 0:
+        pytest.skip("Bảng foods chưa có dữ liệu thật")
+    h = await login(client, "syn")
+    item = (await client.get(FOODS_URL, headers=h, params={"q": "bông cải xanh"})).json()["items"][0]
+    assert item["name_vi"] == "Súp lơ xanh" and item["matched_via"] == "bông cải xanh → súp lơ xanh"
+    assert item["match"] == "exact"
+
+
+async def test_food_search_cooked_dish_is_raw_only_with_note(client, db_session):
+    if await _real_food_count(db_session) == 0:
+        pytest.skip("Bảng foods chưa có dữ liệu thật")
+    h = await login(client, "rawonly")
+    data = (await client.get(FOODS_URL, headers=h, params={"q": "cơm trắng"})).json()
+    assert data["status"] == "raw_only"
+    assert data["raw_only"]["dish"] == "cơm" and "gạo tẻ SỐNG" in data["raw_only"]["note"]
+    assert "Đừng nhập khối lượng cơm chín" in data["raw_only"]["note"]
+    assert [i["name_vi"] for i in data["items"]] == ["Gạo tẻ máy", "Gạo tẻ giã"]
+
+
+async def test_summary_has_carb_note(client):
+    h = await login(client, "carbnote")
+    s = (await client.get(SUMMARY_URL, headers=h)).json()
+    assert "không gồm xơ" in s["carb_note"]

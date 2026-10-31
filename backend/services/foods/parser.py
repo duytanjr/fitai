@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from services.foods.normalize import normalize_search
+from services.foods.preparation import classify
 from services.foods.tcvn3 import UnknownCharacterError, capitalize_first, tcvn3_to_unicode
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,10 @@ class FoodRecord:
     @property
     def name_search(self) -> str:
         return normalize_search(self.name_vi)
+
+    @property
+    def preparation_info(self):
+        return classify(self.name_vi, self.name_en)
 
 
 @dataclass

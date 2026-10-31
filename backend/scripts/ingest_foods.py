@@ -47,6 +47,9 @@ def print_stats(stats: IngestStats, dry_run: bool) -> None:
     print("Số dòng NULL (không có số liệu) theo cột:")
     for col, n in stats.null_counts.items():
         print(f"  {col:12} {n}")
+    print("Trạng thái (chỉ gán khi tên ghi rõ):", dict(sorted(stats.preparation_counts.items())))
+    for f in stats.preparation_conflicts:
+        print(f"  ⚠️  khớp nhiều nhóm → unknown: {f.name_vi} | {f.name_en} | {f.preparation_info.keywords}")
     print("Kiểm tra chất lượng (chỉ đánh dấu, không sửa số liệu):")
     for flag, foods in stats.flagged.items():
         print(f"  {FLAG_TITLES[flag]}: {len(foods)}")

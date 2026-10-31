@@ -6,6 +6,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from models.meal_log import MAX_MEAL_GRAMS, MealType
+from services.foods.preparation import FoodPreparation
 
 GRAMS_DESCRIPTION = "Khối lượng phần ăn được (g), 0 < grams ≤ 5000"
 
@@ -15,7 +16,7 @@ class Nutrients(BaseModel):
     energy_kcal: Optional[float] = None
     protein_g: Optional[float] = None
     fat_g: Optional[float] = None
-    carb_g: Optional[float] = None
+    carb_g: Optional[float] = Field(None, description="Glucid theo nguồn, KHÔNG gồm xơ (celluloza)")
     fiber_g: Optional[float] = None
 
 
@@ -30,11 +31,42 @@ class FoodSearchItem(BaseModel):
     per_100g: Nutrients = Field(description="Giá trị trên 100 g phần ăn được")
     match: Literal["exact", "partial", "suggestion"]
     is_suggestion: bool = Field(description="Gợi ý gần nhất, KHÔNG phải kết quả đúng tên")
+    preparation: FoodPreparation = Field(description="unknown = nguồn không ghi rõ trạng thái")
+    matched_via: Optional[str] = Field(None, description="Khớp qua từ đồng nghĩa, vd. 'bông cải xanh → súp lơ xanh'")
+
+
+class AmbiguityOption(BaseModel):
+    """Lựa chọn khi từ có nhiều nghĩa — KHÔNG kèm số liệu."""
+    id: int
+    name_vi: str
+    group_name: str
+    preparation: FoodPreparation
+
+
+class AmbiguityMeaning(BaseModel):
+    label: str
+    options: list[AmbiguityOption] = Field(default_factory=list)
+    search: Optional[str] = Field(None, description="Cụm cần tìm tiếp khi nghĩa này có nhiều mục")
+
+
+class Ambiguity(BaseModel):
+    term: str
+    meanings: list[AmbiguityMeaning]
+
+
+class RawOnly(BaseModel):
+    """Món đã nấu mà bảng chỉ có nguyên liệu sống (vd. cơm → gạo tẻ)."""
+    dish: str
+    raw_label: str
+    note: str
 
 
 class FoodSearchOut(BaseModel):
     query: str
+    status: Literal["ok", "ambiguous", "raw_only"] = "ok"
     items: list[FoodSearchItem]
+    ambiguity: Optional[Ambiguity] = None
+    raw_only: Optional[RawOnly] = None
 
 
 class MealCreate(BaseModel):
@@ -87,7 +119,7 @@ class MacroValues(BaseModel):
     energy_kcal: float
     protein_g: float
     fat_g: float
-    carb_g: float
+    carb_g: float = Field(description="Glucid theo nguồn, KHÔNG gồm xơ (celluloza)")
 
 
 class EatenTotals(MacroValues):
@@ -105,3 +137,4 @@ class DailySummaryOut(BaseModel):
     missing_fields: list[str]
     target: Optional[MacroValues] = None
     remaining: Optional[MacroValues] = Field(None, description="Mục tiêu − đã ăn (có thể âm)")
+    carb_note: str = Field(description="Carb đã ăn lấy từ cột glucid của nguồn, không gồm xơ")

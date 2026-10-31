@@ -272,7 +272,7 @@ async def test_null_is_not_zero_and_grams_scaling(foods_session):
     assert "lipid 0" not in line
 
     pho = (await search_foods(foods_session, "banh pho"))[0].food
-    assert "glucid 63.4 g" in nutrient_line(pho, 200)       # 31.7 × 200/100
+    assert "glucid (không gồm xơ) 63.4 g" in nutrient_line(pho, 200)       # 31.7 × 200/100
     assert "năng lượng 286 kcal" in nutrient_line(pho, 200)
 
 

@@ -22,6 +22,17 @@ export interface Nutrients {
   fiber_g: number | null;
 }
 
+export type Preparation = "raw" | "cooked" | "processed" | "dried" | "unknown";
+
+/** Nhãn trạng thái; "unknown" = nguồn không ghi rõ (không đoán). */
+export const PREPARATION_LABELS: Record<Preparation, string> = {
+  raw: "sống",
+  cooked: "đã nấu chín",
+  processed: "đã chế biến",
+  dried: "khô",
+  unknown: "không rõ trạng thái",
+};
+
 export interface FoodSearchItem {
   id: number;
   code: number;
@@ -35,6 +46,31 @@ export interface FoodSearchItem {
   match: "exact" | "partial" | "suggestion";
   /** Gợi ý gần nhất, KHÔNG phải kết quả đúng tên */
   is_suggestion: boolean;
+  preparation: Preparation;
+  /** Khớp qua từ đồng nghĩa, vd. "bông cải xanh → súp lơ xanh" (name_vi là tên trong nguồn) */
+  matched_via: string | null;
+}
+
+/** Lựa chọn khi từ có nhiều nghĩa — không kèm số liệu. */
+export interface AmbiguityOption {
+  id: number;
+  name_vi: string;
+  group_name: string;
+  preparation: Preparation;
+}
+
+export interface Ambiguity {
+  term: string;
+  meanings: { label: string; options: AmbiguityOption[]; search: string | null }[];
+}
+
+export interface FoodSearchResult {
+  query: string;
+  status: "ok" | "ambiguous" | "raw_only";
+  items: FoodSearchItem[];
+  ambiguity: Ambiguity | null;
+  /** Món đã nấu (vd. cơm) mà bảng chỉ có nguyên liệu sống (gạo) */
+  raw_only: { dish: string; raw_label: string; note: string } | null;
 }
 
 export interface MealEntry extends Nutrients {
@@ -71,6 +107,8 @@ export interface DailySummary {
   missing_fields: string[];
   target: MacroValues | null;
   remaining: MacroValues | null;
+  /** Carb đã ăn lấy từ cột glucid của nguồn, không gồm xơ */
+  carb_note: string;
 }
 
 /** Hôm nay theo giờ Việt Nam: giờ UTC hiện tại + 7 tiếng (không dùng múi giờ của máy). */
@@ -91,7 +129,7 @@ export function formatValue(value: number | null | undefined, unit: string): str
 
 export const foodsApi = {
   search: (q: string, signal?: AbortSignal) =>
-    apiClient.get<{ query: string; items: FoodSearchItem[] }>(
+    apiClient.get<FoodSearchResult>(
       `/foods?q=${encodeURIComponent(q)}`,
       { signal }
     ),

@@ -24,12 +24,16 @@ from pydantic.v1 import ValidationError as ValidationErrorV1
 
 from core.config import settings
 from services.foods.lookup import (
+    AmbiguousFoodQuery,
     FoodLookupError,
+    RawOnlyFoodQuery,
     FoodMatch,
     FoodQueryError,
+    ResolvedMeaning,
     nutrient_line,
     validate_grams,
 )
+from services.foods.preparation import PREPARATION_LABELS_VI, FoodPreparation
 from services.meals import parse_day, today_vn
 from services.metrics_service import profile_metrics_summary
 from services.rag_service import KnowledgeSearchError, asearch_knowledge
@@ -47,6 +51,8 @@ KNOWLEDGE_UNAVAILABLE_CODE = "KHO_TAI_LIEU_KHONG_KHA_DUNG"
 FOOD_NOT_FOUND_CODE = "KHONG_CO_TRONG_DU_LIEU"
 FOOD_UNAVAILABLE_CODE = "BANG_THUC_PHAM_KHONG_KHA_DUNG"
 MEAL_LOG_UNAVAILABLE_CODE = "NHAT_KY_KHONG_KHA_DUNG"
+FOOD_AMBIGUOUS_CODE = "CAN_LAM_RO"
+FOOD_RAW_ONLY_CODE = "CHI_CO_DANG_SONG"
 FOOD_SOURCE = {
     "title": "Bảng thành phần thực phẩm Việt Nam",
     "authors_org": "Viện Dinh dưỡng",
@@ -153,6 +159,59 @@ def format_search_results(results: list[dict]) -> str:
     return "\n".join(parts)
 
 
+def preparation_label(food: Any) -> str:
+    """Nhãn trạng thái tiếng Việt; thiếu/NULL → 'nguồn không ghi rõ trạng thái'."""
+    value = getattr(food, "preparation", None)
+    try:
+        prep = FoodPreparation(value) if value is not None else FoodPreparation.UNKNOWN
+    except ValueError:
+        prep = FoodPreparation.UNKNOWN
+    return PREPARATION_LABELS_VI[prep]
+
+
+def preparation_field(food: Any) -> str:
+    """Trường trạng thái trong kết quả công cụ; unknown được nhấn mạnh để agent bắt buộc nêu."""
+    label = preparation_label(food)
+    if label == PREPARATION_LABELS_VI[FoodPreparation.UNKNOWN]:
+        return "TRẠNG THÁI: nguồn không ghi rõ sống hay chín (BẮT BUỘC nêu điều này khi trả lời)"
+    return f"trạng thái: {label}"
+
+
+def source_name(food: Any) -> str:
+    """Tên trong nguồn: tiếng Việt kèm tiếng Anh nếu có, vd. "Súp lơ xanh (Cauliflower, green)"."""
+    return f"{food.name_vi} ({food.name_en})" if getattr(food, "name_en", None) else food.name_vi
+
+
+def format_raw_only(dish: Any, foods: list) -> str:
+    """Món đã nấu chỉ có nguyên liệu SỐNG: số liệu trên 100 g sống, không tính theo grams, không quy đổi."""
+    lines = [
+        f"{FOOD_RAW_ONLY_CODE}: Bảng thành phần thực phẩm Việt Nam 2007 KHÔNG có '{dish.label}' (món đã nấu); "
+        f"chỉ có {dish.raw_label} SỐNG. Số liệu dưới đây là của thực phẩm SỐNG, chưa nấu, KHÔNG dùng thay cho "
+        "món đã nấu; TUYỆT ĐỐI không quy đổi (không ước lượng tỷ lệ nở, lượng nước). Không tính theo khối lượng "
+        "người dùng hỏi vì đó là khối lượng món đã nấu.",
+    ]
+    for i, f in enumerate(foods, 1):
+        lines.append(f"{i}. {source_name(f)} | {preparation_field(f)} | tr. PDF {f.source_page}")
+        lines.append(f"   Trên 100 g {dish.raw_label} SỐNG: {nutrient_line(f)}")
+    return "\n".join(lines)
+
+
+def format_ambiguity(term: str, meanings: list[ResolvedMeaning]) -> str:
+    """Từ mơ hồ: chỉ liệt kê lựa chọn, KHÔNG có số liệu (kể cả của mục trùng đúng tên)."""
+    lines = [
+        f"{FOOD_AMBIGUOUS_CODE}: '{term}' có nhiều nghĩa hoặc chưa có mục chung trong Bảng thành phần "
+        "thực phẩm Việt Nam 2007. KHÔNG nêu số liệu. Hỏi người dùng muốn nghĩa/loại nào, rồi gọi lại "
+        "lookup_food với đúng tên đầy đủ của mục đã chọn."
+    ]
+    for i, m in enumerate(meanings, 1):
+        if m.search:
+            lines.append(f"{i}. {m.label}: nhiều mục — gọi lookup_food với '{m.search}' để xem danh sách")
+        else:
+            names = "; ".join(f"{f.name_vi} ({preparation_label(f)})" for f in m.foods)
+            lines.append(f"{i}. {m.label}: {names}")
+    return "\n".join(lines)
+
+
 def format_food_results(query: str, matches: list[FoodMatch], grams: float | None) -> str:
     """Kết quả tra cứu thực phẩm cho LLM. Số theo `grams` do code tính, không để LLM nhân."""
     if not matches:
@@ -170,13 +229,20 @@ def format_food_results(query: str, matches: list[FoodMatch], grams: float | Non
         ]
         lines += [f"{i}. {m.food.name_vi} | nhóm: {m.food.group_name}" for i, m in enumerate(matches, 1)]
         return "\n".join(lines)
-    exact = any(m.is_exact for m in matches)
+    exact = [m for m in matches if m.is_exact]
+    if exact and all(m.matched_via for m in exact):
+        header = (f"Có mục trùng đúng tên QUA TỪ ĐỒNG NGHĨA ({exact[0].matched_via}): bảng ghi là "
+                  f"'{source_name(exact[0].food)}'. Khi trả lời chỉ nói \"bảng ghi là ...\" với đúng tên này, "
+                  "KHÔNG khẳng định nó chính là thứ người dùng gõ.")
+    elif exact:
+        header = "Có mục trùng đúng tên truy vấn."
+    else:
+        header = ("KHÔNG có mục nào trùng đúng tên truy vấn: các mục dưới chỉ chứa từ khoá, là thực phẩm KHÁC — "
+                  "không được dùng số của chúng thay cho thứ người dùng hỏi.")
     lines = [
         "Kết quả tra cứu Bảng thành phần thực phẩm Việt Nam 2007 (Viện Dinh dưỡng). "
         "Giá trị tính trên 100 g PHẦN ĂN ĐƯỢC; 'KHÔNG CÓ SỐ LIỆU' nghĩa là bảng không có số liệu (KHÔNG phải 0).",
-        "Có mục trùng đúng tên truy vấn." if exact else
-        "KHÔNG có mục nào trùng đúng tên truy vấn: các mục dưới chỉ chứa từ khoá, là thực phẩm KHÁC — "
-        "không được dùng số của chúng thay cho thứ người dùng hỏi.",
+        header,
     ]
     for i, m in enumerate(matches, 1):
         f = m.food
@@ -184,8 +250,10 @@ def format_food_results(query: str, matches: list[FoodMatch], grams: float | Non
         lines.append(
             f"{i}. {f.name_vi}" + (f" ({f.name_en})" if f.name_en else "")
             + f" | khớp: {'đúng tên' if m.is_exact else 'chỉ chứa từ khoá'} | nhóm: {f.group_name}"
-            + f" | thải bỏ: {refuse} | tr. PDF {f.source_page}"
+            + f" | thải bỏ: {refuse} | {preparation_field(f)} | tr. PDF {f.source_page}"
         )
+        if m.matched_via:
+            lines.append(f"   Khớp qua từ đồng nghĩa ({m.matched_via}); bảng ghi là: {source_name(f)}")
         lines.append(f"   Trên 100 g phần ăn được: {nutrient_line(f)}")
         if grams is not None:
             lines.append(f"   Theo {grams:g} g phần ăn được (code đã tính): {nutrient_line(f, grams)}")
@@ -230,6 +298,11 @@ def build_tools(ctx: AgentToolContext) -> list[BaseTool]:
             matches = await ctx.lookup_food(query)
         except FoodQueryError as exc:
             return f"Lỗi tham số: {exc}"
+        except AmbiguousFoodQuery as amb:
+            return format_ambiguity(amb.term, amb.meanings)
+        except RawOnlyFoodQuery as raw:
+            # Không thêm nguồn: số liệu này không phải của món người dùng hỏi
+            return format_raw_only(raw.dish, raw.foods)
         except FoodLookupError:
             return (
                 f"{FOOD_UNAVAILABLE_CODE}: Bảng thực phẩm tạm thời không truy cập được. "
@@ -335,7 +408,8 @@ QUY TẮC BẮT BUỘC KHI TƯ VẤN:
 11. MÓN ĂN HOÀN CHỈNH VÀ ĐỒ UỐNG CÓ CỒN: dữ liệu chỉ có nguyên liệu và một số sản phẩm chế biến sẵn; món ăn hoàn chỉnh (phở bò, cơm đã nấu, cháo, canh, món xào...) và bia, rượu CHƯA có. Khi được hỏi, nói rõ chưa có số liệu, không ước lượng.
 12. BẢNG THỰC PHẨM LỖI: nếu lookup_food trả {FOOD_UNAVAILABLE_CODE}, nói rõ bảng thực phẩm tạm thời không truy cập được và không đưa số liệu dinh dưỡng từ trí nhớ.
 13. NHẬT KÝ ĂN UỐNG: khi người dùng hỏi hôm nay (hoặc một ngày cụ thể) đã ăn bao nhiêu calo, protein, chất béo, carb, hoặc còn bao nhiêu calo, PHẢI gọi get_daily_summary (hỏi ngày khác hôm nay thì truyền date dạng YYYY-MM-DD, tính từ ngày hôm nay ở trên) và chỉ dùng đúng số công cụ trả về; TUYỆT ĐỐI không tự cộng các món hay tự trừ. Công cụ đã có mục tiêu nên không cần gọi thêm calc_body_metrics cho câu hỏi này. Đã ăn ở "eaten", mục tiêu ở "target", còn lại ở "remaining" (số âm nghĩa là đã vượt mục tiêu, nói rõ là đã vượt). Nếu entries_count=0 thì nói chưa có dữ liệu nhật ký cho ngày đó. Nếu incomplete_totals=true thì nói rõ tổng CHƯA ĐẦY ĐỦ vì có incomplete_entries mục thiếu số liệu (xem missing_by_nutrient). Nếu is_complete=false thì chỉ nêu số đã ăn, nói cần hoàn tất hồ sơ (missing_fields) để so với mục tiêu, không đưa mục tiêu hay số còn lại. Nếu công cụ trả {MEAL_LOG_UNAVAILABLE_CODE} thì nói nhật ký tạm thời không truy cập được. Công cụ chỉ đọc: không ghi, sửa hay xoá được nhật ký; người dùng muốn ghi món thì hướng dẫn dùng trang "Nhật ký ăn uống".
-14. NGUYÊN TẮC AN TOÀN Y TẾ:
+14. TRẠNG THÁI, TỪ ĐỒNG NGHĨA, TỪ MƠ HỒ (lookup_food): luôn nêu trạng thái sống/chín của thực phẩm theo mục "trạng thái" công cụ trả về; nếu là "nguồn không ghi rõ trạng thái" thì nói đúng như vậy, không tự đoán. Khi người dùng hỏi món ĐÃ NẤU (cơm, thịt luộc, thịt nướng, rau xào...) mà dữ liệu chỉ có thực phẩm sống hoặc chưa rõ trạng thái (ví dụ chỉ có "Gạo tẻ máy" là gạo sống), phải nói rõ đây là số liệu của thực phẩm SỐNG/chưa nấu, KHÔNG phải món đã nấu, và TUYỆT ĐỐI không tự quy đổi sang món đã nấu (không ước lượng tỷ lệ nở, lượng nước hay dầu). Nếu công cụ ghi "TRẠNG THÁI: nguồn không ghi rõ" thì BẮT BUỘC nói "nguồn không ghi rõ trạng thái sống hay chín" trong câu trả lời. Nếu lookup_food trả {FOOD_RAW_ONLY_CODE} (món đã nấu như cơm, xôi, cháo mà bảng chỉ có gạo sống) thì nói rõ bảng không có món đã nấu đó, số liệu đưa ra là của gạo SỐNG chưa nấu, không dùng thay cho món đã nấu và không quy đổi. Nếu kết quả "khớp qua từ đồng nghĩa" thì chỉ nói "bảng ghi là <tên tiếng Việt> (<tên tiếng Anh>)" (ví dụ: bảng ghi là "Súp lơ xanh (Cauliflower, green)"), KHÔNG khẳng định mục đó đồng nhất với tên người dùng gõ. Sau khi đã nêu tên trong nguồn, MỌI câu tiếp theo (kể cả tỷ lệ thải bỏ, trạng thái, số liệu) phải gọi mục đó bằng tên trong nguồn (ví dụ "Súp lơ xanh có tỷ lệ thải bỏ 39%"), KHÔNG dùng lại tên người dùng gõ như thể hai thứ là một. Glucid trong bảng KHÔNG gồm xơ (celluloza). Nếu lookup_food trả {FOOD_AMBIGUOUS_CODE} thì KHÔNG nêu số liệu nào: liệt kê các nghĩa/loại công cụ đưa ra, hỏi người dùng chọn, rồi gọi lại lookup_food với đúng tên đầy đủ của mục đã chọn.
+15. NGUYÊN TẮC AN TOÀN Y TẾ:
    - Bạn KHÔNG PHẢI là bác sĩ y khoa và KHÔNG ĐƯỢC chẩn đoán bệnh tật, không kê đơn thuốc.
    - Đối với các câu hỏi về bệnh lý, thuốc, triệu chứng đau đớn hay chấn thương, bạn PHẢI khuyên người dùng đến gặp bác sĩ hoặc cơ sở y tế chuyên khoa để được thăm khám.
 """

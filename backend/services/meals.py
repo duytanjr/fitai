@@ -27,6 +27,7 @@ MAX_FUTURE_DAYS = 1
 SNAPSHOT_FIELDS = ("energy_kcal", "protein_g", "fat_g", "carb_g", "fiber_g")
 # Trường tổng ngày → trường mục tiêu của metrics_service (xơ không có mục tiêu)
 TARGET_FIELDS = {"energy_kcal": "target_calories", "protein_g": "protein_g", "fat_g": "fat_g", "carb_g": "carb_g"}
+CARB_NOTE = "Carb đã ăn lấy từ cột glucid của Bảng thành phần thực phẩm Việt Nam 2007, không gồm xơ (celluloza)."
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
@@ -173,6 +174,7 @@ def summarize(meals: list[MealLog], metrics: dict, day: date) -> dict:
         "missing_fields": list(metrics.get("missing_fields") or []),
         "target": None,
         "remaining": None,
+        "carb_note": CARB_NOTE,
     }
     if summary["is_complete"]:
         target = {k: metrics[src] for k, src in TARGET_FIELDS.items()}

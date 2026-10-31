@@ -7,12 +7,15 @@ import {
   HIGH_REFUSE_PCT,
   MAX_GRAMS,
   MEAL_TYPES,
+  PREPARATION_LABELS,
   foodsApi,
   formatValue,
   mealsApi,
   scalePreview,
+  type Ambiguity,
   type FoodSearchItem,
   type MealType,
+  type Preparation,
 } from "@/lib/meals";
 
 const SEARCH_DELAY_MS = 300;
@@ -26,6 +29,19 @@ const MATCH_LABELS: Record<FoodSearchItem["match"], { text: string; className: s
     className: "bg-amber-50 text-amber-700 ring-amber-200",
   },
 };
+
+function PreparationBadge({ value }: { value: Preparation }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset",
+        value === "unknown" ? "bg-gray-50 text-gray-500 ring-gray-200" : "bg-sky-50 text-sky-700 ring-sky-200"
+      )}
+    >
+      {PREPARATION_LABELS[value]}
+    </span>
+  );
+}
 
 function defaultMealType(): MealType {
   const hourVN = (new Date().getUTCHours() + 7) % 24;
@@ -53,6 +69,8 @@ interface AddMealFormProps {
 export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMealFormProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<FoodSearchItem[]>([]);
+  const [ambiguity, setAmbiguity] = useState<Ambiguity | null>(null);
+  const [rawOnlyNote, setRawOnlyNote] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [selected, setSelected] = useState<FoodSearchItem | null>(null);
@@ -66,6 +84,8 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
     const q = query.trim();
     if (q.length < MIN_QUERY_LENGTH) {
       setResults([]);
+      setAmbiguity(null);
+      setRawOnlyNote("");
       setSearching(false);
       setSearchError("");
       return;
@@ -76,11 +96,16 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
       setSearchError("");
       try {
         const data = await foodsApi.search(q, controller.signal);
-        if (!controller.signal.aborted) setResults(data.items);
+        if (!controller.signal.aborted) {
+          setResults(data.items);
+          setAmbiguity(data.status === "ambiguous" ? data.ambiguity : null);
+          setRawOnlyNote(data.status === "raw_only" && data.raw_only ? data.raw_only.note : "");
+        }
       } catch (err: any) {
         if (controller.signal.aborted || err?.name === "AbortError") return;
         if (err?.status === 401) return onUnauthorized();
         setResults([]);
+        setAmbiguity(null);
         setSearchError(friendlyError(err, "Không tìm được thực phẩm lúc này. Vui lòng thử lại."));
       } finally {
         if (!controller.signal.aborted) setSearching(false);
@@ -133,7 +158,48 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
           <div className="mt-3 space-y-2">
             {searching && <p className="text-sm text-gray-400">Đang tìm…</p>}
             {searchError && <p className="text-sm text-red-600">{searchError}</p>}
-            {!searching && !searchError && query.trim().length >= MIN_QUERY_LENGTH && results.length === 0 && (
+            {rawOnlyNote && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {rawOnlyNote} Số liệu bên dưới là của thực phẩm SỐNG, chưa nấu.
+              </p>
+            )}
+            {ambiguity && (
+              <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="font-medium">
+                  “{ambiguity.term}” có nhiều nghĩa hoặc chưa có mục chung. Chọn đúng thứ bạn ăn:
+                </p>
+                <div className="mt-2 space-y-2">
+                  {ambiguity.meanings.map((m) => (
+                    <div key={m.label}>
+                      <p className="text-xs text-amber-800">{m.label}</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {m.search ? (
+                          <button
+                            type="button"
+                            onClick={() => setQuery(m.search!)}
+                            className="rounded-full bg-white px-2.5 py-1 text-xs ring-1 ring-amber-200 hover:bg-amber-100"
+                          >
+                            Tìm “{m.search}”
+                          </button>
+                        ) : (
+                          m.options.map((o) => (
+                            <button
+                              key={o.id}
+                              type="button"
+                              onClick={() => setQuery(o.name_vi)}
+                              className="rounded-full bg-white px-2.5 py-1 text-xs ring-1 ring-amber-200 hover:bg-amber-100"
+                            >
+                              {o.name_vi} · {PREPARATION_LABELS[o.preparation]}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!searching && !searchError && !ambiguity && query.trim().length >= MIN_QUERY_LENGTH && results.length === 0 && (
               <p className="text-sm text-gray-500">Không có thực phẩm nào khớp trong dữ liệu.</p>
             )}
             {results.length > 0 && results.every((r) => r.is_suggestion) && (
@@ -151,11 +217,18 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
                 <span>
                   <span className="block text-sm font-medium text-gray-900">{item.name_vi}</span>
                   <span className="block text-xs text-gray-500">{item.group_name}</span>
+                  {item.matched_via && (
+                    <span className="block text-xs text-indigo-700">
+                      Bảng ghi là: {item.name_vi}
+                      {item.name_en ? ` (${item.name_en})` : ""} — khớp qua từ đồng nghĩa “{item.matched_via}”
+                    </span>
+                  )}
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-1">
                   <span className="text-xs text-gray-600">
                     {formatValue(item.per_100g.energy_kcal, "kcal")} / 100 g
                   </span>
+                  <PreparationBadge value={item.preparation} />
                   <span
                     className={cn("rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset", MATCH_LABELS[item.match].className)}
                   >
@@ -170,12 +243,17 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2">
             <div>
-              <p className="text-sm font-medium text-gray-900">{selected.name_vi}</p>
+              <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
+                {selected.name_vi} <PreparationBadge value={selected.preparation} />
+              </p>
               <p className="text-xs text-gray-500">
                 Trên 100 g phần ăn được: {formatValue(selected.per_100g.energy_kcal, "kcal")} · protein{" "}
                 {formatValue(selected.per_100g.protein_g, "g")} · chất béo {formatValue(selected.per_100g.fat_g, "g")} ·
-                carb {formatValue(selected.per_100g.carb_g, "g")}
+                carb (không gồm xơ) {formatValue(selected.per_100g.carb_g, "g")}
               </p>
+              {selected.preparation === "unknown" && (
+                <p className="mt-1 text-xs text-gray-500">Nguồn không ghi rõ trạng thái sống/chín của mục này.</p>
+              )}
               {selected.is_suggestion && (
                 <p className="mt-1 text-xs text-amber-700">
                   Đây là mục gợi ý, không phải kết quả đúng tên bạn tìm. Kiểm tra lại trước khi lưu.
@@ -230,7 +308,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
             <div className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
               Sẽ ghi: <strong>{formatValue(scalePreview(selected.per_100g.energy_kcal, grams), "kcal")}</strong> ·
               protein {formatValue(scalePreview(selected.per_100g.protein_g, grams), "g")} · chất béo{" "}
-              {formatValue(scalePreview(selected.per_100g.fat_g, grams), "g")} · carb{" "}
+              {formatValue(scalePreview(selected.per_100g.fat_g, grams), "g")} · carb (không gồm xơ){" "}
               {formatValue(scalePreview(selected.per_100g.carb_g, grams), "g")}
             </div>
           )}

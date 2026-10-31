@@ -275,8 +275,8 @@ async def test_agent_calls_lookup_food_with_grams_computed_by_code():
     reply, ctx, fake = await run_food_agent(script, lookup)
     lookup.assert_awaited_once_with("bánh phở")
     content = tool_messages(fake)[0].content
-    assert "Trên 100 g phần ăn được" in content and "glucid 31.7 g" in content
-    assert "Theo 200 g phần ăn được (code đã tính)" in content and "glucid 63.4 g" in content
+    assert "Trên 100 g phần ăn được" in content and "glucid (không gồm xơ) 31.7 g" in content
+    assert "Theo 200 g phần ăn được (code đã tính)" in content and "glucid (không gồm xơ) 63.4 g" in content
     assert "Có mục trùng đúng tên" in content
     assert ctx.sources == [
         {"title": "Bảng thành phần thực phẩm Việt Nam", "authors_org": "Viện Dinh dưỡng", "year": 2007, "page": 26}
@@ -476,7 +476,106 @@ def test_system_prompt_meal_log_rules():
         "chưa có dữ liệu nhật ký",
         "không đưa mục tiêu hay số còn lại",
         MEAL_LOG_UNAVAILABLE_CODE,
-        "14. NGUYÊN TẮC AN TOÀN Y TẾ",
+        "15. NGUYÊN TẮC AN TOÀN Y TẾ",
         "10. KHÔNG CÓ ĐÚNG MỤC THỰC PHẨM",           # quy tắc cũ giữ nguyên
     ]:
+        assert rule in prompt, rule
+
+
+# ── Trạng thái, từ đồng nghĩa, từ mơ hồ (5d-1) ───────────────────────────────
+from services.ai_agents.fitness_advisor import FOOD_AMBIGUOUS_CODE  # noqa: E402
+from services.foods.lookup import AmbiguousFoodQuery, ResolvedMeaning  # noqa: E402
+
+
+async def run_lookup(args, lookup):
+    fake = FakeChatModel(lambda messages, i, tc: tool_call("lookup_food", args) if i == 0
+                         else AIMessage(content="ok"))
+    ctx = AgentToolContext(lookup_food=lookup)
+    with patch.object(fitness_agent, "llm", fake):
+        await fitness_agent.chat(history=[], user_message="câu hỏi", tool_context=ctx)
+    return tool_messages(fake)[0].content, ctx
+
+
+async def test_ambiguous_term_returns_options_without_numbers_or_sources():
+    meanings = [
+        ResolvedMeaning("quả bơ", [SimpleNamespace(name_vi="Quả bơ vỏ xanh", preparation=None),
+                                   SimpleNamespace(name_vi="Quả bơ vỏ tím", preparation=None)]),
+        ResolvedMeaning("bơ động vật (butter)", [SimpleNamespace(name_vi="Bơ", preparation=None)]),
+        ResolvedMeaning("thịt bò", [], search="thịt bò"),
+    ]
+    content, ctx = await run_lookup({"query": "bơ", "grams": 100},
+                                    AsyncMock(side_effect=AmbiguousFoodQuery("bơ", meanings)))
+    assert content.startswith(FOOD_AMBIGUOUS_CODE) and "KHÔNG nêu số liệu" in content
+    assert "1. quả bơ: Quả bơ vỏ xanh (nguồn không ghi rõ trạng thái); Quả bơ vỏ tím" in content
+    assert "2. bơ động vật (butter): Bơ" in content
+    assert "3. thịt bò: nhiều mục — gọi lookup_food với 'thịt bò'" in content
+    assert "kcal" not in content and "100 g" not in content
+    assert ctx.sources == []
+
+
+async def test_synonym_match_names_source_item_and_cites_it():
+    m = food("Súp lơ xanh", 202, name_en="Cauliflower, green", preparation="unknown", protein_g=3.0)
+    m.matched_via = "bông cải xanh → súp lơ xanh"
+    content, ctx = await run_lookup({"query": "bông cải xanh"}, AsyncMock(return_value=[m]))
+    assert "QUA TỪ ĐỒNG NGHĨA (bông cải xanh → súp lơ xanh)" in content
+    assert "bảng ghi là 'Súp lơ xanh (Cauliflower, green)'" in content
+    assert "KHÔNG khẳng định nó chính là thứ người dùng gõ" in content
+    assert "Khớp qua từ đồng nghĩa (bông cải xanh → súp lơ xanh); bảng ghi là: Súp lơ xanh (Cauliflower, green)" in content
+    assert [s["page"] for s in ctx.sources] == [202]
+
+
+@pytest.mark.parametrize("prep,label", [
+    ("raw", "trạng thái: sống"), ("cooked", "trạng thái: đã nấu chín"), ("dried", "trạng thái: khô"),
+    ("unknown", "TRẠNG THÁI: nguồn không ghi rõ sống hay chín (BẮT BUỘC nêu điều này khi trả lời)"),
+    (None, "TRẠNG THÁI: nguồn không ghi rõ sống hay chín (BẮT BUỘC nêu điều này khi trả lời)"),
+])
+async def test_lookup_output_states_preparation(prep, label):
+    content, _ = await run_lookup({"query": "gạo tẻ máy"}, AsyncMock(return_value=[food("Gạo tẻ máy", 17, preparation=prep)]))
+    assert label in content
+
+
+def test_system_prompt_preparation_rules():
+    prompt = build_system_prompt(None)
+    for rule in [
+        "luôn nêu trạng thái sống/chín",
+        "nguồn không ghi rõ trạng thái",
+        "số liệu của thực phẩm SỐNG/chưa nấu, KHÔNG phải món đã nấu",
+        "TUYỆT ĐỐI không tự quy đổi sang món đã nấu",
+        "khớp qua từ đồng nghĩa",
+        FOOD_AMBIGUOUS_CODE,
+        "13. NHẬT KÝ ĂN UỐNG",                       # quy tắc cũ giữ nguyên
+    ]:
+        assert rule in prompt, rule
+
+
+# ── Món đã nấu chỉ có dạng sống, nhãn glucid (5d-1 đợt 2) ─────────────────────
+from services.ai_agents.fitness_advisor import FOOD_RAW_ONLY_CODE  # noqa: E402
+from services.foods.aliases import COOKED_DISHES  # noqa: E402
+from services.foods.lookup import RawOnlyFoodQuery  # noqa: E402
+
+
+async def test_cooked_dish_returns_raw_only_numbers_without_grams_or_sources():
+    rice = food("Gạo tẻ máy", 17, name_en="Ordinary polished rice", preparation="raw",
+                energy_kcal=344.0, carb_g=75.9).food
+    content, ctx = await run_lookup({"query": "cơm trắng", "grams": 100},
+                                    AsyncMock(side_effect=RawOnlyFoodQuery(COOKED_DISHES["cơm"], [rice])))
+    assert content.startswith(FOOD_RAW_ONLY_CODE)
+    assert "KHÔNG có 'cơm' (món đã nấu)" in content and "chỉ có gạo tẻ SỐNG" in content
+    assert "KHÔNG dùng thay cho món đã nấu" in content and "không quy đổi" in content
+    assert "Trên 100 g gạo tẻ SỐNG: năng lượng 344 kcal" in content and "trạng thái: sống" in content
+    assert "code đã tính" not in content                                  # không tính theo grams của cơm
+    assert ctx.sources == []
+
+
+def test_glucid_label_says_without_fiber_and_prompt_rules():
+    from services.foods.lookup import nutrient_line
+    line = nutrient_line(SimpleNamespace(energy_kcal=1.0, protein_g=1.0, fat_g=1.0, carb_g=2.9, fiber_g=3.2,
+                                         water_g=1.0, ash_g=1.0))
+    assert "glucid (không gồm xơ) 2.9 g" in line and "xơ (celluloza) 3.2 g" in line
+    prompt = build_system_prompt(None)
+    for rule in [FOOD_RAW_ONLY_CODE, "BẮT BUỘC nói \"nguồn không ghi rõ trạng thái sống hay chín\"",
+                 "bảng ghi là <tên tiếng Việt> (<tên tiếng Anh>)", "KHÔNG khẳng định mục đó đồng nhất",
+                 "Glucid trong bảng KHÔNG gồm xơ",
+                 "MỌI câu tiếp theo (kể cả tỷ lệ thải bỏ, trạng thái, số liệu) phải gọi mục đó bằng tên trong nguồn",
+                 "KHÔNG dùng lại tên người dùng gõ như thể hai thứ là một"]:
         assert rule in prompt, rule

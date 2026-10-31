@@ -536,7 +536,7 @@ async def test_chat_lookup_food_adds_food_source_and_persists(async_client: Asyn
     assert res.json()["sources"] == expected
     tool_text = [m for m in fake.calls[-1]["messages"] if isinstance(m, ToolMessage)][0].content
     assert "Theo 200 g phần ăn được (code đã tính)" in tool_text
-    assert "glucid 66 g" in tool_text and "lipid KHÔNG CÓ SỐ LIỆU" in tool_text
+    assert "glucid (không gồm xơ) 66 g" in tool_text and "lipid KHÔNG CÓ SỐ LIỆU" in tool_text
 
     msgs = (await async_client.get(f"{SESSIONS_URL}/{res.json()['session_id']}/messages", headers=auth_headers(token))).json()
     assert msgs[1]["sources"] == expected

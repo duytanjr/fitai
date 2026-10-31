@@ -3,6 +3,7 @@
 --reset chỉ xoá các dòng của bảng foods (DELETE FROM foods), không đụng bảng khác; nếu đã có
 nhật ký bữa ăn (meal_logs) tham chiếu tới foods thì từ chối, không xoá gì.
 Nạp thường giữ lại (và báo) các mã cũ không còn trong PDF nhưng còn được nhật ký tham chiếu.
+preparation được gán theo tên (preparation_source='auto'); dòng chỉnh tay ('manual') không bị ghi đè.
 Kiểm tra chất lượng chỉ ĐÁNH DẤU (quality_flags), không sửa số liệu.
 """
 from __future__ import annotations
@@ -10,13 +11,14 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.food import Food
 from models.meal_log import MealLog
 from services.foods.parser import NUTRIENT_FIELDS, FoodRecord, ParseResult, SkippedFood
+from services.foods.preparation import PREPARATION_OVERRIDES, Classification, FoodPreparation, classify
 from services.foods.quality import (
     FLAG_ATWATER_MISMATCH,
     FLAG_ATWATER_NO_DATA,
@@ -44,6 +46,8 @@ class IngestStats:
     deleted_stale: int = 0
     kept_referenced: list[int] = field(default_factory=list)   # mã cũ giữ lại vì còn nhật ký tham chiếu
     reset_deleted: int = 0
+    preparation_counts: dict[str, int] = field(default_factory=dict)
+    preparation_conflicts: list[FoodRecord] = field(default_factory=list)
 
 
 class FoodsReferencedError(RuntimeError):
@@ -71,7 +75,16 @@ def food_row(food: FoodRecord, flags: dict[str, str]) -> dict:
         **{f: getattr(food, f) for f in NUTRIENT_FIELDS},
         "source_page": food.source_page,
         "quality_flags": flags or None,
+        **_preparation_values(food.code, food.preparation_info.value),
     }
+
+
+def _preparation_values(code: int, auto_value: FoodPreparation) -> dict:
+    """Override đã duyệt (manual) nếu có, ngược lại giá trị script gán (auto)."""
+    override = PREPARATION_OVERRIDES.get(code)
+    if override:
+        return {"preparation": override.value, "preparation_source": "manual"}
+    return {"preparation": auto_value, "preparation_source": "auto"}
 
 
 def analyse(result: ParseResult) -> tuple[IngestStats, list[dict]]:
@@ -89,6 +102,11 @@ def analyse(result: ParseResult) -> tuple[IngestStats, list[dict]]:
     }
     rows = []
     for food in result.foods:
+        prep = food.preparation_info
+        final = _preparation_values(food.code, prep.value)["preparation"].value
+        stats.preparation_counts[final] = stats.preparation_counts.get(final, 0) + 1
+        if prep.conflict and food.code not in PREPARATION_OVERRIDES:
+            stats.preparation_conflicts.append(food)
         flags = check_food(food)
         for flag in flags:
             stats.flagged[flag].append(food)
@@ -119,6 +137,11 @@ async def load_foods(session: AsyncSession, rows: list[dict], stats: IngestStats
     if rows:
         stmt = insert(Food).values(rows)
         update_cols = {c: stmt.excluded[c] for c in rows[0] if c != "code"}
+        # Không ghi đè trạng thái chỉnh tay
+        manual = Food.preparation_source == "manual"
+        update_cols["preparation"] = case((manual, Food.preparation), else_=stmt.excluded.preparation)
+        update_cols["preparation_source"] = case((manual, Food.preparation_source),
+                                                 else_=stmt.excluded.preparation_source)
         update_cols["updated_at"] = func.now()
         await session.execute(stmt.on_conflict_do_update(index_elements=[Food.code], set_=update_cols))
     stats.inserted = len(codes - existing)
@@ -129,6 +152,53 @@ async def load_foods(session: AsyncSession, rows: list[dict], stats: IngestStats
     if removable:
         await session.execute(delete(Food).where(Food.code.in_(removable)))
     stats.deleted_stale = len(removable)
+
+
+# ── Điền preparation cho dữ liệu đã có (không nạp lại PDF) ─────────────────
+@dataclass
+class PreparationBackfill:
+    assigned: list[tuple[Food, Classification]] = field(default_factory=list)   # khác unknown
+    conflicts: list[tuple[Food, Classification]] = field(default_factory=list)  # nhiều nhóm → unknown
+    manual: list[Food] = field(default_factory=list)                            # đã manual trong DB, bỏ qua
+    overrides: list[Food] = field(default_factory=list)                         # sẽ gán theo override
+    changes: list[tuple[Food, FoodPreparation, str]] = field(default_factory=list)   # (dòng, giá trị, nguồn)
+    counts: dict[str, int] = field(default_factory=dict)
+
+
+async def plan_preparation_backfill(session: AsyncSession) -> PreparationBackfill:
+    plan = PreparationBackfill()
+    for food in (await session.execute(select(Food).order_by(Food.code))).scalars().all():
+        if food.preparation_source == "manual":
+            plan.manual.append(food)
+            continue
+        if food.code in PREPARATION_OVERRIDES:
+            plan.overrides.append(food)
+            plan.changes.append((food, PREPARATION_OVERRIDES[food.code].value, "manual"))
+            continue
+        c = classify(food.name_vi, food.name_en)
+        plan.counts[c.value.value] = plan.counts.get(c.value.value, 0) + 1
+        if c.value is not FoodPreparation.UNKNOWN:
+            plan.assigned.append((food, c))
+        elif c.conflict:
+            plan.conflicts.append((food, c))
+        if food.preparation != c.value or food.preparation_source != "auto":
+            plan.changes.append((food, c.value, "auto"))
+    return plan
+
+
+async def apply_preparation_backfill(session: AsyncSession, plan: PreparationBackfill) -> int:
+    """Chỉ UPDATE preparation/preparation_source; điều kiện WHERE chặn ghi đè dòng chỉnh tay
+    (kể cả nếu dòng được đổi thành 'manual' sau khi lập kế hoạch). Không commit."""
+    updated = 0
+    for food, value, source in plan.changes:
+        res = await session.execute(
+            update(Food)
+            .where(Food.id == food.id, Food.preparation_source.is_distinct_from("manual"))
+            .values(preparation=value, preparation_source=source)
+            .execution_options(synchronize_session=False)
+        )
+        updated += res.rowcount or 0
+    return updated
 
 
 # ── File mẫu để đối chiếu với PDF ───────────────────────────────────────────

@@ -1,10 +1,11 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Index, Integer, String, func
+from sqlalchemy import CheckConstraint, DateTime, Enum as SAEnum, Float, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from core.database import Base
+from services.foods.preparation import FoodPreparation
 
 PER_100G = "trên 100 g phần ăn được; NULL = không có số liệu (khác 0)"
 
@@ -39,6 +40,16 @@ class Food(Base):
     )
     ash_g: Mapped[float | None] = mapped_column(Float, nullable=True, comment=f"Tro (g), {PER_100G}")
 
+    preparation: Mapped[FoodPreparation | None] = mapped_column(
+        SAEnum(FoodPreparation, name="food_preparation", values_callable=lambda e: [m.value for m in e]),
+        nullable=True, server_default=FoodPreparation.UNKNOWN.value,
+        comment="Trạng thái sống/chín — chỉ gán khi tên VN/EN ghi rõ; unknown = nguồn không ghi rõ",
+    )
+    preparation_source: Mapped[str | None] = mapped_column(
+        String(10), nullable=True,
+        comment="'auto' = script gán theo tên; 'manual' = chỉnh tay (script không ghi đè); NULL = chưa gán",
+    )
+
     source_page: Mapped[int] = mapped_column(Integer, nullable=False, comment="Số trang PDF (đếm từ 1)")
     quality_flags: Mapped[dict | None] = mapped_column(
         JSONB, nullable=True, comment="Kiểm tra chất lượng không qua khi nạp (không sửa số liệu)"
@@ -48,6 +59,7 @@ class Food(Base):
     )
 
     __table_args__ = (
+        CheckConstraint("preparation_source IN ('auto', 'manual')", name="ck_foods_preparation_source"),
         # Khớp một phần (ILIKE '%...%') trên tên không dấu
         Index("ix_foods_name_search_trgm", "name_search", postgresql_using="gin",
               postgresql_ops={"name_search": "gin_trgm_ops"}),

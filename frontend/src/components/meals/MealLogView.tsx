@@ -23,7 +23,7 @@ const MACROS: { key: keyof MacroValues; label: string; unit: string }[] = [
   { key: "energy_kcal", label: "Calo", unit: "kcal" },
   { key: "protein_g", label: "Protein", unit: "g" },
   { key: "fat_g", label: "Chất béo", unit: "g" },
-  { key: "carb_g", label: "Carb", unit: "g" },
+  { key: "carb_g", label: "Carb (không gồm xơ)", unit: "g" },
 ];
 
 const NUTRIENT_NAMES: Record<string, string> = {
@@ -77,6 +77,7 @@ function SummaryCard({ summary }: { summary: DailySummary }) {
               </div>
             );
           })}
+          <p className="text-xs text-gray-500">{summary.carb_note}</p>
         </div>
       ) : (
         <div className="space-y-3">
