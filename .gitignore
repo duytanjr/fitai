@@ -104,3 +104,9 @@ data/knowledge/raw/*.pdf
 
 # Bản xuất mẫu để rà soát RAG (không commit)
 data/knowledge/_review/
+
+# Kết quả đánh giá chatbot (chứa câu trả lời đầy đủ) — chỉ giữ .gitkeep
+data/eval/results/*
+!data/eval/results/.gitkeep
+# Điểm mount của data/eval/results bên trong ./backend (Docker tạo khi mount /app/eval_results)
+backend/eval_results/
