@@ -10,8 +10,11 @@
   kết quả trực tiếp đứng trước; mục đã có trực tiếp không lặp lại).
 - Từ mơ hồ (aliases.AMBIGUOUS, so cả truy vấn còn dấu): ném AmbiguousFoodQuery kèm các lựa chọn,
   KHÔNG trả mục nào (kể cả mục trùng đúng tên) — người gọi quên xử lý thì lỗi, không lộ số liệu.
-- Món đã nấu chỉ có nguyên liệu sống (aliases.COOKED_DISHES, vd. "cơm"): ném RawOnlyFoodQuery kèm
+- Món đã nấu chỉ có nguyên liệu sống (aliases.COOKED_DISHES, vd. "xôi"): ném RawOnlyFoodQuery kèm
   các mục nguyên liệu sống — người gọi phải ghi rõ đây là số liệu thực phẩm SỐNG.
+- Từ khoá đã duyệt (aliases.FOOD_ALIASES, vd. "ức gà", "cơm"): các mục đích (có thể nhiều nguồn,
+  nhiều trạng thái) được coi là khớp đúng, đứng trước; kết quả tìm trực tiếp vẫn được thêm sau.
+- Nhiều nguồn: mục tham chiếu theo (mã nguồn, source_ref); code chỉ có nghĩa với VN2007.
 - Cùng mức khớp: ưu tiên mục khớp đúng cả dấu ("bò" → thịt bò trước "Dưa bở").
 - Không mục nào khớp: thử lại với từng từ riêng lẻ, trả tối đa SUGGESTION_LIMIT
   mục GỢI Ý (is_suggestion=True) — là thực phẩm khác, chỉ để hỏi lại người dùng. Từ chỉ màu
@@ -24,14 +27,25 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, func, select, tuple_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.food import Food
-from services.foods.aliases import COLOR_TOKENS, CookedDish, Meaning, expand, find_ambiguous, find_cooked_dish
+from models.food_source import FoodSource
+from services.foods.aliases import (
+    COLOR_TOKENS,
+    CookedDish,
+    FoodRef,
+    Meaning,
+    expand,
+    find_alias,
+    find_ambiguous,
+    find_cooked_dish,
+)
 from services.foods.normalize import normalize_search
 from services.foods.parser import NUTRIENT_FIELDS
+from services.foods.sources import USDA_SR, VN2007, source_code
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +99,8 @@ class FoodMatch:
     food: Food
     level: int
     is_suggestion: bool = False
-    matched_via: str | None = None    # vd. "bông cải xanh → súp lơ xanh" khi khớp qua từ đồng nghĩa
+    matched_via: str | None = None    # vd. "heo → lợn" khi khớp qua từ đồng nghĩa / từ khoá đã duyệt
+    note: str | None = None           # ghi chú của từ khoá đã duyệt (vd. cơm USDA)
 
     @property
     def is_exact(self) -> bool:
@@ -141,7 +156,7 @@ def rank(food: Food, tokens: list[str], accented: list[str] | None = None) -> tu
     accent_hits = sum(w in name_accented for w in accented or [])
     position = min(_position(words, t) for t in tokens)
     extra_words = len(words) - len(tokens)
-    return level, -accent_hits, position, extra_words, len(food.name_search), food.code
+    return level, -accent_hits, position, extra_words, len(food.name_search), food.id
 
 
 async def _fetch(db: AsyncSession, stmt) -> list[Food]:
@@ -162,27 +177,36 @@ async def _candidates(db: AsyncSession, tokens: list[str]) -> list[Food]:
     stmt = (
         select(Food)
         .where(and_(*conditions))
-        .order_by(whole_words.desc(), func.length(Food.name_search), Food.code)
+        .order_by(whole_words.desc(), func.length(Food.name_search), Food.id)
         .limit(CANDIDATE_LIMIT)
     )
     return await _fetch(db, stmt)
 
 
-async def _resolve_meanings(db: AsyncSession, meanings: tuple[Meaning, ...]) -> list[ResolvedMeaning]:
-    codes = [c for m in meanings for c in m.codes]
-    by_code = {f.code: f for f in await _fetch(db, select(Food).where(Food.code.in_(codes)))} if codes else {}
-    missing = [c for c in codes if c not in by_code]
+async def fetch_refs(db: AsyncSession, refs: list[FoodRef]) -> dict[FoodRef, Food]:
+    """Các dòng theo (mã nguồn, source_ref); thiếu mục nào thì ghi cảnh báo (chỉ số lượng)."""
+    if not refs:
+        return {}
+    stmt = (select(Food).join(FoodSource, FoodSource.id == Food.source_id)
+            .where(tuple_(FoodSource.code, Food.source_ref).in_(list(refs))))
+    found = {(f.source.code, f.source_ref): f for f in await _fetch(db, stmt)}
+    missing = [r for r in refs if r not in found]
     if missing:
-        logger.warning("Ambiguous-term config references %d food codes not in table", len(missing))
-    return [ResolvedMeaning(m.label, [by_code[c] for c in m.codes if c in by_code], m.search) for m in meanings]
+        logger.warning("Food config references %d entries not in table", len(missing))
+    return found
+
+
+async def _resolve_meanings(db: AsyncSession, meanings: tuple[Meaning, ...]) -> list[ResolvedMeaning]:
+    found = await fetch_refs(db, [r for m in meanings for r in m.refs])
+    return [ResolvedMeaning(m.label, [found[r] for r in m.refs if r in found], m.search) for m in meanings]
 
 
 async def search_foods(db: AsyncSession, query: str, limit: int = 5) -> list[FoodMatch]:
     tokens = prepare_query(query)
     dish = find_cooked_dish(query)
     if dish:
-        by_code = {f.code: f for f in await _fetch(db, select(Food).where(Food.code.in_(dish.codes)))}
-        raise RawOnlyFoodQuery(dish, [by_code[c] for c in dish.codes if c in by_code])
+        found = await fetch_refs(db, list(dish.refs))
+        raise RawOnlyFoodQuery(dish, [found[r] for r in dish.refs if r in found])
     ambiguous = find_ambiguous(query)
     if ambiguous:
         term, meanings = ambiguous
@@ -191,7 +215,19 @@ async def search_foods(db: AsyncSession, query: str, limit: int = 5) -> list[Foo
     accented = accent_words(query)
     keyed: list[tuple[tuple, int, FoodMatch]] = []   # (rank, 0 = trực tiếp / 1 = từ đồng nghĩa, match)
     seen: set[int] = set()
+    alias_matches: list[FoodMatch] = []
+    alias = find_alias(query)
+    if alias:
+        key, target = alias
+        found = await fetch_refs(db, list(target.refs))
+        for ref in target.refs:
+            if ref in found:
+                seen.add(found[ref].id)
+                alias_matches.append(FoodMatch(food=found[ref], level=MATCH_EXACT,
+                                               matched_via=f"từ khoá đã duyệt '{key}'", note=target.note))
     for food in await _candidates(db, tokens):
+        if food.id in seen:
+            continue
         r = rank(food, tokens, accented)
         seen.add(food.id)
         keyed.append((r, 0, FoodMatch(food=food, level=r[0])))
@@ -203,11 +239,12 @@ async def search_foods(db: AsyncSession, query: str, limit: int = 5) -> list[Foo
                 continue
             seen.add(food.id)
             keyed.append((r, 1, FoodMatch(food=food, level=r[0], matched_via=label)))
-    if not keyed:
+    if not keyed and not alias_matches:
         return await _suggestions(db, tokens)
     # Cùng mức khớp: kết quả trực tiếp trước kết quả qua từ đồng nghĩa (không bị ghi đè)
     keyed.sort(key=lambda k: (k[0][0], k[1], k[0][1:]))
-    return [m for _, _, m in keyed[:limit]]
+    # Mục của từ khoá đã duyệt luôn được trả đủ (mọi trạng thái/nguồn), không bị cắt bởi `limit`
+    return alias_matches + [m for _, _, m in keyed[:max(limit - len(alias_matches), 0)]]
 
 
 async def _suggestions(db: AsyncSession, tokens: list[str]) -> list[FoodMatch]:
@@ -221,7 +258,7 @@ async def _suggestions(db: AsyncSession, tokens: list[str]) -> list[FoodMatch]:
     found: dict[int, tuple[Food, list[str]]] = {}
     for token in singles:
         for food in await _candidates(db, [token]):
-            found.setdefault(food.code, (food, []))[1].append(token)
+            found.setdefault(food.id, (food, []))[1].append(token)
 
     def key(item: tuple[Food, list[str]]) -> tuple:
         food, matched = item
@@ -255,11 +292,18 @@ NUTRIENT_LABELS = {
     "protein_g": ("protein", "g"),
     "fat_g": ("lipid", "g"),
     "carb_g": ("glucid (không gồm xơ)", "g"),   # glucid của nguồn không gồm celluloza (tổng 6 cột ≈ 100 g)
-    "fiber_g": ("xơ (celluloza)", "g"),
+    "fiber_g": ("xơ", "g"),                      # loại xơ theo nguồn: xem fiber_label()
     "water_g": ("nước", "g"),
     "ash_g": ("tro", "g"),
 }
 assert set(NUTRIENT_LABELS) == set(NUTRIENT_FIELDS)
+
+
+FIBER_LABELS = {VN2007: "xơ (celluloza)", USDA_SR: "xơ thực phẩm tổng số"}
+
+
+def fiber_label(food: Food) -> str:
+    return FIBER_LABELS.get(source_code(food), "xơ")
 
 
 def nutrient_line(food: Food, grams: float | None = None) -> str:
@@ -268,5 +312,11 @@ def nutrient_line(food: Food, grams: float | None = None) -> str:
         value = getattr(food, field_name)
         if grams is not None:
             value = scale(value, grams)
+        if field_name == "fiber_g":
+            label = fiber_label(food)
         parts.append(f"{label} KHÔNG CÓ SỐ LIỆU" if value is None else f"{label} {value:g} {unit}")
+        if field_name == "carb_g" and value is None and getattr(food, "carb_total_g", None) is not None:
+            total = getattr(food, "carb_total_g")
+            total = scale(total, grams) if grams is not None else total
+            parts.append(f"carbohydrate tổng (GỒM xơ, chưa trừ được xơ) {total:g} g")
     return "; ".join(parts)

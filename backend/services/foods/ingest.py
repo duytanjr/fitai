@@ -19,6 +19,7 @@ from models.food import Food
 from models.meal_log import MealLog
 from services.foods.parser import NUTRIENT_FIELDS, FoodRecord, ParseResult, SkippedFood
 from services.foods.preparation import PREPARATION_OVERRIDES, Classification, FoodPreparation, classify
+from services.foods.sources import VN2007, VN2007_ID
 from services.foods.quality import (
     FLAG_ATWATER_MISMATCH,
     FLAG_ATWATER_NO_DATA,
@@ -64,6 +65,8 @@ class FoodsReferencedError(RuntimeError):
 
 def food_row(food: FoodRecord, flags: dict[str, str]) -> dict:
     return {
+        "source_id": VN2007_ID,
+        "source_ref": str(food.code),
         "code": food.code,
         "stt": food.stt,
         "name_vi": food.name_vi,
@@ -81,7 +84,7 @@ def food_row(food: FoodRecord, flags: dict[str, str]) -> dict:
 
 def _preparation_values(code: int, auto_value: FoodPreparation) -> dict:
     """Override đã duyệt (manual) nếu có, ngược lại giá trị script gán (auto)."""
-    override = PREPARATION_OVERRIDES.get(code)
+    override = PREPARATION_OVERRIDES.get((VN2007, str(code)))
     if override:
         return {"preparation": override.value, "preparation_source": "manual"}
     return {"preparation": auto_value, "preparation_source": "auto"}
@@ -105,7 +108,7 @@ def analyse(result: ParseResult) -> tuple[IngestStats, list[dict]]:
         prep = food.preparation_info
         final = _preparation_values(food.code, prep.value)["preparation"].value
         stats.preparation_counts[final] = stats.preparation_counts.get(final, 0) + 1
-        if prep.conflict and food.code not in PREPARATION_OVERRIDES:
+        if prep.conflict and (VN2007, str(food.code)) not in PREPARATION_OVERRIDES:
             stats.preparation_conflicts.append(food)
         flags = check_food(food)
         for flag in flags:
@@ -122,35 +125,37 @@ async def load_foods(session: AsyncSession, rows: list[dict], stats: IngestStats
     Không reset: upsert theo mã số và xoá các dòng có mã số không còn trong lần nạp này
     (vd. thực phẩm thuộc nhóm đã bị loại), trừ các mã còn được nhật ký tham chiếu.
     """
-    referenced = set(
-        (await session.execute(select(Food.code).join(MealLog, MealLog.food_id == Food.id).distinct())).scalars()
-    )
+    vn_only = Food.source_id == VN2007_ID          # chỉ đụng dòng VN2007 (không đụng nguồn khác)
+    referenced = set((await session.execute(
+        select(Food.code).join(MealLog, MealLog.food_id == Food.id).where(vn_only).distinct())).scalars())
     if reset:
         if referenced:
-            entries = (await session.execute(select(func.count()).select_from(MealLog))).scalar_one()
+            entries = (await session.execute(select(func.count()).select_from(MealLog).join(
+                Food, Food.id == MealLog.food_id).where(vn_only))).scalar_one()
             raise FoodsReferencedError(len(referenced), entries)
-        res = await session.execute(delete(Food))
+        res = await session.execute(delete(Food).where(vn_only))
         stats.reset_deleted = res.rowcount or 0
 
-    existing = set((await session.execute(select(Food.code))).scalars().all())
+    existing = set((await session.execute(select(Food.code).where(vn_only))).scalars().all())
     codes = {r["code"] for r in rows}
     if rows:
         stmt = insert(Food).values(rows)
-        update_cols = {c: stmt.excluded[c] for c in rows[0] if c != "code"}
+        update_cols = {c: stmt.excluded[c] for c in rows[0] if c not in ("code", "source_id", "source_ref")}
         # Không ghi đè trạng thái chỉnh tay
         manual = Food.preparation_source == "manual"
         update_cols["preparation"] = case((manual, Food.preparation), else_=stmt.excluded.preparation)
         update_cols["preparation_source"] = case((manual, Food.preparation_source),
                                                  else_=stmt.excluded.preparation_source)
         update_cols["updated_at"] = func.now()
-        await session.execute(stmt.on_conflict_do_update(index_elements=[Food.code], set_=update_cols))
+        await session.execute(stmt.on_conflict_do_update(index_elements=[Food.source_id, Food.source_ref],
+                                                         set_=update_cols))
     stats.inserted = len(codes - existing)
     stats.updated = len(codes & existing)
     stale = existing - codes
     stats.kept_referenced = sorted(stale & referenced)
     removable = stale - referenced
     if removable:
-        await session.execute(delete(Food).where(Food.code.in_(removable)))
+        await session.execute(delete(Food).where(vn_only, Food.code.in_(removable)))
     stats.deleted_stale = len(removable)
 
 
@@ -167,15 +172,18 @@ class PreparationBackfill:
 
 async def plan_preparation_backfill(session: AsyncSession) -> PreparationBackfill:
     plan = PreparationBackfill()
-    for food in (await session.execute(select(Food).order_by(Food.code))).scalars().all():
+    for food in (await session.execute(select(Food).order_by(Food.source_id, Food.id))).scalars().unique().all():
         if food.preparation_source == "manual":
             plan.manual.append(food)
             continue
-        if food.code in PREPARATION_OVERRIDES:
+        key = (food.source.code, food.source_ref)
+        if key in PREPARATION_OVERRIDES:
             plan.overrides.append(food)
-            plan.changes.append((food, PREPARATION_OVERRIDES[food.code].value, "manual"))
+            plan.changes.append((food, PREPARATION_OVERRIDES[key].value, "manual"))
             continue
-        c = classify(food.name_vi, food.name_en)
+        # VN2007: theo tên VN + EN; nguồn khác (USDA): chỉ theo mô tả tiếng Anh gốc
+        c = (classify(food.name_vi, food.name_en) if food.source.code == VN2007
+             else classify("", food.name_original))
         plan.counts[c.value.value] = plan.counts.get(c.value.value, 0) + 1
         if c.value is not FoodPreparation.UNKNOWN:
             plan.assigned.append((food, c))

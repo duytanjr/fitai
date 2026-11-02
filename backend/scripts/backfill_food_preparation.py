@@ -41,7 +41,7 @@ async def run(dry_run: bool) -> int:
         if plan.overrides:
             print(f"\n== {len(plan.overrides)} mục sẽ gán theo override đã duyệt (manual) ==")
             for f in plan.overrides:
-                o = PREPARATION_OVERRIDES[f.code]
+                o = PREPARATION_OVERRIDES[(f.source.code, f.source_ref)]
                 print(f"{f.code} | {f.name_vi} | {o.value.value} | {o.reason}")
 
         if plan.manual:

@@ -20,19 +20,30 @@ class Nutrients(BaseModel):
     fiber_g: Optional[float] = None
 
 
+class FoodSourceInfo(BaseModel):
+    code: str = Field(description="VN2007 | USDA_SR_LEGACY_2018")
+    label: str = Field(description="Nhãn ngắn: 'VN 2007' / 'USDA'")
+    title: str
+    ref: str = Field(description="Tham chiếu trong nguồn: mã số (VN2007) hoặc fdc_id (USDA)")
+
+
 class FoodSearchItem(BaseModel):
     id: int
-    code: int
+    code: Optional[int] = Field(None, description="Mã số bảng VN 2007 (None với nguồn khác)")
     name_vi: str
     name_en: Optional[str] = None
+    name_original: Optional[str] = Field(None, description="Mô tả gốc trong nguồn (USDA: tiếng Anh)")
     group_name: str
     refuse_pct: Optional[float] = Field(None, description="Tỷ lệ thải bỏ (%); None = không có số liệu")
-    source_page: int
-    per_100g: Nutrients = Field(description="Giá trị trên 100 g phần ăn được")
+    source_page: Optional[int] = Field(None, description="Trang PDF (VN 2007)")
+    source: FoodSourceInfo
+    per_100g: Nutrients = Field(description="Giá trị trên 100 g (VN 2007: phần ăn được)")
+    carb_total_g: Optional[float] = Field(None, description="Carbohydrate gốc của nguồn (USDA: gồm xơ)")
     match: Literal["exact", "partial", "suggestion"]
     is_suggestion: bool = Field(description="Gợi ý gần nhất, KHÔNG phải kết quả đúng tên")
     preparation: FoodPreparation = Field(description="unknown = nguồn không ghi rõ trạng thái")
-    matched_via: Optional[str] = Field(None, description="Khớp qua từ đồng nghĩa, vd. 'bông cải xanh → súp lơ xanh'")
+    matched_via: Optional[str] = Field(None, description="Khớp qua từ đồng nghĩa / từ khoá đã duyệt, vd. 'heo → lợn'")
+    note: Optional[str] = Field(None, description="Ghi chú của từ khoá đã duyệt (vd. cơm USDA)")
 
 
 class AmbiguityOption(BaseModel):
@@ -41,6 +52,7 @@ class AmbiguityOption(BaseModel):
     name_vi: str
     group_name: str
     preparation: FoodPreparation
+    source_label: str = Field(description="'VN 2007' / 'USDA'")
 
 
 class AmbiguityMeaning(BaseModel):

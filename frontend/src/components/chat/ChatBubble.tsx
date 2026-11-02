@@ -12,6 +12,7 @@ function formatSource(source: ChatSource): string {
   const parts = [source.title];
   if (source.year) parts.push(String(source.year));
   if (source.page) parts.push(`tr. PDF ${source.page}`);
+  else if (source.ref) parts.push(source.ref);
   return parts.join(", ");
 }
 
@@ -51,7 +52,7 @@ export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProp
               <p className="font-semibold text-gray-600">Tài liệu tham khảo</p>
               <ol className="mt-1 list-decimal space-y-0.5 pl-4">
                 {sources!.map((source, i) => (
-                  <li key={`${source.title}-${source.page}-${i}`}>{formatSource(source)}</li>
+                  <li key={`${source.title}-${source.page ?? source.ref}-${i}`}>{formatSource(source)}</li>
                 ))}
               </ol>
             </div>

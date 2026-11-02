@@ -13,6 +13,8 @@ export interface ChatSource {
   year?: number | string | null;
   /** Số trang PDF (đếm từ 1) */
   page?: number | null;
+  /** Tham chiếu khi nguồn không có số trang, vd. "fdc_id 171477" (USDA) */
+  ref?: string | null;
 }
 
 export interface ChatMessage {

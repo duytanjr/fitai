@@ -323,7 +323,8 @@ async def test_food_search_returns_per_100g_and_flags(client, foods):
     assert bun["match"] == "partial"
     assert bun["per_100g"]["fat_g"] is None and bun["refuse_pct"] is None    # NULL giữ nguyên
 
-    suggest = (await client.get(FOODS_URL, headers=h, params={"q": "ức zqthit"})).json()["items"]
+    # 5d-2: "ức" giờ có mục (ức gà USDA) → dùng từ chắc chắn không có trong bảng
+    suggest = (await client.get(FOODS_URL, headers=h, params={"q": "zzqqk zqthit"})).json()["items"]
     assert [i["name_vi"] for i in suggest] == ["Zqthịt gà thử"]
     assert suggest[0]["is_suggestion"] is True and suggest[0]["match"] == "suggestion"
 
@@ -420,7 +421,8 @@ async def test_food_search_ambiguous_bo_has_options_without_numbers(client, db_s
     meanings = data["ambiguity"]["meanings"]
     assert [m["label"] for m in meanings] == ["quả bơ", "bơ động vật (butter)"]
     assert [o["name_vi"] for o in meanings[0]["options"]] == ["Quả bơ vỏ xanh", "Quả bơ vỏ tím"]
-    assert all(set(o) == {"id", "name_vi", "group_name", "preparation"} for m in meanings for o in m["options"])
+    assert all(set(o) == {"id", "name_vi", "group_name", "preparation", "source_label"}
+               for m in meanings for o in m["options"])
 
     exact = (await client.get(FOODS_URL, headers=h, params={"q": "quả bơ vỏ xanh"})).json()
     assert exact["status"] == "ok" and exact["items"][0]["name_vi"] == "Quả bơ vỏ xanh"
@@ -431,20 +433,21 @@ async def test_food_search_synonym_shows_source_name(client, db_session):
     if await _real_food_count(db_session) == 0:
         pytest.skip("Bảng foods chưa có dữ liệu thật")
     h = await login(client, "syn")
-    item = (await client.get(FOODS_URL, headers=h, params={"q": "bông cải xanh"})).json()["items"][0]
-    assert item["name_vi"] == "Súp lơ xanh" and item["matched_via"] == "bông cải xanh → súp lơ xanh"
-    assert item["match"] == "exact"
+    # 5d-2: "bông cải xanh" không còn đi qua từ đồng nghĩa sang Súp lơ xanh → dùng heo → lợn
+    item = (await client.get(FOODS_URL, headers=h, params={"q": "thịt heo nạc"})).json()["items"][0]
+    assert item["name_vi"] == "Thịt lợn nạc" and item["matched_via"] == "heo → lợn"
+    assert item["match"] == "exact" and item["source"]["label"] == "VN 2007"
 
 
 async def test_food_search_cooked_dish_is_raw_only_with_note(client, db_session):
     if await _real_food_count(db_session) == 0:
         pytest.skip("Bảng foods chưa có dữ liệu thật")
     h = await login(client, "rawonly")
-    data = (await client.get(FOODS_URL, headers=h, params={"q": "cơm trắng"})).json()
+    data = (await client.get(FOODS_URL, headers=h, params={"q": "xôi"})).json()     # 5d-2: cơm có ở USDA
     assert data["status"] == "raw_only"
-    assert data["raw_only"]["dish"] == "cơm" and "gạo tẻ SỐNG" in data["raw_only"]["note"]
-    assert "Đừng nhập khối lượng cơm chín" in data["raw_only"]["note"]
-    assert [i["name_vi"] for i in data["items"]] == ["Gạo tẻ máy", "Gạo tẻ giã"]
+    assert data["raw_only"]["dish"] == "xôi" and "gạo nếp SỐNG" in data["raw_only"]["note"]
+    assert "Đừng nhập khối lượng xôi chín" in data["raw_only"]["note"]
+    assert [i["name_vi"] for i in data["items"]] == ["Gạo nếp cái", "Gạo nếp máy (Loại thường)"]
 
 
 async def test_summary_has_carb_note(client):

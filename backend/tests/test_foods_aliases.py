@@ -14,9 +14,12 @@ from core.security import get_password_hash
 from models.food import Food
 from models.meal_log import MealLog, MealType
 from models.user import User
+from models.food_source import FoodSource
+from services.foods.sources import USDA_SR
 from services.foods.aliases import (
     AMBIGUOUS,
     COOKED_DISHES,
+    FOOD_ALIASES,
     EXPECTED_NAMES,
     SYNONYMS,
     ambiguity_key,
@@ -82,7 +85,7 @@ async def names(session, query, limit=10):
 # ── Cấu hình ─────────────────────────────────────────────────────────────────
 APPROVED_SYNONYMS = [
     ("heo", "lợn", False), ("đậu hũ", "đậu phụ", False), ("mì", "mỳ", True),
-    ("bánh mì", "bánh mỳ", False), ("ô liu", "oliu", True), ("bông cải xanh", "súp lơ xanh", False),
+    ("bánh mì", "bánh mỳ", False), ("ô liu", "oliu", True),     # 5d-2: bỏ "bông cải xanh → súp lơ xanh"
     ("đậu phộng", "lạc", False), ("hạt mè", "vừng", False), ("bắp cải", "cải bắp", False),
     ("khóm", "dứa", False), ("trái thơm", "dứa", False), ("khổ qua", "mướp đắng", False),
     ("ngò rí", "rau mùi", False), ("cá lóc", "cá quả", False), ("dưa leo", "dưa chuột", False),
@@ -95,7 +98,7 @@ APPROVED_SYNONYMS = [
 def test_synonym_list_is_exactly_the_approved_list():
     assert [(s.source, s.target, s.bidirectional) for s in SYNONYMS] == APPROVED_SYNONYMS
     assert set(AMBIGUOUS) == {"bơ", "bo", "tôm", "tom", "chuối", "chuoi",
-                              "bắp", "mè", "thơm", "mãng cầu", "táo", "hồng", "dưa"}
+                              "bắp", "mè", "thơm", "mãng cầu", "táo", "hồng", "dưa", "com"}
 
 
 def test_expand_matches_whole_phrases_only():
@@ -108,10 +111,9 @@ def test_expand_matches_whole_phrases_only():
 
 
 def test_cooked_dish_matching_ignores_color_words_only():
-    assert find_cooked_dish("cơm").label == "cơm" and find_cooked_dish("Cơm trắng").label == "cơm"
-    assert find_cooked_dish("com trang").label == "cơm"
-    assert find_cooked_dish("xôi").raw_label == "gạo nếp" and find_cooked_dish("cháo").raw_label == "gạo tẻ"
-    assert find_cooked_dish("cơm rang") is None and find_cooked_dish("rau giền cơm") is None
+    assert find_cooked_dish("xôi").raw_label == "gạo nếp" and find_cooked_dish("Xôi trắng").label == "xôi"
+    assert find_cooked_dish("cháo").raw_label == "gạo tẻ"
+    assert find_cooked_dish("cơm") is None and find_cooked_dish("cơm trắng") is None   # 5d-2: cơm có ở USDA
     assert find_cooked_dish("chao") is None                  # trùng "Lạc chao dầu"
 
 
@@ -123,12 +125,13 @@ def test_ambiguity_uses_accented_whole_query():
 
 
 def test_every_ambiguous_code_has_expected_name():
-    codes = {c for meanings in AMBIGUOUS.values() for m in meanings for c in m.codes}
-    codes |= {c for d in COOKED_DISHES.values() for c in d.codes}
-    assert codes == set(EXPECTED_NAMES)
+    refs = {r for meanings in AMBIGUOUS.values() for m in meanings for r in m.refs}
+    refs |= {r for d in COOKED_DISHES.values() for r in d.refs}
+    refs |= {r for a in FOOD_ALIASES.values() for r in a.refs}
+    assert refs <= set(EXPECTED_NAMES)
     bo_meanings = [m.label for m in AMBIGUOUS["bo"]]
     assert bo_meanings == ["quả bơ", "bơ động vật (butter)", "thịt bò"]
-    assert AMBIGUOUS["bo"][2].search == "thịt bò" and AMBIGUOUS["bo"][2].codes == ()
+    assert AMBIGUOUS["bo"][2].search == "thịt bò" and AMBIGUOUS["bo"][2].refs == ()
 
 
 async def test_ambiguous_codes_exist_in_real_foods_table(db_session):
@@ -139,8 +142,13 @@ async def test_ambiguous_codes_exist_in_real_foods_table(db_session):
         pytest.skip(f"Không đọc được bảng foods ({type(exc).__name__})")
     if total == 0:
         pytest.skip("Bảng foods chưa có dữ liệu — hãy chạy scripts/ingest_foods.py")
-    rows = (await db_session.execute(select(Food.code, Food.name_vi).where(Food.code.in_(EXPECTED_NAMES)))).all()
-    assert dict(rows) == EXPECTED_NAMES
+    rows = (await db_session.execute(select(FoodSource.code, Food.source_ref, Food.name_vi).join(
+        FoodSource, FoodSource.id == Food.source_id))).all()
+    actual = {(c, ref): name for c, ref, name in rows}
+    for ref, name in EXPECTED_NAMES.items():
+        if ref[0] == USDA_SR and not any(k[0] == USDA_SR for k in actual):
+            continue                                         # chưa nạp USDA trên DB này
+        assert actual.get(ref) == name, ref
 
 
 async def _real_names(db_session) -> list[str]:
@@ -172,7 +180,7 @@ async def test_synonym_rule_target_exists_and_source_is_not_an_item(db_session):
     ("nấm đông cô", "Nấm hương tươi"), ("khoai mì", "Củ sắn"), ("hột gà", "Trứng gà"), ("hột vịt", "Trứng vịt"),
     ("quýt", "Quít"), ("trái kiwi", "Quả kiwi"), ("bí đỏ", "Bí ngô"),
     ("thịt heo nạc", "Thịt lợn nạc"), ("đậu hũ", "Đậu phụ"), ("bánh mì", "Bánh mỳ"),
-    ("dầu ô liu", "Dầu oliu"), ("bông cải xanh", "Súp lơ xanh"),
+    ("dầu ô liu", "Dầu oliu"),
 ])
 async def test_each_synonym_on_real_data(db_session, query, expected):
     await _real_names(db_session)
@@ -193,7 +201,7 @@ async def test_new_ambiguous_terms_on_real_data(db_session, term):
     with pytest.raises(AmbiguousFoodQuery) as exc:
         await search_foods(db_session, term)
     for meaning, cfg in zip(exc.value.meanings, AMBIGUOUS[term]):
-        assert [f.code for f in meaning.foods] == list(cfg.codes)       # mọi mã đều có trong bảng
+        assert [(f.source.code, f.source_ref) for f in meaning.foods] == list(cfg.refs)   # mọi mục đều có
 
 
 # ── Từ đồng nghĩa ────────────────────────────────────────────────────────────
@@ -202,7 +210,6 @@ async def test_new_ambiguous_terms_on_real_data(db_session, term):
     ("đậu hũ", "Đậu phụ", "đậu hũ → đậu phụ"),
     ("bánh mì", "Bánh mỳ", "bánh mì → bánh mỳ"),
     ("dầu ô liu", "Dầu oliu", "ô liu → oliu"),
-    ("bông cải xanh", "Súp lơ xanh", "bông cải xanh → súp lơ xanh"),
 ])
 async def test_synonyms_find_source_name(foods_session, query, expected_name, via):
     await seed(foods_session, foods=ALIAS_FOODS)
@@ -280,8 +287,8 @@ async def test_accent_match_ranks_first(foods_session):
 
 # ── Món đã nấu, từ chỉ màu ───────────────────────────────────────────────────
 @pytest.mark.parametrize("query,names_expected", [
-    ("cơm", ["Gạo tẻ máy", "Gạo tẻ giã"]), ("cơm trắng", ["Gạo tẻ máy", "Gạo tẻ giã"]),
-    ("xôi", ["Gạo nếp cái", "Gạo nếp máy (Loại thường)"]), ("cháo", ["Gạo tẻ máy", "Gạo tẻ giã"]),
+    ("xôi", ["Gạo nếp cái", "Gạo nếp máy (Loại thường)"]), ("xôi trắng", ["Gạo nếp cái", "Gạo nếp máy (Loại thường)"]),
+    ("cháo", ["Gạo tẻ máy", "Gạo tẻ giã"]),
 ])
 async def test_cooked_dish_returns_raw_ingredients(foods_session, query, names_expected):
     await seed(foods_session, foods=ALIAS_FOODS)
@@ -369,18 +376,25 @@ async def test_backfill_does_not_touch_meal_logs(foods_session):
 
 # ── Override chỉnh tay đã duyệt ──────────────────────────────────────────────
 def test_overrides_are_exactly_the_approved_list():
-    assert {c: o.value.value for c, o in PREPARATION_OVERRIDES.items()} == {
-        1001: "raw", 1002: "raw", 1003: "raw", 1004: "raw", 1005: "raw",
-        3031: "unknown", 1021: "unknown", 8056: "unknown", 11007: "unknown",
+    assert {k: o.value.value for k, o in PREPARATION_OVERRIDES.items()} == {
+        ("VN2007", "1001"): "raw", ("VN2007", "1002"): "raw", ("VN2007", "1003"): "raw",
+        ("VN2007", "1004"): "raw", ("VN2007", "1005"): "raw",
+        ("VN2007", "3031"): "unknown", ("VN2007", "1021"): "unknown", ("VN2007", "8056"): "unknown",
+        ("VN2007", "11007"): "unknown",
+        ("USDA_SR_LEGACY_2018", "173904"): "dried",
     }
     assert all(o.reason for o in PREPARATION_OVERRIDES.values())
 
 
 async def test_override_codes_exist_in_real_foods_table(db_session):
     await _real_names(db_session)
-    rows = dict((await db_session.execute(
-        select(Food.code, Food.name_vi).where(Food.code.in_(PREPARATION_OVERRIDES)))).all())
-    assert rows == {c: o.name for c, o in PREPARATION_OVERRIDES.items()}
+    rows = {(c, ref): name for c, ref, name in (await db_session.execute(
+        select(FoodSource.code, Food.source_ref, Food.name_vi).join(FoodSource, FoodSource.id == Food.source_id)
+    )).all()}
+    for key, o in PREPARATION_OVERRIDES.items():
+        if key[0] == USDA_SR and not any(k[0] == USDA_SR for k in rows):
+            continue                                         # chưa nạp USDA trên DB này
+        assert rows.get(key) == o.name, key
 
 
 async def test_override_beats_keyword_rule_on_ingest(foods_session):

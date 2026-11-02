@@ -403,10 +403,10 @@ def test_system_prompt_food_rules():
         "không bao giờ coi là 0",
         "truyền grams",
         "chưa hỗ trợ cộng tổng",
-        "không có mục ức gà",
+        "không có mục cánh gà",
         "chưa có số liệu về bia",
         "không dùng số của men bia",
-        "phở bò, cơm đã nấu, cháo, canh",
+        "phở bò, cháo, canh",                      # 5d-2: cơm trắng đã có (USDA)
         "bảng thực phẩm tạm thời không truy cập được",
         "danh sách GỢI Ý",
         "KHÔNG nêu số liệu như thể đó là món đã hỏi",
@@ -476,7 +476,7 @@ def test_system_prompt_meal_log_rules():
         "chưa có dữ liệu nhật ký",
         "không đưa mục tiêu hay số còn lại",
         MEAL_LOG_UNAVAILABLE_CODE,
-        "15. NGUYÊN TẮC AN TOÀN Y TẾ",
+        "16. NGUYÊN TẮC AN TOÀN Y TẾ",
         "10. KHÔNG CÓ ĐÚNG MỤC THỰC PHẨM",           # quy tắc cũ giữ nguyên
     ]:
         assert rule in prompt, rule
@@ -555,14 +555,14 @@ from services.foods.lookup import RawOnlyFoodQuery  # noqa: E402
 
 
 async def test_cooked_dish_returns_raw_only_numbers_without_grams_or_sources():
-    rice = food("Gạo tẻ máy", 17, name_en="Ordinary polished rice", preparation="raw",
-                energy_kcal=344.0, carb_g=75.9).food
-    content, ctx = await run_lookup({"query": "cơm trắng", "grams": 100},
-                                    AsyncMock(side_effect=RawOnlyFoodQuery(COOKED_DISHES["cơm"], [rice])))
+    rice = food("Gạo nếp cái", 14, name_en="Glutinous rice, milled", preparation="raw",
+                energy_kcal=344.0, carb_g=74.9).food
+    content, ctx = await run_lookup({"query": "xôi", "grams": 100},
+                                    AsyncMock(side_effect=RawOnlyFoodQuery(COOKED_DISHES["xôi"], [rice])))
     assert content.startswith(FOOD_RAW_ONLY_CODE)
-    assert "KHÔNG có 'cơm' (món đã nấu)" in content and "chỉ có gạo tẻ SỐNG" in content
+    assert "KHÔNG có 'xôi' (món đã nấu)" in content and "chỉ có gạo nếp SỐNG" in content
     assert "KHÔNG dùng thay cho món đã nấu" in content and "không quy đổi" in content
-    assert "Trên 100 g gạo tẻ SỐNG: năng lượng 344 kcal" in content and "trạng thái: sống" in content
+    assert "Trên 100 g gạo nếp SỐNG: năng lượng 344 kcal" in content and "trạng thái: sống" in content
     assert "code đã tính" not in content                                  # không tính theo grams của cơm
     assert ctx.sources == []
 

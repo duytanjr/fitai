@@ -43,6 +43,22 @@ function PreparationBadge({ value }: { value: Preparation }) {
   );
 }
 
+function SourceBadge({ label }: { label: string }) {
+  return (
+    <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] text-violet-700 ring-1 ring-inset ring-violet-200">
+      {label}
+    </span>
+  );
+}
+
+function carbText(item: FoodSearchItem, grams = 100): string {
+  const carb = scalePreview(item.per_100g.carb_g, grams);
+  if (carb === null && item.carb_total_g !== null) {
+    return `carb (không gồm xơ) không có số liệu; carb tổng (GỒM xơ) ${formatValue(scalePreview(item.carb_total_g, grams), "g")}`;
+  }
+  return `carb (không gồm xơ) ${formatValue(carb, "g")}`;
+}
+
 function defaultMealType(): MealType {
   const hourVN = (new Date().getUTCHours() + 7) % 24;
   if (hourVN < 10) return "sang";
@@ -189,7 +205,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
                               onClick={() => setQuery(o.name_vi)}
                               className="rounded-full bg-white px-2.5 py-1 text-xs ring-1 ring-amber-200 hover:bg-amber-100"
                             >
-                              {o.name_vi} · {PREPARATION_LABELS[o.preparation]}
+                              {o.name_vi} · {PREPARATION_LABELS[o.preparation]} · {o.source_label}
                             </button>
                           ))
                         )}
@@ -216,19 +232,27 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
               >
                 <span>
                   <span className="block text-sm font-medium text-gray-900">{item.name_vi}</span>
+                  {item.name_original && (
+                    <span className="block text-xs italic text-gray-500">{item.name_original}</span>
+                  )}
                   <span className="block text-xs text-gray-500">{item.group_name}</span>
                   {item.matched_via && (
                     <span className="block text-xs text-indigo-700">
                       Bảng ghi là: {item.name_vi}
-                      {item.name_en ? ` (${item.name_en})` : ""} — khớp qua từ đồng nghĩa “{item.matched_via}”
+                      {item.name_original || item.name_en ? ` (${item.name_original || item.name_en})` : ""} — khớp qua{" "}
+                      {item.matched_via.startsWith("từ khoá") ? item.matched_via : `từ đồng nghĩa “${item.matched_via}”`}
                     </span>
                   )}
+                  {item.note && <span className="block text-xs text-amber-700">{item.note}</span>}
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-1">
                   <span className="text-xs text-gray-600">
                     {formatValue(item.per_100g.energy_kcal, "kcal")} / 100 g
                   </span>
-                  <PreparationBadge value={item.preparation} />
+                  <span className="flex gap-1">
+                    <PreparationBadge value={item.preparation} />
+                    <SourceBadge label={item.source.label} />
+                  </span>
                   <span
                     className={cn("rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset", MATCH_LABELS[item.match].className)}
                   >
@@ -244,13 +268,17 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
           <div className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2">
             <div>
               <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
-                {selected.name_vi} <PreparationBadge value={selected.preparation} />
+                {selected.name_vi} <PreparationBadge value={selected.preparation} />{" "}
+                <SourceBadge label={selected.source.label} />
               </p>
+              {selected.name_original && <p className="text-xs italic text-gray-500">{selected.name_original}</p>}
               <p className="text-xs text-gray-500">
-                Trên 100 g phần ăn được: {formatValue(selected.per_100g.energy_kcal, "kcal")} · protein{" "}
-                {formatValue(selected.per_100g.protein_g, "g")} · chất béo {formatValue(selected.per_100g.fat_g, "g")} ·
-                carb (không gồm xơ) {formatValue(selected.per_100g.carb_g, "g")}
+                {selected.source.code === "VN2007" ? "Trên 100 g phần ăn được" : "Trên 100 g (dữ liệu thực phẩm Mỹ, USDA)"}:{" "}
+                {formatValue(selected.per_100g.energy_kcal, "kcal")} · protein{" "}
+                {formatValue(selected.per_100g.protein_g, "g")} · chất béo {formatValue(selected.per_100g.fat_g, "g")} ·{" "}
+                {carbText(selected)}
               </p>
+              {selected.note && <p className="mt-1 text-xs text-amber-700">{selected.note}</p>}
               {selected.preparation === "unknown" && (
                 <p className="mt-1 text-xs text-gray-500">Nguồn không ghi rõ trạng thái sống/chín của mục này.</p>
               )}
@@ -308,8 +336,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
             <div className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
               Sẽ ghi: <strong>{formatValue(scalePreview(selected.per_100g.energy_kcal, grams), "kcal")}</strong> ·
               protein {formatValue(scalePreview(selected.per_100g.protein_g, grams), "g")} · chất béo{" "}
-              {formatValue(scalePreview(selected.per_100g.fat_g, grams), "g")} · carb (không gồm xơ){" "}
-              {formatValue(scalePreview(selected.per_100g.carb_g, grams), "g")}
+              {formatValue(scalePreview(selected.per_100g.fat_g, grams), "g")} · {carbText(selected, grams)}
             </div>
           )}
 

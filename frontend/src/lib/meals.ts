@@ -33,22 +33,37 @@ export const PREPARATION_LABELS: Record<Preparation, string> = {
   unknown: "không rõ trạng thái",
 };
 
+export interface FoodSourceInfo {
+  code: string;
+  /** "VN 2007" / "USDA" */
+  label: string;
+  title: string;
+  ref: string;
+}
+
 export interface FoodSearchItem {
   id: number;
-  code: number;
+  code: number | null;
   name_vi: string;
   name_en: string | null;
+  /** Mô tả gốc trong nguồn (USDA: tiếng Anh) */
+  name_original: string | null;
   group_name: string;
   refuse_pct: number | null;
-  source_page: number;
-  /** Giá trị trên 100 g phần ăn được */
+  source_page: number | null;
+  source: FoodSourceInfo;
+  /** Giá trị trên 100 g (VN 2007: phần ăn được); carb_g = glucid KHÔNG gồm xơ */
   per_100g: Nutrients;
+  /** Carbohydrate gốc của nguồn (USDA: gồm xơ) */
+  carb_total_g: number | null;
   match: "exact" | "partial" | "suggestion";
   /** Gợi ý gần nhất, KHÔNG phải kết quả đúng tên */
   is_suggestion: boolean;
   preparation: Preparation;
   /** Khớp qua từ đồng nghĩa, vd. "bông cải xanh → súp lơ xanh" (name_vi là tên trong nguồn) */
   matched_via: string | null;
+  /** Ghi chú của từ khoá đã duyệt (vd. cơm USDA) */
+  note: string | null;
 }
 
 /** Lựa chọn khi từ có nhiều nghĩa — không kèm số liệu. */
@@ -57,6 +72,7 @@ export interface AmbiguityOption {
   name_vi: string;
   group_name: string;
   preparation: Preparation;
+  source_label: string;
 }
 
 export interface Ambiguity {

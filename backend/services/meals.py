@@ -27,7 +27,9 @@ MAX_FUTURE_DAYS = 1
 SNAPSHOT_FIELDS = ("energy_kcal", "protein_g", "fat_g", "carb_g", "fiber_g")
 # Trường tổng ngày → trường mục tiêu của metrics_service (xơ không có mục tiêu)
 TARGET_FIELDS = {"energy_kcal": "target_calories", "protein_g": "protein_g", "fat_g": "fat_g", "carb_g": "carb_g"}
-CARB_NOTE = "Carb đã ăn lấy từ cột glucid của Bảng thành phần thực phẩm Việt Nam 2007, không gồm xơ (celluloza)."
+CARB_NOTE = ("Carb đã ăn là glucid không gồm xơ theo từng nguồn (Bảng thành phần thực phẩm Việt Nam 2007; "
+             "USDA: carbohydrate trừ xơ). Xơ hai nguồn khác loại (celluloza / xơ thực phẩm tổng số) nên tổng xơ "
+             "khi lẫn hai nguồn chỉ mang tính tham khảo.")
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 

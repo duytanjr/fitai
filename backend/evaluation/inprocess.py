@@ -19,7 +19,8 @@ from evaluation.questions import Question
 from evaluation.runner import ChatOutcome
 from models.food import Food
 from services.ai_agents.fitness_advisor import FitnessAdvisorAgent
-from services.foods.aliases import AMBIGUOUS, COOKED_DISHES
+from services.foods.aliases import AMBIGUOUS
+from services.foods.sources import VN2007, source_code
 from services.foods.lookup import search_foods
 
 NUTRIENTS = (("energy_kcal", "kcal"), ("protein_g", "protein"), ("fat_g", "lipid"), ("carb_g", "glucid"))
@@ -92,14 +93,16 @@ async def load_references(client: AsyncClient, accounts: EvalAccounts) -> Refere
         h = accounts.headers(account)
         refs.metrics[account] = (await client.get(f"{API}/profile/metrics", headers=h)).json()
         refs.summary[account] = (await client.get(f"{API}/meals/summary", headers=h)).json()
-    avocado_butter = [c for m in AMBIGUOUS["bơ"] for c in m.codes]
-    rice = list(COOKED_DISHES["cơm"].codes)
+    avocado_butter = [int(ref) for m in AMBIGUOUS["bơ"] for src, ref in m.refs if src == VN2007]
+    # C09: số liệu gạo SỐNG (VN 2007) không được nêu như số của cơm — giữ nguyên ý nghĩa kiểm tra cũ
+    rice = [1004, 1003]
     codes = {c for c, *_ in FOOD_CHECKS.values()} | set(avocado_butter) | set(rice)
     from sqlalchemy import select
     async with AsyncSessionLocal() as db:
         rows = (await db.execute(select(Food).where(Food.code.in_(codes)))).scalars().all()
         refs.foods = {f.code: f for f in rows}
-        suggestions = [m.food for m in await search_foods(db, "ức gà", limit=10)]
+        # C04: chỉ các mục gà KHÁC của VN 2007 (5d-2: "ức gà" đã có mục USDA, là kết quả đúng — không tính)
+        suggestions = [m.food for m in await search_foods(db, "gà", limit=10) if source_code(m.food) == VN2007]
     refs.substitutes = {
         "C04": _values(suggestions),
         "C06": _values([refs.foods[c] for c in avocado_butter if c in refs.foods]),

@@ -83,6 +83,46 @@ không gồm xơ.
 phải bông cải xanh (broccoli) hay không. Tra "bông cải xanh" chỉ cho biết "bảng ghi là Súp lơ xanh
 (Cauliflower, green)", không khẳng định hai thứ là một.
 
+## 3b. Nguồn bổ sung: USDA FoodData Central — SR Legacy (2018)
+
+* **Giấy phép:** CC0 1.0 (public domain) — USDA FoodData Central. Dữ liệu thô tải về đặt ở
+  `data/foods/external/` (KHÔNG commit, đã thêm vào `.gitignore`). Foundation Foods chưa dùng (bản tải
+  về thiếu `food.csv`, `food_nutrient.csv`, `food_portion.csv`).
+* **Chỉ 20 mục đã duyệt** (danh sách trong `backend/services/foods/usda.py`, `USDA_SELECTION`). File con
+  `data/foods/usda_selected.csv` (commit được) sinh từ dữ liệu thô:
+
+```bash
+docker compose exec backend python scripts/build_usda_subset.py --out /tmp/usda_selected.csv
+docker cp fitai_backend:/tmp/usda_selected.csv data/foods/usda_selected.csv
+docker compose exec backend python scripts/ingest_usda_foods.py --dry-run
+docker compose exec backend python scripts/ingest_usda_foods.py            # chạy lại không nhân đôi
+docker compose exec backend python scripts/ingest_usda_foods.py --reset    # CHỈ xoá & nạp lại dòng USDA
+```
+
+* **Bảng `food_sources`:** mỗi dòng `foods` có `source_id` + `source_ref` (VN2007: mã số; USDA: fdc_id),
+  khoá duy nhất `(source_id, source_ref)`; `code`/`stt`/`source_page` chỉ có nghĩa với VN2007. Mỗi kết quả
+  trích dẫn đúng nguồn của chính nó (VN: tr. PDF; USDA: fdc_id). `--reset` của mỗi script chỉ đụng dòng
+  của nguồn đó và bị từ chối nếu có nhật ký bữa ăn tham chiếu.
+* **Mã chất** (đọc từ `nutrient.csv` theo tên + đơn vị): năng lượng 1008 (KCAL), protein 1003, lipid tổng
+  1004, carbohydrate by difference 1005, xơ thực phẩm tổng số 1079, nước 1051, tro 1007.
+* **Quy ước carb:** "Carbohydrate, by difference" của USDA GỒM xơ (xác nhận bằng dữ liệu: nước + protein +
+  lipid + tro + carb ≈ 100 g mà không cộng thêm xơ). Lưu nguyên vào `carb_total_g`; `carb_g` = carb − xơ
+  để cùng nghĩa "glucid không gồm xơ" với bảng 2007. Thiếu xơ → `carb_g` = NULL (không coi xơ = 0); ra số
+  âm → NULL kèm cờ `carb_tru_xo_am`.
+* **Xơ khác loại:** bảng 2007 ghi celluloza, USDA ghi xơ thực phẩm tổng số (TDF, AOAC) — không so sánh
+  trực tiếp; tổng xơ khi lẫn hai nguồn chỉ mang tính tham khảo.
+* **Năng lượng:** USDA tính bằng hệ số Atwater RIÊNG từng thực phẩm (`food_calorie_conversion_factor`), nên
+  không áp quy tắc 4/9/4 của `quality.py`. Script kiểm lại bằng hệ số riêng và ghi vào
+  `quality_flags.nang_luong_he_so_rieng` (cả 20 mục khớp trong ±1 kcal).
+* **Ghi chú dữ liệu:** tôm nấu chín (fdc 171971) — mô tả gốc có "may contain additives to retain moisture";
+  cá ngừ đóng hộp (fdc 171986) — tổng khối lượng 102,32 g (cờ `tong_khoi_luong_ngoai_khoang`, giữ nguyên số
+  gốc); cơm (gạo trắng nấu chín, fdc 169757) — tỷ lệ nước khi nấu có thể khác cơm Việt; sữa chua (fdc 171284)
+  — nguồn ghi "plain", không ghi rõ có thêm đường hay không.
+* **Trạng thái:** gán theo từ khoá tiếng Anh trong mô tả gốc; yến mạch khô (fdc 173904) gán tay `dried`
+  ("dry" không thêm vào bộ từ khoá vì trùng "dry heat").
+* **Chưa dùng `food_portion`** (quy đổi đơn vị gia dụng ra gam) — việc sau. Cảnh báo: "cup" là chén đong
+  Mỹ (~240 ml), KHÔNG phải bát ăn cơm của người Việt; cỡ trứng theo chuẩn Mỹ.
+
 ## 4. Hạn chế đã biết
 
 * **Không có món ăn hoàn chỉnh** (phở bò, cơm đã nấu, cháo, canh, món xào...): chỉ có

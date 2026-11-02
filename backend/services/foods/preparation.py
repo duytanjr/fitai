@@ -112,23 +112,32 @@ def classify(name_vi: str, name_en: str | None) -> Classification:
 
 @dataclass(frozen=True)
 class PreparationOverride:
-    code: int                  # mã số trong bảng foods
+    source: str                # mã nguồn (VN2007 / USDA_SR_LEGACY_2018)
+    ref: str                   # tham chiếu trong nguồn (mã số / fdc_id)
     name: str                  # tên mong đợi (test đối chiếu với DB)
     value: FoodPreparation
     reason: str
 
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self.source, self.ref)
 
-# Giá trị chỉnh tay đã duyệt — áp dụng khi nạp PDF và khi backfill, với preparation_source='manual'.
-# Một dòng đã 'manual' trong DB (chỉnh tay trực tiếp) vẫn được giữ nguyên.
-PREPARATION_OVERRIDES: dict[int, PreparationOverride] = {o.code: o for o in (
-    PreparationOverride(1001, "Gạo nếp cái", FoodPreparation.RAW, "gạo xay xát chưa nấu (EN milled; nước 14 g, 344 kcal)"),
-    PreparationOverride(1002, "Gạo nếp máy (Loại thường)", FoodPreparation.RAW, "gạo xay xát chưa nấu (EN milled)"),
-    PreparationOverride(1003, "Gạo tẻ giã", FoodPreparation.RAW, "gạo giã chưa nấu (EN home-pounded rice)"),
-    PreparationOverride(1004, "Gạo tẻ máy", FoodPreparation.RAW, "gạo xay xát chưa nấu (EN polished rice)"),
-    PreparationOverride(1005, "Gạo lứt", FoodPreparation.RAW, "gạo lứt chưa nấu (EN brown or hulled)"),
-    PreparationOverride(3031, "Sữa bột đậu nành", FoodPreparation.UNKNOWN,
+
+_VN, _USDA = "VN2007", "USDA_SR_LEGACY_2018"
+# Giá trị chỉnh tay đã duyệt — áp dụng khi nạp và khi backfill, với preparation_source='manual'.
+# Một dòng đã 'manual' trong DB (chỉnh tay trực tiếp) vẫn được giữ nguyên. Khoá: (nguồn, tham chiếu).
+PREPARATION_OVERRIDES: dict[tuple[str, str], PreparationOverride] = {o.key: o for o in (
+    PreparationOverride(_VN, "1001", "Gạo nếp cái", FoodPreparation.RAW, "gạo xay xát chưa nấu (EN milled; nước 14 g, 344 kcal)"),
+    PreparationOverride(_VN, "1002", "Gạo nếp máy (Loại thường)", FoodPreparation.RAW, "gạo xay xát chưa nấu (EN milled)"),
+    PreparationOverride(_VN, "1003", "Gạo tẻ giã", FoodPreparation.RAW, "gạo giã chưa nấu (EN home-pounded rice)"),
+    PreparationOverride(_VN, "1004", "Gạo tẻ máy", FoodPreparation.RAW, "gạo xay xát chưa nấu (EN polished rice)"),
+    PreparationOverride(_VN, "1005", "Gạo lứt", FoodPreparation.RAW, "gạo lứt chưa nấu (EN brown or hulled)"),
+    PreparationOverride(_VN, "3031", "Sữa bột đậu nành", FoodPreparation.UNKNOWN,
                         "'roasted' chỉ nói về nguyên liệu (made from roasted soybeans)"),
-    PreparationOverride(1021, "Cốm", FoodPreparation.UNKNOWN, "EN ghi Raw nhưng cốm thường đã rang/giã"),
-    PreparationOverride(8056, "Bánh phồng tôm sống", FoodPreparation.UNKNOWN, "sản phẩm chế biến, chỉ là chưa rán"),
-    PreparationOverride(11007, "Mứt bí ngô", FoodPreparation.UNKNOWN, "mứt sên đường, EN 'Dried preserved'"),
+    PreparationOverride(_VN, "1021", "Cốm", FoodPreparation.UNKNOWN, "EN ghi Raw nhưng cốm thường đã rang/giã"),
+    PreparationOverride(_VN, "8056", "Bánh phồng tôm sống", FoodPreparation.UNKNOWN, "sản phẩm chế biến, chỉ là chưa rán"),
+    PreparationOverride(_VN, "11007", "Mứt bí ngô", FoodPreparation.UNKNOWN, "mứt sên đường, EN 'Dried preserved'"),
+    # 5d-2 (USDA): "dry" không thêm vào bộ từ khoá tự động vì trùng "dry heat" (cá hồi nấu chín)
+    PreparationOverride(_USDA, "173904", "Yến mạch cán khô", FoodPreparation.DRIED,
+                        "mô tả ghi dry = dạng khô chưa nấu"),
 )}

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 import uuid
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer
 
 
 class ChatMessageCreate(BaseModel):
@@ -29,11 +29,20 @@ class ChatMessageCreate(BaseModel):
 
 
 class SourceOut(BaseModel):
-    """Một nguồn trích dẫn (đoạn tài liệu RAG) của câu trả lời AI."""
+    """Một nguồn trích dẫn (đoạn tài liệu RAG hoặc một dòng thực phẩm) của câu trả lời AI."""
     title: str
     authors_org: Optional[str] = None
     year: Optional[int | str] = None
     page: Optional[int] = Field(None, description="Số trang PDF (đếm từ 1)")
+    ref: Optional[str] = Field(None, description="Tham chiếu khi nguồn không có số trang, vd. 'fdc_id 171477'")
+
+    @model_serializer(mode="wrap")
+    def _drop_empty_ref(self, handler):
+        # Giữ nguyên dạng phản hồi cũ cho nguồn có số trang: chỉ đưa "ref" khi có giá trị
+        data = handler(self)
+        if data.get("ref") is None:
+            data.pop("ref", None)
+        return data
 
 
 class ChatResponse(BaseModel):
