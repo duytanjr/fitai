@@ -1,6 +1,6 @@
 # Trạng thái dự án FitAI (ghi chú bàn giao giữa các phiên)
 
-Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-02.
+Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-04.
 
 ## 1. Các lát đã xong (git log)
 | Lát | Commit | Nội dung chính |
@@ -14,8 +14,12 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | 5d-1 | 7bdeb15 | từ đồng nghĩa/mơ hồ, preparation sống/chín, quy ước glucid, gạo sống (manual) |
 | Đánh giá v1 | eade8b0 | eval_questions.csv v1 + bộ chạy đánh giá |
 | 5d-2 | 7516fb2 | food_sources, 20 mục USDA SR Legacy, trích dẫn theo từng dòng |
+| 7 (FR15–17) | chưa commit | body_metrics, /body-metrics, /progress, báo cáo tuần, get_progress_summary, dashboard tiến độ |
 
-- pytest hiện tại: 393 passed, 0 skipped (lần chạy cuối trong phiên).
+- pytest hiện tại: 487 passed, 0 skipped (sau lát 7; trước đó 393).
+- Lát 7 trên nhánh feat/progress, chưa commit. md5 trước/sau migration e5a7c3b91f20 (trùng nhau):
+  foods 529 dòng (VN + USDA) `8a773b9b054b5568fad90618824d9ced`, meal_logs 16 dòng
+  `dead684f3f89244a24a7d81e4bd7f269`, food_sources 2 dòng `52bc5ff84530157b4e78a424a8f5fd2f`.
 - Đổi nhãn "xơ thực phẩm tổng số" đã nằm trong 7516fb2 (chưa chắc: suy từ git status sạch).
 - Dòng `food_sources.id=2` trong DB dev có thể còn chữ cũ "xơ ăn kiêng tổng số" (migration chạy trước khi đổi
   tên); chỉ là cột mô tả, chưa hiển thị ở đâu.
@@ -26,9 +30,25 @@ Công cụ của agent (fitness_advisor.py, tối đa 3 vòng, 3 lệnh gọi/v�
 - `calc_body_metrics()`: không nhận tham số; đọc hồ sơ của user lấy từ JWT.
 - `lookup_food(query, grams?)`: tra bảng foods; code tính theo grams; mỗi dòng trích nguồn riêng.
 - `get_daily_summary(date?)`: chỉ đọc nhật ký ngày của user hiện tại (giờ VN = UTC+7).
+- `get_progress_summary(days=7)` (công cụ thứ 5): chỉ đọc, không nhận user_id; days ∈ {7, 30, 90}, sai thì
+  trả lỗi tham số. Chỉ kèm chuỗi theo ngày khi days=7. Prompt quy tắc 16 (tiến độ): nói "N ngày gần nhất",
+  không nói "tuần này", kèm calorie_note, không dùng từ đánh giá; quy tắc an toàn y tế giờ là số 17.
 
 Bảng chính: users, user_profiles, chat_sessions, chat_messages (sources JSON), foods, food_sources,
-meal_logs (FK RESTRICT tới foods). Migration head: d81346ffa006.
+meal_logs (FK RESTRICT tới foods), body_metrics. Migration head: e5a7c3b91f20.
+
+Tiến độ (lát 7, services/progress.py):
+- `body_metrics`: duy nhất (user_id, measured_on), FK CASCADE, CHECK cân nặng 20–300, vòng eo NULL hoặc
+  30–250. Ngày theo giờ VN, tối đa +1 ngày. Ghi cân KHÔNG đổi cân nặng trong hồ sơ.
+- API (JWT, bản ghi người khác → 404): POST /body-metrics (upsert; trường không gửi giữ nguyên, null rõ
+  ràng thì xoá; 201 tạo mới / 200 cập nhật), GET /body-metrics?from=&to= (mặc định 90 ngày, tối đa 366),
+  DELETE /body-metrics/{id}; GET /progress?days=7|30|90 (ngày trống là null, không bao giờ 0; cờ
+  incomplete_totals; mục tiêu từ metrics_service, hồ sơ chưa đủ thì null + is_complete=false);
+  GET /progress/weekly-report?week_start= (thứ Hai, mặc định tuần trước; tuần chưa hết dùng days_elapsed
+  làm mẫu số; nhận xét do code tạo, trung tính, kèm ghi chú calo).
+- Dashboard (frontend/src/components/dashboard/): thẻ hôm nay, biểu đồ calo và cân nặng tự vẽ bằng SVG
+  (không thêm thư viện, có aria-label và dòng chữ giá trị gần nhất), form ghi/sửa/xoá số đo, thẻ báo cáo tuần,
+  nút Đăng xuất.
 
 Nguồn dữ liệu thực phẩm (`food_sources`, id cố định):
 - 1 = VN2007, Bảng thành phần thực phẩm Việt Nam 2007: 509 dòng (nhóm 14 đồ uống bị loại, thiếu STT 450).
@@ -96,12 +116,19 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   bằng thử thật.
 - ESLint frontend lỗi sẵn ("nextVitals is not iterable"); kiểm tra frontend bằng tsc và next build.
 - Bản quyền bảng 2007 trong data/foods/README.md: người dùng tự điền.
+- Tiến độ: chưa có gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (mục tiêu calo vẫn tính theo cân
+  nặng trong hồ sơ). Trung bình calo chỉ tính trên ngày có nhật ký nên thấp hơn thực tế nếu ghi thiếu bữa.
+  Dashboard mới chỉ kiểm bằng tsc/next build, chưa thử trên trình duyệt; get_progress_summary chưa thử với
+  Gemini thật.
 
 ## 7. Việc còn lại (thứ tự dự kiến)
-1. Lát tiến độ (FR15–17: cân nặng, biểu đồ, báo cáo tuần).
-2. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
-3. Thể dục (FR12–14: bài tập, lịch tập, nhật ký tập).
-4. Quản trị (FR18–20: tài liệu, CSDL món ăn và bài tập, nhật ký hội thoại ẩn danh).
-5. Lọc câu hỏi y khoa (guardrail riêng, ngoài quy tắc prompt hiện có).
-6. Cập nhật hành vi mong đợi C04/C08/C09/C10 (bản v2), rồi đo lần 2 và so với mốc eade8b0.
+1. Hoàn tất lát 7: người dùng commit; `docker compose build frontend && docker compose up -d frontend`; thử
+   dashboard trên trình duyệt; thử get_progress_summary với Gemini thật (vài lượt).
+2. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
+3. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
+4. Thể dục (FR12–14: bài tập, lịch tập, nhật ký tập).
+5. Quản trị (FR18–20: tài liệu, CSDL món ăn và bài tập, nhật ký hội thoại ẩn danh).
+6. Lọc câu hỏi y khoa (guardrail riêng, ngoài quy tắc prompt hiện có).
+7. Cập nhật hành vi mong đợi C04/C08/C09/C10 (bản v2), rồi đo lần 2 và so với mốc eade8b0. Có thể thêm
+   câu đánh giá cho tiến độ.
 Thứ tự trên là dự kiến của người dùng; chi tiết từng lát chưa chốt (chưa chắc).
