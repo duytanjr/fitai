@@ -195,3 +195,15 @@ class ChatService:
         )
         msg_res = await self.db.execute(msg_stmt)
         return list(msg_res.scalars().all())
+
+    async def delete_session(self, user_id: uuid.UUID, session_id: uuid.UUID) -> None:
+        """Xoá phiên của user (tin nhắn bị xoá theo FK ON DELETE CASCADE). Không thuộc user → 404."""
+        session = (await self.db.execute(select(ChatSession).where(
+            ChatSession.id == session_id, ChatSession.user_id == user_id))).scalar_one_or_none()
+        if session is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Phiên trò chuyện không tồn tại hoặc không thuộc quyền sở hữu của bạn.",
+            )
+        await self.db.delete(session)
+        await self.db.commit()

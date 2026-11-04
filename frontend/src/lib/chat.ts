@@ -47,4 +47,7 @@ export const chatApi = {
 
   getSessionMessages: (sessionId: string) =>
     apiClient.get<ChatMessage[]>(`/chat/sessions/${sessionId}/messages`),
+
+  /** Xoá phiên của chính mình (kèm mọi tin nhắn). */
+  deleteSession: (sessionId: string) => apiClient.delete<void>(`/chat/sessions/${sessionId}`),
 };

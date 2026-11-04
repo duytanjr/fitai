@@ -1,6 +1,6 @@
 """API Routers cho tính năng Chatbot (FR4, FR6)."""
 import uuid
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -69,3 +69,17 @@ async def get_session_messages(
         user_id=current_user.id, session_id=session_id
     )
     return messages
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat_session(
+    session_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Người dùng xoá phiên của CHÍNH mình (kèm mọi tin nhắn — FK ON DELETE CASCADE).
+
+    Trả 404 nếu phiên không tồn tại hoặc không thuộc người dùng hiện tại.
+    """
+    await ChatService(db).delete_session(user_id=current_user.id, session_id=session_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

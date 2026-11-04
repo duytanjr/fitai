@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     KNOWLEDGE_PDF_MEMORY_MB: int = 1024       # giới hạn bộ nhớ ảo của tiến trình con đọc PDF
     KNOWLEDGE_MAX_CHUNKS: int = 400           # vượt thì không nhúng (tai_lieu_qua_dai)
 
+    # Xem hội thoại ẩn danh (lát 8b-2) — dữ liệu sức khoẻ, mặc định TẮT
+    ADMIN_CONVERSATION_VIEWER_ENABLED: bool = False
+    ADMIN_CONVERSATION_VIEW_DAILY_LIMIT: int = 30
+
     # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
 

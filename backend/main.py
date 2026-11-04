@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from core.log_filters import install_access_log_filter
-from api.routers import admin_documents, admin_foods, auth, body_metrics, chat, foods, meals, progress, users
+from api.routers import admin_conversations, admin_documents, admin_foods, auth, body_metrics, chat, foods, meals, progress, users
 from api.routers.profile import router as profile_router
 
 # Access log không ghi query string (có thể chứa từ khoá tìm thực phẩm của người dùng)
@@ -37,6 +37,19 @@ app.include_router(body_metrics.router, prefix=settings.API_V1_STR)
 app.include_router(progress.router, prefix=settings.API_V1_STR)
 app.include_router(admin_foods.router, prefix=settings.API_V1_STR)
 app.include_router(admin_documents.router, prefix=settings.API_V1_STR)
+app.include_router(admin_conversations.router, prefix=settings.API_V1_STR)
+
+ADMIN_PREFIX = f"{settings.API_V1_STR}/admin/"
+
+
+@app.middleware("http")
+async def no_store_for_admin(request, call_next):
+    """Mọi phản hồi /admin/* (kể cả 401/403/422/429) không được lưu cache — có thể chứa dữ liệu nhạy cảm."""
+    response = await call_next(request)
+    if request.url.path.startswith(ADMIN_PREFIX):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.on_event("startup")

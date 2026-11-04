@@ -20,6 +20,7 @@ export function ChatView() {
     setSessions,
     addSession,
     setCurrentSession,
+    removeSession,
     setMessages,
     appendMessage,
   } = useChatStore();
@@ -96,6 +97,28 @@ export function ChatView() {
           setError("Không thể tải tin nhắn của phiên này.");
         }
       }
+    }
+  };
+
+  // ── Xoá phiên (của chính mình) ─────────────────────────────────────────────
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteSession = async (sessionId: string) => {
+    setDeletingId(sessionId);
+    setError("");
+    try {
+      await chatApi.deleteSession(sessionId);
+      removeSession(sessionId);
+      setConfirmDeleteId(null);
+    } catch (err: any) {
+      if (err?.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      setError(err?.status === 404 ? "Phiên này không còn tồn tại." : "Không xoá được cuộc trò chuyện. Vui lòng thử lại.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -191,19 +214,45 @@ export function ChatView() {
               Chưa có cuộc trò chuyện nào
             </p>
           ) : (
-            sessions.map((session) => (
-              <button
-                key={session.id}
-                onClick={() => handleSelectSession(session.id)}
-                className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors truncate block ${
-                  currentSessionId === session.id
-                    ? "bg-indigo-50 text-indigo-700 font-medium"
-                    : "text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {session.title ?? "Cuộc trò chuyện mới"}
-              </button>
-            ))
+            sessions.map((session) =>
+              confirmDeleteId === session.id ? (
+                <div key={session.id} className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <p className="mb-1.5">Xoá cuộc trò chuyện này và mọi tin nhắn? Không hoàn tác được.</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="danger" loading={deletingId === session.id}
+                            onClick={() => handleDeleteSession(session.id)}>
+                      Xoá
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={deletingId === session.id}
+                            onClick={() => setConfirmDeleteId(null)}>
+                      Không
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div key={session.id} className="group flex items-center gap-1">
+                  <button
+                    onClick={() => handleSelectSession(session.id)}
+                    className={`min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left text-sm transition-colors truncate block ${
+                      currentSessionId === session.id
+                        ? "bg-indigo-50 text-indigo-700 font-medium"
+                        : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {session.title ?? "Cuộc trò chuyện mới"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(session.id)}
+                    aria-label="Xoá cuộc trò chuyện"
+                    title="Xoá cuộc trò chuyện"
+                    className="shrink-0 rounded px-2 py-1 text-xs text-gray-400 hover:bg-red-50 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )
+            )
           )}
         </nav>
       </aside>
@@ -297,6 +346,9 @@ export function ChatView() {
             <ChatInput onSend={handleSend} disabled={isSending} />
             <p className="mt-2 text-center text-xs text-gray-400">
               FitAI có thể mắc lỗi. Luôn tham vấn chuyên gia y tế cho các vấn đề sức khỏe hay chấn thương.
+            </p>
+            <p className="mt-1 text-center text-xs text-gray-400">
+              Hội thoại có thể được quản trị viên xem ở dạng ẩn danh để cải thiện chất lượng.
             </p>
           </div>
         </div>

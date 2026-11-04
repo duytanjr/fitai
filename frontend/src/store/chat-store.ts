@@ -11,6 +11,7 @@ interface ChatState {
   setCurrentSession: (sessionId: string | null) => void;
   setMessages: (sessionId: string, messages: ChatMessage[]) => void;
   appendMessage: (sessionId: string, message: ChatMessage) => void;
+  removeSession: (sessionId: string) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -37,4 +38,14 @@ export const useChatStore = create<ChatState>((set) => ({
         [sessionId]: [...(state.activeSessions[sessionId] ?? []), message],
       },
     })),
+
+  removeSession: (sessionId) =>
+    set((state) => {
+      const { [sessionId]: _removed, ...rest } = state.activeSessions;
+      return {
+        sessions: state.sessions.filter((s) => s.id !== sessionId),
+        activeSessions: rest,
+        currentSessionId: state.currentSessionId === sessionId ? null : state.currentSessionId,
+      };
+    }),
 }));
