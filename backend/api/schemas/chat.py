@@ -35,13 +35,16 @@ class SourceOut(BaseModel):
     year: Optional[int | str] = None
     page: Optional[int] = Field(None, description="Số trang PDF (đếm từ 1)")
     ref: Optional[str] = Field(None, description="Tham chiếu khi nguồn không có số trang, vd. 'fdc_id 171477'")
+    note: Optional[str] = Field(None, description="Ghi chú nguồn số liệu (dòng quản trị viên nhập) — dữ liệu, "
+                                                  "hiển thị dạng văn bản thuần")
 
     @model_serializer(mode="wrap")
     def _drop_empty_ref(self, handler):
-        # Giữ nguyên dạng phản hồi cũ cho nguồn có số trang: chỉ đưa "ref" khi có giá trị
+        # Giữ nguyên dạng phản hồi cũ: chỉ đưa "ref" / "note" khi có giá trị
         data = handler(self)
-        if data.get("ref") is None:
-            data.pop("ref", None)
+        for key in ("ref", "note"):
+            if data.get(key) is None:
+                data.pop(key, None)
         return data
 
 

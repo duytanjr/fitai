@@ -15,6 +15,8 @@ export interface ChatSource {
   page?: number | null;
   /** Tham chiếu khi nguồn không có số trang, vd. "fdc_id 171477" (USDA) */
   ref?: string | null;
+  /** Ghi chú nguồn số liệu (dòng quản trị viên nhập) — dữ liệu người nhập, chỉ hiển thị dạng văn bản thuần */
+  note?: string | null;
 }
 
 export interface ChatMessage {

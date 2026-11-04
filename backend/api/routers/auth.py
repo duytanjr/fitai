@@ -69,4 +69,5 @@ async def register(
         email=user.email,
         full_name=user.full_name,
         is_active=user.is_active,
+        role=user.role,
     )

@@ -45,7 +45,7 @@ from services.foods.aliases import (
 )
 from services.foods.normalize import normalize_search
 from services.foods.parser import NUTRIENT_FIELDS
-from services.foods.sources import USDA_SR, VN2007, source_code
+from services.foods.sources import ADMIN_MANUAL, USDA_SR, VN2007, source_code
 
 logger = logging.getLogger(__name__)
 
@@ -299,7 +299,7 @@ NUTRIENT_LABELS = {
 assert set(NUTRIENT_LABELS) == set(NUTRIENT_FIELDS)
 
 
-FIBER_LABELS = {VN2007: "xơ (celluloza)", USDA_SR: "xơ thực phẩm tổng số"}
+FIBER_LABELS = {VN2007: "xơ (celluloza)", USDA_SR: "xơ thực phẩm tổng số", ADMIN_MANUAL: "xơ (loại không xác định)"}
 
 
 def fiber_label(food: Food) -> str:

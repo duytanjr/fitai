@@ -52,7 +52,11 @@ export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProp
               <p className="font-semibold text-gray-600">Tài liệu tham khảo</p>
               <ol className="mt-1 list-decimal space-y-0.5 pl-4">
                 {sources!.map((source, i) => (
-                  <li key={`${source.title}-${source.page ?? source.ref}-${i}`}>{formatSource(source)}</li>
+                  <li key={`${source.title}-${source.page ?? source.ref}-${i}`}>
+                    {formatSource(source)}
+                    {/* Văn bản thuần (React tự escape), không render HTML */}
+                    {source.note && <span className="block text-gray-400">Ghi chú nguồn: {source.note}</span>}
+                  </li>
                 ))}
               </ol>
             </div>

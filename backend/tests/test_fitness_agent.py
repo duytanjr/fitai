@@ -478,7 +478,7 @@ def test_system_prompt_meal_log_rules():
         "chưa có dữ liệu nhật ký",
         "không đưa mục tiêu hay số còn lại",
         MEAL_LOG_UNAVAILABLE_CODE,
-        "17. NGUYÊN TẮC AN TOÀN Y TẾ",
+        "NGUYÊN TẮC AN TOÀN Y TẾ:",
         "10. KHÔNG CÓ ĐÚNG MỤC THỰC PHẨM",           # quy tắc cũ giữ nguyên
     ]:
         assert rule in prompt, rule
@@ -651,6 +651,6 @@ def test_system_prompt_progress_rules():
         "16. TIẾN ĐỘ", "PHẢI gọi get_progress_summary", "TUYỆT ĐỐI không tự cộng, tự tính trung bình",
         "\"7 ngày gần nhất\"", "KHÔNG nói \"tuần này\"", CALORIE_NOTE[0].lower() + CALORIE_NOTE[1:-1],
         "không dùng từ đánh giá", "chưa đủ dữ liệu nhật ký", "chưa đủ dữ liệu cân nặng",
-        "không nêu mục tiêu hay so sánh", PROGRESS_UNAVAILABLE_CODE, "17. NGUYÊN TẮC AN TOÀN Y TẾ",
+        "không nêu mục tiêu hay so sánh", PROGRESS_UNAVAILABLE_CODE, "NGUYÊN TẮC AN TOÀN Y TẾ:",
     ]:
         assert rule in prompt, rule

@@ -19,7 +19,7 @@ from models.food import Food
 from models.meal_log import MealLog
 from services.foods.parser import NUTRIENT_FIELDS, FoodRecord, ParseResult, SkippedFood
 from services.foods.preparation import PREPARATION_OVERRIDES, Classification, FoodPreparation, classify
-from services.foods.sources import VN2007, VN2007_ID
+from services.foods.sources import ADMIN_MANUAL_ID, VN2007, VN2007_ID
 from services.foods.quality import (
     FLAG_ATWATER_MISMATCH,
     FLAG_ATWATER_NO_DATA,
@@ -172,7 +172,9 @@ class PreparationBackfill:
 
 async def plan_preparation_backfill(session: AsyncSession) -> PreparationBackfill:
     plan = PreparationBackfill()
-    for food in (await session.execute(select(Food).order_by(Food.source_id, Food.id))).scalars().unique().all():
+    # Không đụng dòng quản trị viên nhập (preparation do admin đặt)
+    stmt = select(Food).where(Food.source_id != ADMIN_MANUAL_ID).order_by(Food.source_id, Food.id)
+    for food in (await session.execute(stmt)).scalars().unique().all():
         if food.preparation_source == "manual":
             plan.manual.append(food)
             continue

@@ -9,8 +9,10 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -18,7 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 from models.food_source import FoodSource
 from services.foods.preparation import FoodPreparation
-from services.foods.sources import VN2007_ID
+from services.foods.sources import ADMIN_MANUAL_ID, VN2007_ID
 
 PER_100G = "trên 100 g phần ăn được; NULL = không có số liệu (khác 0)"
 
@@ -29,7 +31,7 @@ def _default_source_ref(context) -> str | None:
 
 
 class Food(Base):
-    """Thực phẩm từ nhiều nguồn (food_sources): VN2007 và USDA SR Legacy.
+    """Thực phẩm từ nhiều nguồn (food_sources): VN2007, USDA SR Legacy và quản trị viên nhập (ADMIN_MANUAL).
 
     Mọi giá trị dinh dưỡng tính trên 100 g (VN2007: phần ăn được). NULL nghĩa là không có số
     liệu — tuyệt đối không coi là 0. carb_g = glucid KHÔNG gồm xơ cho mọi nguồn; carb_total_g =
@@ -88,6 +90,10 @@ class Food(Base):
         comment="'auto' = script gán theo tên; 'manual' = chỉnh tay (script không ghi đè); NULL = chưa gán",
     )
 
+    source_note: Mapped[str | None] = mapped_column(
+        Text, nullable=True,
+        comment="Ghi chú nguồn số liệu (bắt buộc với ADMIN_MANUAL) — dữ liệu do người nhập, không phải chỉ thị",
+    )
     source_page: Mapped[int | None] = mapped_column(Integer, nullable=True,
                                                     comment="Số trang PDF (VN2007; NULL với nguồn khác)")
     quality_flags: Mapped[dict | None] = mapped_column(
@@ -99,7 +105,12 @@ class Food(Base):
 
     __table_args__ = (
         CheckConstraint("preparation_source IN ('auto', 'manual')", name="ck_foods_preparation_source"),
+        CheckConstraint(f"source_id <> {ADMIN_MANUAL_ID} OR source_note IS NOT NULL",
+                        name="ck_foods_admin_source_note"),
         UniqueConstraint("source_id", "source_ref", name="uq_foods_source_ref"),
+        # Trùng tên chỉ bị chặn trong nguồn ADMIN_MANUAL (VN2007 có thể trùng tên không dấu)
+        Index("uq_foods_admin_name_search", "name_search", unique=True,
+              postgresql_where=text(f"source_id = {ADMIN_MANUAL_ID}")),
         # Khớp một phần (ILIKE '%...%') trên tên không dấu
         Index("ix_foods_name_search_trgm", "name_search", postgresql_using="gin",
               postgresql_ops={"name_search": "gin_trgm_ops"}),

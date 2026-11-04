@@ -21,6 +21,8 @@ export interface User {
   email: string;
   full_name: string | null;
   is_active: boolean;
+  /** Chỉ để quyết định hiện liên kết quản trị; quyền thật luôn do server kiểm tra. */
+  role?: "user" | "admin";
 }
 
 export interface ProfileData {

@@ -22,6 +22,7 @@ from models.food_source import FoodSource  # noqa: F401
 from models.food import Food  # noqa: F401
 from models.meal_log import MealLog  # noqa: F401
 from models.body_metric import BodyMetric  # noqa: F401
+from models.admin_audit_log import AdminAuditLog  # noqa: F401
 
 # ─── Alembic Config ──────────────────────────────────────────────────
 config = context.config

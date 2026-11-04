@@ -13,4 +13,5 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "full_name": current_user.full_name,
         "is_active": current_user.is_active,
+        "role": current_user.role.value,   # chỉ đọc; quyền thật luôn do server kiểm (require_admin)
     }

@@ -24,7 +24,7 @@ from services.foods.lookup import (
     search_foods,
 )
 from services.foods.preparation import FoodPreparation
-from services.foods.sources import SHORT_LABELS, source_code
+from services.foods.sources import ADMIN_MANUAL, SHORT_LABELS, source_code
 
 router = APIRouter(prefix="/foods", tags=["Foods"])
 
@@ -82,7 +82,8 @@ def _item(f, match: str, is_suggestion: bool = False, matched_via: str | None = 
     return FoodSearchItem(
         id=f.id, code=f.code, name_vi=f.name_vi, name_en=f.name_en, name_original=f.name_original,
         group_name=f.group_name, refuse_pct=f.refuse_pct, source_page=f.source_page,
-        source=FoodSourceInfo(code=code, label=SHORT_LABELS.get(code, code), title=f.source.title, ref=f.source_ref),
+        source=FoodSourceInfo(code=code, label=SHORT_LABELS.get(code, code), title=f.source.title, ref=f.source_ref,
+                              note=f.source_note if code == ADMIN_MANUAL else None),
         per_100g=Nutrients(energy_kcal=f.energy_kcal, protein_g=f.protein_g, fat_g=f.fat_g,
                            carb_g=f.carb_g, fiber_g=f.fiber_g),
         carb_total_g=f.carb_total_g, match=match, is_suggestion=is_suggestion,

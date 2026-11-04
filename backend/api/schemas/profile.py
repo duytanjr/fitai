@@ -1,11 +1,13 @@
 """Pydantic schemas cho UserProfile."""
 from typing import Optional
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from models.profile import ActivityLevel, FitnessGoal
 
 
 class ProfileUpdate(BaseModel):
-    """Schema cập nhật hồ sơ — mọi trường đều optional."""
+    """Schema cập nhật hồ sơ — mọi trường đều optional. Trường lạ (vd. role) → 422."""
+    model_config = ConfigDict(extra="forbid")
+
     age: Optional[int] = None
     gender: Optional[str] = None
     height_cm: Optional[float] = None

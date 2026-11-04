@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { authApi } from "@/lib/auth";
 import { mealsApi, todayVN, type DailySummary } from "@/lib/meals";
 import {
   PROGRESS_DAYS,
@@ -70,6 +71,18 @@ export function DashboardView() {
   useEffect(() => {
     if (!isAuthenticated) router.replace("/login");
   }, [isAuthenticated, router]);
+
+  // Làm mới thông tin user (role có thể đã đổi bằng make_admin) — chỉ để hiện/ẩn liên kết quản trị
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    authApi
+      .me()
+      .then((me) => {
+        const { token, setAuth } = useAuthStore.getState();
+        if (token) setAuth(me, token);
+      })
+      .catch(() => {});
+  }, [isAuthenticated]);
 
   const load = useCallback(
     async (range: ProgressDays) => {
@@ -156,6 +169,11 @@ export function DashboardView() {
             <Link href="/chat" className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900">
               Chat với AI
             </Link>
+            {user?.role === "admin" && (
+              <Link href="/admin" className="text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700">
+                Quản trị
+              </Link>
+            )}
             <button
               onClick={handleLogout}
               className="text-sm font-medium text-red-500 transition-colors hover:text-red-600"

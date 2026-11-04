@@ -21,10 +21,11 @@ class Nutrients(BaseModel):
 
 
 class FoodSourceInfo(BaseModel):
-    code: str = Field(description="VN2007 | USDA_SR_LEGACY_2018")
-    label: str = Field(description="Nhãn ngắn: 'VN 2007' / 'USDA'")
+    code: str = Field(description="VN2007 | USDA_SR_LEGACY_2018 | ADMIN_MANUAL")
+    label: str = Field(description="Nhãn ngắn: 'VN 2007' / 'USDA' / 'Quản trị viên nhập'")
     title: str
-    ref: str = Field(description="Tham chiếu trong nguồn: mã số (VN2007) hoặc fdc_id (USDA)")
+    ref: str = Field(description="Tham chiếu trong nguồn: mã số (VN2007), fdc_id (USDA) hoặc ADM-xxxxx")
+    note: Optional[str] = Field(None, description="Ghi chú nguồn số liệu (chỉ dòng quản trị viên nhập)")
 
 
 class FoodSearchItem(BaseModel):
@@ -52,7 +53,7 @@ class AmbiguityOption(BaseModel):
     name_vi: str
     group_name: str
     preparation: FoodPreparation
-    source_label: str = Field(description="'VN 2007' / 'USDA'")
+    source_label: str = Field(description="'VN 2007' / 'USDA' / 'Quản trị viên nhập'")
 
 
 class AmbiguityMeaning(BaseModel):
