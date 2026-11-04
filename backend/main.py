@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from core.log_filters import install_access_log_filter
-from api.routers import auth, chat, foods, meals, users
+from api.routers import auth, body_metrics, chat, foods, meals, progress, users
 from api.routers.profile import router as profile_router
 
 # Access log không ghi query string (có thể chứa từ khoá tìm thực phẩm của người dùng)
@@ -33,6 +33,8 @@ app.include_router(users.router, prefix=settings.API_V1_STR)
 app.include_router(profile_router, prefix=settings.API_V1_STR)
 app.include_router(foods.router, prefix=settings.API_V1_STR)
 app.include_router(meals.router, prefix=settings.API_V1_STR)
+app.include_router(body_metrics.router, prefix=settings.API_V1_STR)
+app.include_router(progress.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", tags=["Health"])

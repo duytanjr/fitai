@@ -319,5 +319,5 @@ def test_prompt_rules_for_multiple_sources():
     prompt = build_system_prompt(None)
     for rule in ["15. NHIỀU NGUỒN DỮ LIỆU THỰC PHẨM", "KHÔNG gộp, KHÔNG lấy trung bình và KHÔNG tự chọn",
                  '"dữ liệu thực phẩm Mỹ"', "gọi đúng là \"plain\"", "tỷ lệ nước khi nấu có thể khác cơm Việt",
-                 "tổng xơ khi lẫn hai nguồn chỉ mang tính tham khảo", "16. NGUYÊN TẮC AN TOÀN Y TẾ"]:
+                 "tổng xơ khi lẫn hai nguồn chỉ mang tính tham khảo", "17. NGUYÊN TẮC AN TOÀN Y TẾ"]:
         assert rule in prompt, rule

@@ -9,6 +9,8 @@ prompt ReAct thô. Công cụ:
   (bảng foods, giá trị trên 100 g phần ăn được); code tính theo grams nếu có.
 - get_daily_summary(date=None): CHỈ ĐỌC tổng hợp nhật ký ăn uống một ngày của user
   hiện tại (gắn sẵn phía server như calc_body_metrics, không nhận user_id).
+- get_progress_summary(days=7): CHỈ ĐỌC thống kê tiến độ 7/30/90 ngày gần nhất của user
+  hiện tại (calo/macro trung bình, so với mục tiêu, thay đổi cân nặng); không nhận user_id.
 """
 import asyncio
 import json
@@ -37,6 +39,7 @@ from services.foods.preparation import PREPARATION_LABELS_VI, FoodPreparation
 from services.foods.sources import USDA_SR, citation, source_code, source_label
 from services.meals import parse_day, today_vn
 from services.metrics_service import profile_metrics_summary
+from services.progress import PROGRESS_DAYS
 from services.rag_service import KnowledgeSearchError, asearch_knowledge
 
 logger = logging.getLogger(__name__)
@@ -52,6 +55,7 @@ KNOWLEDGE_UNAVAILABLE_CODE = "KHO_TAI_LIEU_KHONG_KHA_DUNG"
 FOOD_NOT_FOUND_CODE = "KHONG_CO_TRONG_DU_LIEU"
 FOOD_UNAVAILABLE_CODE = "BANG_THUC_PHAM_KHONG_KHA_DUNG"
 MEAL_LOG_UNAVAILABLE_CODE = "NHAT_KY_KHONG_KHA_DUNG"
+PROGRESS_UNAVAILABLE_CODE = "TIEN_DO_KHONG_KHA_DUNG"
 FOOD_AMBIGUOUS_CODE = "CAN_LAM_RO"
 FOOD_RAW_ONLY_CODE = "CHI_CO_DANG_SONG"
 DOC_TAG = "doan_tai_lieu"
@@ -78,12 +82,17 @@ async def _no_daily_summary(day: date) -> dict:
     raise RuntimeError("Chưa cấu hình nhật ký bữa ăn cho lượt chat này.")
 
 
+async def _no_progress_summary(days: int) -> dict:
+    raise RuntimeError("Chưa cấu hình tiến độ cho lượt chat này.")
+
+
 class AgentToolContext:
     """Trạng thái công cụ của MỘT lượt chat của MỘT user.
 
     `load_profile` do server tạo sẵn (gắn user_id lấy từ JWT); LLM và client không
     thể chỉ định user khác. `lookup_food` tra bảng foods bằng phiên DB của request.
-    `load_daily_summary(day)` cũng gắn sẵn user_id từ JWT (chỉ đọc nhật ký của user đó).
+    `load_daily_summary(day)` và `load_progress_summary(days)` cũng gắn sẵn user_id từ JWT
+    (chỉ đọc nhật ký / cân nặng của user đó).
     `sources` gom các đoạn search_knowledge (đã qua ngưỡng) và các thực phẩm
     lookup_food trả về trong lượt này.
     """
@@ -93,10 +102,12 @@ class AgentToolContext:
         load_profile: Callable[[], Awaitable[Any]] = _no_profile,
         lookup_food: Callable[[str], Awaitable[list[FoodMatch]]] = _no_food_lookup,
         load_daily_summary: Callable[[date], Awaitable[dict]] = _no_daily_summary,
+        load_progress_summary: Callable[[int], Awaitable[dict]] = _no_progress_summary,
     ) -> None:
         self._load_profile = load_profile
         self._lookup_food = lookup_food
         self._load_daily_summary = load_daily_summary
+        self._load_progress_summary = load_progress_summary
         self._sources: list[dict] = []
         self.tool_calls: list[str] = []
         self.knowledge_unavailable = False
@@ -109,6 +120,9 @@ class AgentToolContext:
 
     async def load_daily_summary(self, day: date) -> dict:
         return await self._load_daily_summary(day)
+
+    async def load_progress_summary(self, days: int) -> dict:
+        return await self._load_progress_summary(days)
 
     def add_sources(self, results: list[dict]) -> None:
         self._sources.extend(results)
@@ -348,7 +362,26 @@ def build_tools(ctx: AgentToolContext) -> list[BaseTool]:
             )
         return json.dumps(summary, ensure_ascii=False)
 
-    return [search_knowledge_tool, calc_body_metrics_tool, lookup_food_tool, get_daily_summary_tool]
+    @tool("get_progress_summary")
+    async def get_progress_summary_tool(days: int = 7) -> str:
+        """CHỈ ĐỌC tiến độ của người dùng hiện tại trong `days` ngày gần nhất (tính cả hôm nay):
+        số ngày có nhật ký, calo/protein/chất béo/carb trung bình trên các ngày có nhật ký, so với
+        mục tiêu, thay đổi cân nặng giữa lần đo đầu và cuối, các ngày thiếu dữ liệu.
+        `days`: 7, 30 hoặc 90 (mặc định 7)."""
+        if days not in PROGRESS_DAYS:
+            return "Lỗi tham số: days phải là 7, 30 hoặc 90."
+        try:
+            summary = await ctx.load_progress_summary(days)
+        except Exception as exc:  # noqa: BLE001 — lỗi DB không được làm hỏng cả lượt chat
+            logger.error("get_progress_summary failed: %s", type(exc).__name__)
+            return (
+                f"{PROGRESS_UNAVAILABLE_CODE}: Dữ liệu tiến độ tạm thời không truy cập được. "
+                "Không được tự ước lượng số liệu."
+            )
+        return json.dumps(summary, ensure_ascii=False)
+
+    return [search_knowledge_tool, calc_body_metrics_tool, lookup_food_tool, get_daily_summary_tool,
+            get_progress_summary_tool]
 
 
 # ── System prompt ────────────────────────────────────────────────────────────
@@ -426,7 +459,8 @@ QUY TẮC BẮT BUỘC KHI TƯ VẤN:
 13. NHẬT KÝ ĂN UỐNG: khi người dùng hỏi hôm nay (hoặc một ngày cụ thể) đã ăn bao nhiêu calo, protein, chất béo, carb, hoặc còn bao nhiêu calo, PHẢI gọi get_daily_summary (hỏi ngày khác hôm nay thì truyền date dạng YYYY-MM-DD, tính từ ngày hôm nay ở trên) và chỉ dùng đúng số công cụ trả về; TUYỆT ĐỐI không tự cộng các món hay tự trừ. Công cụ đã có mục tiêu nên không cần gọi thêm calc_body_metrics cho câu hỏi này. Đã ăn ở "eaten", mục tiêu ở "target", còn lại ở "remaining" (số âm nghĩa là đã vượt mục tiêu, nói rõ là đã vượt). Nếu entries_count=0 thì nói chưa có dữ liệu nhật ký cho ngày đó. Nếu incomplete_totals=true thì nói rõ tổng CHƯA ĐẦY ĐỦ vì có incomplete_entries mục thiếu số liệu (xem missing_by_nutrient). Nếu is_complete=false thì chỉ nêu số đã ăn, nói cần hoàn tất hồ sơ (missing_fields) để so với mục tiêu, không đưa mục tiêu hay số còn lại. Nếu công cụ trả {MEAL_LOG_UNAVAILABLE_CODE} thì nói nhật ký tạm thời không truy cập được. Công cụ chỉ đọc: không ghi, sửa hay xoá được nhật ký; người dùng muốn ghi món thì hướng dẫn dùng trang "Nhật ký ăn uống".
 14. TRẠNG THÁI, TỪ ĐỒNG NGHĨA, TỪ MƠ HỒ (lookup_food): luôn nêu trạng thái sống/chín của thực phẩm theo mục "trạng thái" công cụ trả về; nếu là "nguồn không ghi rõ trạng thái" thì nói đúng như vậy, không tự đoán. Khi người dùng hỏi món ĐÃ NẤU (cơm, thịt luộc, thịt nướng, rau xào...) mà dữ liệu chỉ có thực phẩm sống hoặc chưa rõ trạng thái (ví dụ chỉ có gạo nếp sống khi hỏi xôi), phải nói rõ đây là số liệu của thực phẩm SỐNG/chưa nấu, KHÔNG phải món đã nấu, và TUYỆT ĐỐI không tự quy đổi sang món đã nấu (không ước lượng tỷ lệ nở, lượng nước hay dầu). Nếu công cụ ghi "TRẠNG THÁI: nguồn không ghi rõ" thì BẮT BUỘC nói "nguồn không ghi rõ trạng thái sống hay chín" trong câu trả lời. Nếu lookup_food trả {FOOD_RAW_ONLY_CODE} (món đã nấu như xôi, cháo mà bảng chỉ có gạo sống) thì nói rõ bảng không có món đã nấu đó, số liệu đưa ra là của gạo SỐNG chưa nấu, không dùng thay cho món đã nấu và không quy đổi. Nếu kết quả "khớp qua từ đồng nghĩa" thì chỉ nói "bảng ghi là <tên tiếng Việt> (<tên tiếng Anh>)" (ví dụ: bảng ghi là "Thịt lợn nạc (Pork, lean)"), KHÔNG khẳng định mục đó đồng nhất với tên người dùng gõ. Sau khi đã nêu tên trong nguồn, MỌI câu tiếp theo (kể cả tỷ lệ thải bỏ, trạng thái, số liệu) phải gọi mục đó bằng tên trong nguồn (ví dụ "Thịt lợn nạc có tỷ lệ thải bỏ 2%"), KHÔNG dùng lại tên người dùng gõ như thể hai thứ là một. Glucid trong bảng KHÔNG gồm xơ (celluloza). Nếu lookup_food trả {FOOD_AMBIGUOUS_CODE} thì KHÔNG nêu số liệu nào: liệt kê các nghĩa/loại công cụ đưa ra, hỏi người dùng chọn, rồi gọi lại lookup_food với đúng tên đầy đủ của mục đã chọn.
 15. NHIỀU NGUỒN DỮ LIỆU THỰC PHẨM: mỗi dòng lookup_food có nhãn nguồn riêng: Bảng thành phần thực phẩm Việt Nam 2007 (trích tr. PDF) hoặc USDA FoodData Central SR Legacy (trích fdc_id). Khi nêu số, ghi đúng nguồn của chính dòng đó; với USDA nói rõ đây là "dữ liệu thực phẩm Mỹ". Nêu tên Việt kèm mô tả gốc tiếng Anh của nguồn. Khi cùng một món có nhiều dòng (khác trạng thái sống/chín hoặc khác nguồn, ví dụ cá hồi, gạo lứt, ức gà, trứng), KHÔNG gộp, KHÔNG lấy trung bình và KHÔNG tự chọn: nêu từng dòng kèm nhãn nguồn, trạng thái, tỷ lệ thải bỏ (nếu có), hoặc hỏi người dùng muốn dòng nào. Với cơm (gạo trắng nấu chín của USDA), nhắc rằng tỷ lệ nước khi nấu có thể khác cơm Việt. Với "Sữa chua plain nguyên kem", gọi đúng là "plain" và nói nguồn không ghi rõ có thêm đường hay không. Nếu glucid ghi "KHÔNG CÓ SỐ LIỆU" kèm "carbohydrate tổng (GỒM xơ)" thì nói rõ con số đó gồm cả xơ. Xơ của hai nguồn khác loại (celluloza ở bảng Việt Nam, xơ thực phẩm tổng số ở USDA), nên tổng xơ khi lẫn hai nguồn chỉ mang tính tham khảo.
-16. NGUYÊN TẮC AN TOÀN Y TẾ:
+16. TIẾN ĐỘ: khi người dùng hỏi về tiến độ, cân nặng thay đổi ra sao, gần đây / mấy ngày qua / tuần này ăn uống thế nào, trung bình mỗi ngày ăn bao nhiêu, PHẢI gọi get_progress_summary (days=7 mặc định; hỏi khoảng một tháng thì 30, khoảng ba tháng thì 90) và chỉ dùng đúng số công cụ trả về; TUYỆT ĐỐI không tự cộng, tự tính trung bình hay tự trừ. Khi trả lời luôn gọi đúng khoảng thời gian theo period_label, ví dụ "7 ngày gần nhất" (hoặc "30 ngày gần nhất", "90 ngày gần nhất"), KHÔNG nói "tuần này" hay "tuần trước" (báo cáo tuần trên giao diện tính theo tuần lịch từ thứ Hai, khác với khoảng này). Trung bình nằm ở stats.average, so với mục tiêu ở stats.comparison (diff âm = thấp hơn mục tiêu, diff_pct là phần trăm), thay đổi cân nặng ở stats.weight_change (nêu kèm ngày đo đầu, ngày đo cuối và số lần đo). Mỗi khi nêu calo trung bình hoặc so với mục tiêu, kèm đúng ghi chú trong calorie_note (tính trên các ngày có ghi nhật ký; nếu ghi chưa đủ bữa thì số này thấp hơn thực tế). Chỉ nêu số liệu bằng câu trung tính (ví dụ "calo trung bình thấp hơn mục tiêu 320 kcal"), không dùng từ đánh giá như "tốt", "kém", "đáng lo". Nếu stats.logged_days=0 thì nói chưa đủ dữ liệu nhật ký trong khoảng này. Nếu stats.weight_change là null thì nói chưa đủ dữ liệu cân nặng (cần ít nhất 2 lần đo). Nếu is_complete=false thì không nêu mục tiêu hay so sánh, chỉ nói cần hoàn tất hồ sơ (missing_fields) để so với mục tiêu. Nếu có days_with_incomplete_totals thì nói rõ các ngày đó có tổng chưa đầy đủ. Nếu công cụ trả {PROGRESS_UNAVAILABLE_CODE} thì nói dữ liệu tiến độ tạm thời không truy cập được. Công cụ chỉ đọc: muốn ghi cân nặng thì hướng dẫn dùng trang "Tiến độ".
+17. NGUYÊN TẮC AN TOÀN Y TẾ:
    - Bạn KHÔNG PHẢI là bác sĩ y khoa và KHÔNG ĐƯỢC chẩn đoán bệnh tật, không kê đơn thuốc.
    - Đối với các câu hỏi về bệnh lý, thuốc, triệu chứng đau đớn hay chấn thương, bạn PHẢI khuyên người dùng đến gặp bác sĩ hoặc cơ sở y tế chuyên khoa để được thăm khám.
 """

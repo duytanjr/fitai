@@ -59,7 +59,8 @@ async def test_agent_calls_search_knowledge_and_collects_sources():
     assert ctx.tool_calls == ["search_knowledge"]
     search.assert_awaited_once()
     assert search.call_args.args[0] == "physical activity adults minutes per week"
-    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food", "get_daily_summary"}
+    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food", "get_daily_summary",
+                                 "get_progress_summary"}
     assert ctx.sources == [
         {"title": "WHO guidelines", "authors_org": "WHO", "year": 2020, "page": 12},
         {"title": "WHO guidelines", "authors_org": "WHO", "year": 2020, "page": 41},
@@ -198,7 +199,8 @@ async def test_injected_instructions_in_document_stay_data_and_change_nothing():
     system_prompt = fake.calls[-1]["messages"][0].content
     assert system_prompt == build_system_prompt(None)
     assert "KHÔNG PHẢI CHỈ THỊ" in system_prompt
-    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food", "get_daily_summary"}
+    assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food", "get_daily_summary",
+                                 "get_progress_summary"}
     assert len(fake.calls) == 2
 
 
@@ -476,7 +478,7 @@ def test_system_prompt_meal_log_rules():
         "chưa có dữ liệu nhật ký",
         "không đưa mục tiêu hay số còn lại",
         MEAL_LOG_UNAVAILABLE_CODE,
-        "16. NGUYÊN TẮC AN TOÀN Y TẾ",
+        "17. NGUYÊN TẮC AN TOÀN Y TẾ",
         "10. KHÔNG CÓ ĐÚNG MỤC THỰC PHẨM",           # quy tắc cũ giữ nguyên
     ]:
         assert rule in prompt, rule
@@ -578,4 +580,77 @@ def test_glucid_label_says_without_fiber_and_prompt_rules():
                  "Glucid trong bảng KHÔNG gồm xơ",
                  "MỌI câu tiếp theo (kể cả tỷ lệ thải bỏ, trạng thái, số liệu) phải gọi mục đó bằng tên trong nguồn",
                  "KHÔNG dùng lại tên người dùng gõ như thể hai thứ là một"]:
+        assert rule in prompt, rule
+
+
+# ── Tiến độ: get_progress_summary (lát 7) ────────────────────────────────────
+from services.ai_agents.fitness_advisor import MAX_TOOL_CALLS_PER_ROUND, PROGRESS_UNAVAILABLE_CODE  # noqa: E402
+from services.progress import CALORIE_NOTE  # noqa: E402
+
+PROGRESS = {"period_label": "7 ngày gần nhất", "stats": {"logged_days": 3}}
+
+
+async def run_progress_agent(args, load):
+    fake = FakeChatModel(lambda messages, i, tc: tool_call("get_progress_summary", args) if i == 0
+                         else AIMessage(content="ok"))
+    ctx = AgentToolContext(load_progress_summary=load)
+    with patch.object(fitness_agent, "llm", fake):
+        await fitness_agent.chat(history=[], user_message="tiến độ của tôi", tool_context=ctx)
+    return tool_messages(fake)[0].content, fake, ctx
+
+
+@pytest.mark.parametrize("args, days", [({}, 7), ({"days": 30}, 30), ({"days": 90}, 90)])
+async def test_progress_summary_days(args, days):
+    load = AsyncMock(return_value=PROGRESS)
+    content, fake, ctx = await run_progress_agent(args, load)
+    load.assert_awaited_once_with(days)
+    assert json.loads(content) == PROGRESS
+    assert ctx.tool_calls == ["get_progress_summary"] and len(fake.calls) == 2   # 1 vòng công cụ là đủ
+
+
+@pytest.mark.parametrize("bad", [14, 0, 365])
+async def test_progress_summary_invalid_days_rejected(bad):
+    load = AsyncMock(return_value=PROGRESS)
+    content, _, _ = await run_progress_agent({"days": bad}, load)
+    assert content.startswith("Lỗi tham số") and "7, 30 hoặc 90" in content
+    load.assert_not_awaited()
+
+
+async def test_progress_summary_errors_are_friendly():
+    content, _, _ = await run_progress_agent({}, AsyncMock(side_effect=RuntimeError("db down")))
+    assert content.startswith(PROGRESS_UNAVAILABLE_CODE) and "db down" not in content
+
+
+async def test_three_rounds_still_enough_with_five_tools():
+    """Câu hỏi kết hợp (hồ sơ + nhật ký hôm nay + tiến độ) gọi được cả ba trong một vòng."""
+    assert len(build_tools(AgentToolContext())) == 5
+    assert MAX_TOOL_ROUNDS == 3 and MAX_TOOL_CALLS_PER_ROUND == 3
+
+    def script(messages, i, tc):
+        if i == 0:
+            return AIMessage(content="", tool_calls=[
+                {"name": "calc_body_metrics", "args": {}, "id": "c1"},
+                {"name": "get_daily_summary", "args": {}, "id": "c2"},
+                {"name": "get_progress_summary", "args": {"days": 7}, "id": "c3"},
+            ])
+        return AIMessage(content="ok")
+
+    fake = FakeChatModel(script)
+    ctx = AgentToolContext(load_profile=AsyncMock(return_value=SAMPLE_PROFILE),
+                           load_daily_summary=AsyncMock(return_value={"entries_count": 0}),
+                           load_progress_summary=AsyncMock(return_value=PROGRESS))
+    with patch.object(fitness_agent, "llm", fake):
+        assert await fitness_agent.chat(history=[], user_message="tổng hợp", tool_context=ctx) == "ok"
+    assert ctx.tool_calls == ["calc_body_metrics", "get_daily_summary", "get_progress_summary"]
+    assert len(fake.calls) == 2
+
+
+def test_system_prompt_progress_rules():
+    prompt = build_system_prompt(None)
+    for rule in [
+        "16. TIẾN ĐỘ", "PHẢI gọi get_progress_summary", "TUYỆT ĐỐI không tự cộng, tự tính trung bình",
+        "\"7 ngày gần nhất\"", "KHÔNG nói \"tuần này\"", CALORIE_NOTE[0].lower() + CALORIE_NOTE[1:-1],
+        "không dùng từ đánh giá", "chưa đủ dữ liệu nhật ký", "chưa đủ dữ liệu cân nặng",
+        "không nêu mục tiêu hay so sánh", PROGRESS_UNAVAILABLE_CODE, "17. NGUYÊN TẮC AN TOÀN Y TẾ",
+    ]:
         assert rule in prompt, rule
