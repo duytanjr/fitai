@@ -105,6 +105,12 @@ data/knowledge/raw/*.pdf
 # Bản xuất mẫu để rà soát RAG (không commit)
 data/knowledge/_review/
 
+# Tài liệu RAG do quản trị viên tải lên — chỉ giữ .gitkeep
+data/knowledge/uploads/*
+!data/knowledge/uploads/.gitkeep
+# Điểm mount của data/knowledge/uploads bên trong ./backend (Docker tạo khi mount /app/uploads)
+backend/uploads/
+
 # Kết quả đánh giá chatbot (chứa câu trả lời đầy đủ) — chỉ giữ .gitkeep
 data/eval/results/*
 !data/eval/results/.gitkeep

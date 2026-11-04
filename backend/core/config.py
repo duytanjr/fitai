@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     # Ngưỡng độ tương đồng cosine (1 - khoảng cách); tạm thời, chốt sau khi chạy rag_smoke
     RAG_SIMILARITY_THRESHOLD: float = 0.65
 
+    # Quản trị tài liệu RAG (lát 8b-1). Thư mục tải lên ghi được, ngoài /app/data (chỉ đọc).
+    KNOWLEDGE_UPLOAD_DIR: str = "uploads"
+    KNOWLEDGE_MAX_UPLOAD_MB: int = 20
+    KNOWLEDGE_MAX_PDF_PAGES: int = 300
+    KNOWLEDGE_PDF_TIMEOUT_S: int = 60         # đọc/làm sạch PDF trong tiến trình con, quá hạn thì huỷ
+    KNOWLEDGE_PDF_MEMORY_MB: int = 1024       # giới hạn bộ nhớ ảo của tiến trình con đọc PDF
+    KNOWLEDGE_MAX_CHUNKS: int = 400           # vượt thì không nhúng (tai_lieu_qua_dai)
+
     # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
 

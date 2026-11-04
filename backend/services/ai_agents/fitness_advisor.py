@@ -15,6 +15,7 @@ prompt ReAct thô. Công cụ:
 import asyncio
 import json
 import logging
+import unicodedata
 from datetime import date
 from typing import Any, Awaitable, Callable, Optional
 
@@ -155,6 +156,15 @@ class AgentToolContext:
 
 
 # ── Công cụ ──────────────────────────────────────────────────────────────────
+def _attr(value: Any, limit: int = 200) -> str:
+    """Giá trị thuộc tính của thẻ tài liệu (metadata do người nhập là DỮ LIỆU): bỏ ký tự điều khiển, không
+    cho dấu " < > đóng thuộc tính/thẻ, cắt tối đa `limit` ký tự."""
+    text = "" if value is None else str(value)
+    text = "".join(" " if unicodedata.category(ch)[0] == "C" else ch for ch in text)
+    text = " ".join(text.replace('"', "'").replace("<", "‹").replace(">", "›").split())
+    return text[:limit]
+
+
 def format_search_results(results: list[dict]) -> str:
     """Đóng gói đoạn tài liệu trong thẻ riêng để LLM coi là DỮ LIỆU, không phải chỉ thị."""
     if not results:
@@ -165,8 +175,8 @@ def format_search_results(results: list[dict]) -> str:
         # Không cho nội dung tài liệu tự đóng thẻ để "thoát" khỏi vùng dữ liệu
         text = r.get("text", "").replace(f"<{DOC_TAG}", "<_").replace(f"</{DOC_TAG}", "</_")
         parts.append(
-            f'<{DOC_TAG} so="{i}" nguon="{r.get("title", "")}" to_chuc="{r.get("authors_org", "")}" '
-            f'nam="{r.get("year", "")}" trang_pdf="{r.get("page", "")}" loai="{kind}">\n'
+            f'<{DOC_TAG} so="{i}" nguon="{_attr(r.get("title"))}" to_chuc="{_attr(r.get("authors_org"))}" '
+            f'nam="{_attr(r.get("year"))}" trang_pdf="{_attr(r.get("page"))}" loai="{kind}">\n'
             f"{text}\n</{DOC_TAG}>"
         )
     return "\n".join(parts)

@@ -24,6 +24,18 @@ class EmbeddingError(Exception):
     """Không tạo được embedding (lỗi mạng, hết hạn mức, cấu hình sai...)."""
 
 
+class EmbeddingQuotaError(EmbeddingError):
+    """Hết hạn mức / bị giới hạn tốc độ (429) sau khi đã thử lại — có thể thử lại sau."""
+
+
+def _is_quota(exc: Exception) -> bool:
+    try:
+        from google.api_core import exceptions as gexc
+    except ImportError:  # pragma: no cover
+        return False
+    return isinstance(exc, (gexc.ResourceExhausted, gexc.TooManyRequests))
+
+
 def _is_retryable(exc: Exception) -> bool:
     try:
         from google.api_core import exceptions as gexc
@@ -89,7 +101,8 @@ class GeminiEmbedder:
                 if not _is_retryable(exc) or attempt > self.max_retries:
                     # Chỉ ghi loại lỗi, không ghi nội dung hay khoá API
                     logger.error("Embedding failed: %s (attempt %d)", type(exc).__name__, attempt)
-                    raise EmbeddingError(f"Không tạo được embedding: {type(exc).__name__}") from exc
+                    error = EmbeddingQuotaError if _is_quota(exc) else EmbeddingError
+                    raise error(f"Không tạo được embedding: {type(exc).__name__}") from exc
                 delay = min(self.max_delay, self.base_delay * 2 ** (attempt - 1))
                 logger.warning(
                     "Embedding rate-limited/unavailable (%s), retry %d/%d sau %.0fs",

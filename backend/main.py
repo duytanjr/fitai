@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from core.log_filters import install_access_log_filter
-from api.routers import admin_foods, auth, body_metrics, chat, foods, meals, progress, users
+from api.routers import admin_documents, admin_foods, auth, body_metrics, chat, foods, meals, progress, users
 from api.routers.profile import router as profile_router
 
 # Access log không ghi query string (có thể chứa từ khoá tìm thực phẩm của người dùng)
@@ -36,6 +36,26 @@ app.include_router(meals.router, prefix=settings.API_V1_STR)
 app.include_router(body_metrics.router, prefix=settings.API_V1_STR)
 app.include_router(progress.router, prefix=settings.API_V1_STR)
 app.include_router(admin_foods.router, prefix=settings.API_V1_STR)
+app.include_router(admin_documents.router, prefix=settings.API_V1_STR)
+
+
+@app.on_event("startup")
+async def recover_knowledge_documents() -> None:
+    """Bản ghi kẹt ở 'indexing' → failed (gian_doan); đăng ký tài liệu có sẵn. Lỗi chỉ ghi log, không chặn app."""
+    import logging
+
+    from core.database import AsyncSessionLocal
+    from services.knowledge.documents import recover_interrupted, sync_builtin_documents
+
+    try:
+        async with AsyncSessionLocal() as db:
+            recovered = await recover_interrupted(db)
+            await sync_builtin_documents(db)
+            await db.commit()
+        if recovered:
+            logging.getLogger(__name__).warning("Recovered %d interrupted indexing job(s)", recovered)
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger(__name__).error("Knowledge documents startup check failed: %s", type(exc).__name__)
 
 
 @app.get("/health", tags=["Health"])

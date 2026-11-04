@@ -21,8 +21,10 @@ async function request<T>(
   const token =
     typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
 
+  // FormData (tải file): để trình duyệt tự đặt Content-Type multipart kèm boundary
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers: HeadersInit = {
-    "Content-Type": "application/json",
+    ...(isForm ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
@@ -56,6 +58,7 @@ export const apiClient = {
   patch: <T>(endpoint: string, body: unknown) =>
     request<T>(endpoint, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: "DELETE" }),
+  postForm: <T>(endpoint: string, form: FormData) => request<T>(endpoint, { method: "POST", body: form }),
 };
 
 export { ApiError };

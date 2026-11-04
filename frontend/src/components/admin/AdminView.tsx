@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { authApi } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { AdminDocumentsTab } from "@/components/admin/AdminDocumentsTab";
 import { AdminFoodsTab } from "@/components/admin/AdminFoodsTab";
 
 type Tab = "foods" | "documents" | "conversations";
 
 const TABS: { key: Tab; label: string; ready: boolean }[] = [
   { key: "foods", label: "Thực phẩm", ready: true },
-  { key: "documents", label: "Tài liệu", ready: false },
+  { key: "documents", label: "Tài liệu", ready: true },
   { key: "conversations", label: "Hội thoại", ready: false },
 ];
 
@@ -96,6 +97,8 @@ export function AdminView() {
 
         {tab === "foods" ? (
           <AdminFoodsTab onUnauthorized={toLogin} onForbidden={toHome} />
+        ) : tab === "documents" ? (
+          <AdminDocumentsTab onUnauthorized={toLogin} onForbidden={toHome} />
         ) : (
           <p className="rounded-xl bg-white p-6 text-sm text-gray-500 shadow-sm ring-1 ring-gray-100">
             Mục {TABS.find((t) => t.key === tab)?.label.toLowerCase()} sắp có.

@@ -7,8 +7,11 @@ Chạy bên trong Docker container (chạy lại nhiều lần không nhân đô
   docker exec fitai_backend python scripts/ingest_knowledge.py --dry-run    # chỉ làm sạch + chia đoạn, không gọi API
 
 Đổi EMBEDDING_MODEL thì BẮT BUỘC chạy lại với --reset.
+Không xoá đoạn của tài liệu tải lên qua trang quản trị (doc_origin='upload'). Đoạn của tài liệu có sẵn được
+gắn doc_id / doc_enabled theo bảng knowledge_documents (đồng bộ từ sources.csv trước khi nạp).
 """
 import argparse
+import asyncio
 import logging
 import os
 import sys
@@ -48,8 +51,23 @@ def print_stats(stats: DocumentStats, dry_run: bool) -> None:
     if not dry_run:
         print(
             f"   ChromaDB: {stats.embedded} embedding mới/cập nhật, {stats.unchanged} giữ nguyên, "
-            f"{stats.deleted} đoạn cũ đã xoá"
+            f"{stats.deleted} đoạn cũ đã xoá, {stats.metadata_updated} đoạn chỉ cập nhật metadata"
         )
+
+
+async def load_doc_meta() -> dict[str, dict]:
+    """Đồng bộ tài liệu có sẵn vào knowledge_documents rồi trả metadata đoạn theo tên file."""
+    from core.database import AsyncSessionLocal, engine
+    from services.knowledge.documents import builtin_doc_meta, sync_builtin_documents
+
+    try:
+        async with AsyncSessionLocal() as db:
+            await sync_builtin_documents(db)
+            meta = await builtin_doc_meta(db)
+            await db.commit()
+    finally:
+        await engine.dispose()
+    return meta
 
 
 def main() -> int:
@@ -81,7 +99,7 @@ def main() -> int:
         if args.reset:
             print("🧹 Đã xoá và tạo lại collection.")
         embedder = GeminiEmbedder(batch_size=args.batch_size)
-        results, orphans = ingest_knowledge(knowledge_dir, collection, embedder)
+        results, orphans = ingest_knowledge(knowledge_dir, collection, embedder, asyncio.run(load_doc_meta()))
     except (KnowledgeStoreError, EmbeddingError) as exc:
         print(f"❌ {exc}")
         print("   Chạy lại lệnh để tiếp tục: các đoạn đã nạp sẽ không bị embedding lại.")

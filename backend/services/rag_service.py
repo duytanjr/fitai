@@ -3,6 +3,10 @@
 Điểm `score` = độ tương đồng cosine = 1 - khoảng cách cosine của ChromaDB
 (collection tạo với hnsw:space=cosine). Thang lý thuyết [-1, 1]; càng gần 1 càng
 liên quan. Chỉ những đoạn có score >= RAG_SIMILARITY_THRESHOLD mới được trả về.
+
+Chỉ tìm trong đoạn KHÔNG bị tắt rõ ràng: where doc_enabled != False. Đã thử thật với Chroma 1.5.9:
+"$ne False" giữ đoạn THIẾU trường doc_enabled (đoạn cũ chưa backfill), còn "$eq True" loại chúng — nên
+dùng "$ne" để không có lúc nào tìm kiếm hỏng. Đoạn đang chờ của lần lập chỉ mục dở có doc_enabled=False.
 """
 from __future__ import annotations
 
@@ -21,6 +25,8 @@ logger = logging.getLogger(__name__)
 class KnowledgeSearchError(Exception):
     """Không truy xuất được kho tài liệu (embedding hoặc ChromaDB lỗi)."""
 
+
+ENABLED_FILTER = {"doc_enabled": {"$ne": False}}
 
 _lock = threading.Lock()
 _embedder: GeminiEmbedder | None = None
@@ -62,6 +68,7 @@ def query_knowledge(query: str, k: int | None = None) -> list[dict[str, Any]]:
         res = _get_collection().query(
             query_embeddings=[vector],
             n_results=k,
+            where=ENABLED_FILTER,
             include=["documents", "metadatas", "distances"],
         )
     except KnowledgeStoreError as exc:
@@ -84,6 +91,7 @@ def query_knowledge(query: str, k: int | None = None) -> list[dict[str, Any]]:
                 "page_end": meta.get("page_end"),
                 "is_table": bool(meta.get("is_table", False)),
                 "file": meta.get("file", ""),
+                "doc_id": meta.get("doc_id"),
                 "score": round(1.0 - float(dist), 4),
             }
         )
