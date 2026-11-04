@@ -15,14 +15,17 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | Đánh giá v1 | eade8b0 | eval_questions.csv v1 + bộ chạy đánh giá |
 | 5d-2 | 7516fb2 | food_sources, 20 mục USDA SR Legacy, trích dẫn theo từng dòng |
 | 7 (FR15–17) | cdb6293 | body_metrics, /body-metrics, /progress, báo cáo tuần, get_progress_summary, dashboard tiến độ |
-| 8a (FR19 thực phẩm + phân quyền) | chưa commit (nhánh feat/admin-1) | users.role, admin_audit_log, nguồn ADMIN_MANUAL, /admin/foods, make_admin, trang /admin |
+| 8a (FR19 thực phẩm + phân quyền) | a719799 | users.role, admin_audit_log, nguồn ADMIN_MANUAL, /admin/foods, make_admin, trang /admin |
+| 8b-1 (FR18 tài liệu RAG) | 8e1bbfa | knowledge_documents, /admin/documents, lập chỉ mục hai pha, bộ lọc doc_enabled, pdf_guard, tab Tài liệu |
 
-- pytest hiện tại: 580 passed, 0 skipped (sau lát 8a; sau lát 7 là 487).
-- md5 trước/sau migration f3c8a1d2b7e4 (trùng nhau, cũng trùng sau pytest và thử đầu-cuối): foods 529 dòng,
-  tính trên các cột cũ, không gồm source_note, `8a773b9b054b5568fad90618824d9ced`; meal_logs 23 dòng
-  `5e937f6981948a0875c85edb6653f239`; body_metrics 7 dòng `fdbf4752cc5d4016195a6d5d28a0040f`;
-  food_sources riêng dòng 1–2 `52bc5ff84530157b4e78a424a8f5fd2f` (cả bảng nay 3 dòng). Câu SQL md5 và bản
+- pytest hiện tại: 628 passed, 0 skipped (sau lát 8b-1; sau 8a là 580, sau lát 7 là 487).
+- md5 trước/sau migration a9d4e6f1c2b3 (trùng nhau): foods 529 dòng, tính trên mọi cột kể cả source_note,
+  `88900310ebf5772e3286d73e84e48edc`; meal_logs 23 dòng `5e937f6981948a0875c85edb6653f239`; food_sources 3 dòng
+  `e0ec8aea8d9ae7de0f765b2857db16df`; body_metrics 7 dòng `fdbf4752cc5d4016195a6d5d28a0040f`; users 75 dòng
+  `bd77f2ba9ba81f7b9d41738e7b5196ab` (sau thử đầu-cuối 76 dòng do thêm tài khoản admin thử). Câu SQL md5 và bản
   pg_dump trước migration nằm ở scratchpad của phiên, ngoài git.
+- rag_smoke 10 câu A: giống hệt trước/sau lát 8b-1 (10 câu, 40 đoạn qua ngưỡng). So bằng vector câu hỏi nhúng MỘT
+  lần rồi lưu lại (để không tốn hạn mức), chạy đúng scripts/rag_smoke.py; kết quả đã khớp với lần chạy thật.
 - Đổi nhãn "xơ thực phẩm tổng số" đã nằm trong 7516fb2 (chưa chắc: suy từ git status sạch).
 - Dòng `food_sources.id=2` trong DB dev VẪN còn chữ cũ "xơ ăn kiêng tổng số" ở fiber_type (đã thấy khi kiểm
   tra lát 8a; migration chạy trước khi đổi tên); chỉ là cột mô tả, chưa hiển thị ở đâu.
@@ -42,7 +45,42 @@ nhất", không nói "tuần này", kèm calorie_note, không dùng từ đánh 
 18 an toàn y tế. Test tìm quy tắc an toàn theo tiêu đề "NGUYÊN TẮC AN TOÀN Y TẾ:", không theo số thứ tự.
 
 Bảng chính: users (role), user_profiles, chat_sessions, chat_messages (sources JSON), foods, food_sources,
-meal_logs (FK RESTRICT tới foods), body_metrics, admin_audit_log. Migration head: f3c8a1d2b7e4.
+meal_logs (FK RESTRICT tới foods), body_metrics, admin_audit_log, knowledge_documents. Migration head: a9d4e6f1c2b3.
+
+Tài liệu RAG (lát 8b-1, services/knowledge/documents.py, indexing.py, pdf_guard.py; api/routers/admin_documents.py):
+- `knowledge_documents`: origin builtin | upload; status uploaded | indexing | indexed | failed; error_code là mã
+  ngắn (CHECK `^[a-z0-9_]{1,40}$`); content_hash sha256 duy nhất (trùng → 409); unique index một phần
+  `((true)) WHERE status='indexing'` nên chỉ một việc lập chỉ mục tại một thời điểm (vi phạm → 409).
+  Hai tài liệu builtin (ISSN, WHO) đăng ký từ sources.csv bằng `sync_builtin_documents` (idempotent, giữ
+  `enabled`), chạy lúc khởi động app và trong script backfill.
+- Đoạn trong Chroma có `doc_id`, `doc_enabled`, `doc_origin`. rag_service lọc `{"doc_enabled": {"$ne": False}}`:
+  đã thử thật với Chroma 1.5.9, `$ne False` giữ đoạn THIẾU trường, còn `$eq True` loại chúng. Chroma
+  `collection.update` gộp metadata; giá trị None xoá khoá.
+- Lập chỉ mục hai pha (chạy nền bằng BackgroundTasks): đoạn mới ghi với `doc_enabled=False, index_pending=True`
+  (vô hình với tìm kiếm); nhúng xong toàn bộ mới kích hoạt, rồi xoá đoạn cũ không còn trong tập mới. id đoạn upload
+  = sha1(doc:<doc_id>|trang|loại|chỉ số|content_hash) nên thử lại không nhúng lại đoạn đã có. Lỗi giữa chừng → đoạn
+  cũ giữ nguyên, `enabled` không đổi. Vượt KNOWLEDGE_MAX_CHUNKS (400) → failed/tai_lieu_qua_dai, không nhúng.
+  Lỗi hạn mức → failed/loi_han_muc (EmbeddingQuotaError; lập chỉ mục thử lại tối đa 3 lần). Khởi động: bản ghi
+  kẹt ở indexing → failed/gian_doan.
+- `pdf_guard` + `pdf_worker`: mọi lần mở PDF tải lên đều chạy trong tiến trình con với môi trường tối thiểu
+  (PATH, PYTHONPATH, LANG, HOME — không có GOOGLE_API_KEY hay SECRET_KEY), RLIMIT_AS (KNOWLEDGE_PDF_MEMORY_MB) và
+  thời gian chờ (KNOWLEDGE_PDF_TIMEOUT_S). Tải lên: chỉ .pdf có byte đầu `%PDF-`, tối đa KNOWLEDGE_MAX_UPLOAD_MB
+  (20, qua proxy cổng 3000 file 12 MB không bị cắt nên giữ 20), không mã hoá, tối đa 300 trang; file trên đĩa
+  tên `<uuid>.pdf`, tên gốc chỉ là metadata; không endpoint nào phục vụ file.
+- /admin/documents (require_admin): GET danh sách / {id}; POST multipart; POST /{id}/index (?force=true để lập
+  lại); GET /{id}/preview (đã lập chỉ mục: 5 đoạn cách đều từ Chroma; chưa: đọc PDF qua pdf_guard, không nhúng);
+  PATCH (metadata → cập nhật metadata đoạn; enabled → doc_enabled; không nhúng lại); DELETE (chỉ upload: đoạn →
+  file → bản ghi; file thiếu vẫn xoá, trả file_missing=true). Builtin: xem và bật/tắt được; xoá, sửa thông tin,
+  lập chỉ mục lại → 403. Audit chỉ ghi `{"fields": [...]}`.
+- Metadata do người nhập được làm sạch (bỏ ký tự điều khiển, « » → ", title/authors_org ≤ 200, topic ≤ 100,
+  license_note ≤ 500); `format_search_results` thêm làm sạch thuộc tính thẻ (" → ', < > → ‹ ›).
+- Script: `scripts/backfill_knowledge_metadata.py [--dry-run]` gắn metadata doc_* cho đoạn builtin, không nhúng lại
+  (đã chạy: 134 đoạn trước và sau, chạy lại 0 thay đổi). `ingest_knowledge` không xoá đoạn `doc_origin='upload'`;
+  đoạn không đổi nội dung mà metadata khác thì chỉ cập nhật metadata.
+- Lưu file: mount ghi được `./data/knowledge/uploads:/app/uploads` (đã áp dụng). Thư mục gitignore, giữ .gitkeep;
+  `backend/uploads/` là điểm mount do Docker tạo.
+- Frontend: tab Tài liệu trong /admin (tự tải lại mỗi 3 s khi có tài liệu đang lập chỉ mục; tắt tài liệu builtin
+  phải xác nhận; builtin ẩn nút xoá và lập chỉ mục lại; xem trước hiển thị văn bản thuần). Tab Hội thoại "sắp có".
 
 Quản trị (lát 8a, services/foods/admin.py, api/routers/admin_foods.py):
 - `users.role`: enum user_role ('user' | 'admin'), NOT NULL, mặc định 'user'. Chỉ đổi được bằng
@@ -65,8 +103,8 @@ Quản trị (lát 8a, services/foods/admin.py, api/routers/admin_foods.py):
   «…»; giao diện hiển thị dạng văn bản thuần. Script nạp VN/USDA và backfill_food_preparation không đụng dòng
   ADMIN_MANUAL (có test).
 - Frontend: trang /admin (hỏi lại /users/me; không phải admin → /dashboard, chưa đăng nhập → /login), tab
-  Thực phẩm (bảng tìm/lọc, thêm/sửa/xoá chỉ dòng ADMIN_MANUAL, form kiểm tra như backend), tab Tài liệu và Hội
-  thoại ghi "sắp có". Liên kết "Quản trị" trên dashboard chỉ hiện khi role là admin.
+  Thực phẩm (bảng tìm/lọc, thêm/sửa/xoá chỉ dòng ADMIN_MANUAL, form kiểm tra như backend). Liên kết "Quản trị"
+  trên dashboard chỉ hiện khi role là admin.
 
 Tiến độ (lát 7, services/progress.py):
 - `body_metrics`: duy nhất (user_id, measured_on), FK CASCADE, CHECK cân nặng 20–300, vòng eo NULL hoặc
@@ -89,8 +127,9 @@ Nguồn dữ liệu thực phẩm (`food_sources`, id cố định):
 - 3 = ADMIN_MANUAL: quản trị viên nhập qua /admin/foods; source_ref = ADM-xxxxx; nhãn "Quản trị viên nhập";
   mỗi dòng có source_note. DB dev hiện không có dòng nào (dòng thử đầu-cuối đã xoá).
 
-RAG gồm: ISSN 2017 "diets and body composition" và WHO 2020 "physical activity and sedentary behaviour"
-(data/knowledge/raw; danh mục ở sources.csv). PDF bảng 2007 dùng cho foods, không nạp vào RAG.
+RAG gồm: ISSN 2017 "diets and body composition" (34 đoạn) và WHO 2020 "physical activity and sedentary
+behaviour" (100 đoạn) — tổng 134 đoạn, đều builtin, đang bật (data/knowledge/raw; danh mục ở sources.csv). Hiện
+không có tài liệu tải lên nào (tài liệu thử đầu-cuối đã xoá). PDF bảng 2007 dùng cho foods, không nạp vào RAG.
 
 Cấu hình tra cứu (services/foods/aliases.py, có test): SYNONYMS, AMBIGUOUS (bơ, bo, tôm, chuối, bắp, mè,
 thơm, mãng cầu, táo, hồng, dưa, com), COOKED_DISHES (xôi, cháo: chỉ có gạo sống), FOOD_ALIASES (ức gà, cơm,
@@ -103,7 +142,7 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
 - Thư mục migration thật: backend/alembic/versions/ (bỏ qua các thư mục trùng versions/versions,
   alembic/alembic, scripts/scripts: người dùng tự dọn).
 - /app/data trong container mount chỉ đọc: ghi file ra /tmp trong container rồi `docker cp` ra máy.
-  Ngoại lệ: data/eval/results mount ghi được tại /app/eval_results.
+  Ngoại lệ: data/eval/results mount ghi được tại /app/eval_results; data/knowledge/uploads ghi được tại /app/uploads.
 - Ngoài git: data/knowledge/_review/, data/foods/external/ (USDA thô 45 MB), data/eval/results/* (giữ .gitkeep),
   backend/eval_results/ (điểm mount do Docker tạo).
 - Trước/sau migration hoặc nạp dữ liệu: so md5 các cột dữ liệu của dòng VN2007 và của meal_logs; sao lưu
@@ -113,11 +152,16 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   nội dung tin nhắn hay hồ sơ vào log. SQL echo tắt (SQL_ECHO), hide_parameters=True, access log bỏ query string.
 - DB dev có các user thử: e2e-…@example.com (thử tay), eval-mau / eval-chua-ho-so / eval-nhat-ky-trong
   @example.com (bộ đánh giá, chạy lại cho cùng trạng thái). Không tự xoá. Miền .local bị validation từ chối.
-  `admin-e2e-050b60@example.com` đang là admin (thử lát 8a); `user-e2e-050b60@example.com` là user thường.
+  `admin-e2e-050b60@example.com` đang là admin (thử lát 8a); `user-e2e-050b60@example.com` là user thường;
+  `admin-docs-e2e-37892b@example.com` đang là admin (thử lát 8b-1).
+- Test cần Chroma dùng collection TẠM (`test_docs_<uuid>`, xoá sau mỗi test), embedding giả; PDF test tạo bằng
+  code (tests/pdf_factory.py, văn bản ASCII). So rag_smoke trước/sau bằng vector câu hỏi nhúng một lần rồi lưu.
 
 ## 4. Ràng buộc môi trường
 - Gemini miễn phí: khoảng 20 lượt/ngày/mô hình cho dự án này (người dùng cung cấp; từng gặp ResourceExhausted
   dù đã giãn 40–75 s). Mỗi câu có dùng công cụ tốn 2 lượt trở lên. Không gọi Gemini khi không cần.
+- Hạn mức embedding cũng thấp: mỗi lần search_knowledge (và mỗi câu rag_smoke) tốn một lượt embedding; ngày
+  2026-11-04 từng gặp ResourceExhausted khi chạy 10 câu liền nhau, giãn 15 s mỗi câu thì qua.
 - Mô hình: gemini-2.5-flash (temperature 0,3); embedding models/gemini-embedding-001.
 - Frontend chạy bản build production: đổi giao diện cần `docker compose build frontend && docker compose up -d frontend`.
 
@@ -155,16 +199,21 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   Dashboard mới chỉ kiểm bằng tsc/next build, chưa thử trên trình duyệt; get_progress_summary chưa thử với
   Gemini thật.
 - Quản trị (8a): trùng tên mới test bằng hai yêu cầu liên tiếp, CHƯA test bằng hai kết nối song song thật (cần
-  commit dữ liệu ra ngoài transaction của test). Chưa có tab Tài liệu và Hội thoại (thuộc 8b), chưa quản lý bài
-  tập. Ô trạng thái sống/chín của dòng VN/USDA chỉ đọc trên giao diện (đổi được qua API). Trang /admin chỉ kiểm
-  bằng tsc/next build, chưa thử trên trình duyệt; quy tắc 17 chưa thử với Gemini thật.
+  commit dữ liệu ra ngoài transaction của test). Chưa có tab Hội thoại (8b-2), chưa quản lý bài tập. Ô trạng thái
+  sống/chín của dòng VN/USDA chỉ đọc trên giao diện (đổi được qua API). Quy tắc 17 chưa thử với Gemini thật.
+- Tài liệu RAG (8b-1): chưa test hai kết nối lập chỉ mục song song thật (đã test unique index ở mức DB và đường
+  409 qua API). python-multipart nhận và lưu tạm cả body trước khi endpoint kiểm giới hạn 20 MB (không chặn sớm
+  theo header). Văn bản PDF test viết không dấu (font Helvetica trong PDF tạo bằng code). Lập chỉ mục chạy trong
+  tiến trình uvicorn (BackgroundTasks), khởi động lại giữa chừng thì bản ghi thành failed/gian_doan và phải thử lại.
+- Giao diện: frontend đã build lại sau lát 8b-1, nhưng CHƯA có ghi nhận thử trên trình duyệt cho dashboard, trang
+  /admin (tab Thực phẩm, tab Tài liệu, xác nhận khi tắt tài liệu builtin, tải file lớn); mới kiểm bằng tsc/next
+  build và gọi API trực tiếp.
 
 ## 7. Việc còn lại (thứ tự dự kiến)
-1. Hoàn tất lát 8a: người dùng commit; `docker compose build frontend && docker compose up -d frontend` (cũng
-   đưa dashboard lát 7 lên); thử dashboard và trang /admin trên trình duyệt; thử get_progress_summary và một
-   dòng ADMIN_MANUAL qua lookup_food với Gemini thật (vài lượt).
-2. Quản trị 8b (FR18, FR20): tab Tài liệu (tải lên, cập nhật, xoá, lập chỉ mục lại Chroma) và tab Hội thoại
-   (xem nhật ký hội thoại ẩn danh).
+1. Thử trên trình duyệt: dashboard, /admin tab Thực phẩm và tab Tài liệu (tải lên, lập chỉ mục, xem trước, bật/tắt,
+   xoá); thử get_progress_summary, một dòng ADMIN_MANUAL qua lookup_food và search_knowledge có tài liệu tải lên
+   với Gemini thật (vài lượt).
+2. Quản trị 8b-2 (FR20): tab Hội thoại — xem nhật ký hội thoại ẩn danh để đánh giá chất lượng.
 3. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
 4. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
 5. Thể dục (FR12–14: bài tập, lịch tập, nhật ký tập), kèm phần quản trị bài tập của FR19.
