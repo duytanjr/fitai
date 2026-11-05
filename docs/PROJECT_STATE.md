@@ -1,6 +1,6 @@
 # Trạng thái dự án FitAI (ghi chú bàn giao giữa các phiên)
 
-Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-04.
+Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-06.
 
 ## 1. Các lát đã xong (git log)
 | Lát | Commit | Nội dung chính |
@@ -17,8 +17,15 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | 7 (FR15–17) | cdb6293 | body_metrics, /body-metrics, /progress, báo cáo tuần, get_progress_summary, dashboard tiến độ |
 | 8a (FR19 thực phẩm + phân quyền) | a719799 | users.role, admin_audit_log, nguồn ADMIN_MANUAL, /admin/foods, make_admin, trang /admin |
 | 8b-1 (FR18 tài liệu RAG) | 8e1bbfa | knowledge_documents, /admin/documents, lập chỉ mục hai pha, bộ lọc doc_enabled, pdf_guard, tab Tài liệu |
+| 8b-2 (FR20 hội thoại ẩn danh) | b6e8256 | /admin/conversations (tắt mặc định), bí danh HMAC, che nội dung, nhật ký xem, người dùng tự xoá phiên |
+| 9a (một phần FR12–13) | chưa commit | workout_videos, training_programs, program_days, program_day_items, seed_training.py, /training |
 
-- pytest hiện tại: 628 passed, 0 skipped (sau lát 8b-1; sau 8a là 580, sau lát 7 là 487).
+- pytest hiện tại: 822 passed, 0 skipped (sau lát 9a; sau 8b-2 là 689, sau 8b-1 là 628, sau 8a là 580, sau lát 7
+  là 487).
+- md5 trước/sau migration c4b8e2f7a915 và sau thử đầu-cuối 9a (trùng nhau): foods 529 dòng
+  `88900310ebf5772e3286d73e84e48edc`, meal_logs 23 dòng `5e937f6981948a0875c85edb6653f239`, body_metrics 7 dòng
+  `fdbf4752cc5d4016195a6d5d28a0040f`, users 80 dòng `45add6f9c99a77675bdb856963d98f93`, chat_sessions 38 dòng
+  `d512c213ba82af1ae8c65e0dceed1811`. Bản pg_dump trước migration ở scratchpad của phiên, ngoài git.
 - md5 trước/sau migration a9d4e6f1c2b3 (trùng nhau): foods 529 dòng, tính trên mọi cột kể cả source_note,
   `88900310ebf5772e3286d73e84e48edc`; meal_logs 23 dòng `5e937f6981948a0875c85edb6653f239`; food_sources 3 dòng
   `e0ec8aea8d9ae7de0f765b2857db16df`; body_metrics 7 dòng `fdbf4752cc5d4016195a6d5d28a0040f`; users 75 dòng
@@ -45,7 +52,53 @@ nhất", không nói "tuần này", kèm calorie_note, không dùng từ đánh 
 18 an toàn y tế. Test tìm quy tắc an toàn theo tiêu đề "NGUYÊN TẮC AN TOÀN Y TẾ:", không theo số thứ tự.
 
 Bảng chính: users (role), user_profiles, chat_sessions, chat_messages (sources JSON), foods, food_sources,
-meal_logs (FK RESTRICT tới foods), body_metrics, admin_audit_log, knowledge_documents. Migration head: a9d4e6f1c2b3.
+meal_logs (FK RESTRICT tới foods), body_metrics, admin_audit_log, knowledge_documents, workout_videos,
+training_programs, program_days, program_day_items. Migration head: c4b8e2f7a915.
+
+Tập luyện (lát 9a, models/training.py, services/training/{youtube,seed,catalog}.py, api/routers/training.py):
+- Bảng: `workout_videos` (youtube_id 11 ký tự UNIQUE, url chuẩn `https://www.youtube.com/watch?v=<id>`; title bắt
+  buộc; channel, duration_min 1–180, category, intensity, impact, equipment, level, notes, checked_on đều NULL được;
+  video chưa có link thì youtube_id/url NULL, chỉ được draft, duy nhất theo title); `training_programs` (slug
+  UNIQUE, goal_tag, level, duration_days ≥ 1, KHÔNG có cột tuổi); `program_days` (CASCADE, day_number duy nhất trong
+  chương trình, is_rest, note); `program_day_items` (CASCADE theo ngày, RESTRICT theo video, duy nhất (ngày,
+  position), required mặc định true). id là số nguyên.
+- Xác thực link (youtube.py, hàm thuần): chỉ https, host đúng một trong youtube.com / www / m / youtu.be (so
+  nguyên chuỗi), không userinfo, không port; dạng watch?v=, youtu.be/<id>, shorts/<id>; từ chối mọi dạng khác.
+- Trình nạp `scripts/seed_training.py [--dir DIR] [--dry-run]` (mặc định data/training, trong container
+  /app/data/training): đọc programs.csv + schedule.csv, tự nhận dấu phân cách `,` `;` tab từ dòng tiêu đề (mơ hồ →
+  lỗi), utf-8-sig, cắt khoảng trắng, true/false/1/0. Cột bắt buộc: programs.csv — slug, title, description,
+  goal_tag, level, duration_days, publish (intensity_label tuỳ chọn); schedule.csv — program_slug, day_number,
+  is_rest, position, label, required, url (mọi cột khác tuỳ chọn; title mặc định bằng label; ô được điền vẫn phải
+  hợp lệ). Upsert theo khoá tự nhiên, chạy lại không đổi gì; ngày/mục không còn trong CSV bị xoá, video và chương
+  trình không bao giờ bị xoá. Lỗi cấu trúc → không ghi gì (mã thoát 1). Cùng youtube_id ở nhiều dòng chỉ lỗi khi ô
+  ĐƯỢC ĐIỀN khác nhau. Chi tiết cột: data/training/README.md.
+- Trạng thái: video draft nếu thiếu url hoặc title/label bắt đầu "(VÍ DỤ)"; thiếu thời lượng/kênh/checked_on chỉ
+  cảnh báo. Chương trình published khi publish=true, đủ ngày, mọi mục trỏ tới video published, có ít nhất một
+  mục, title/description không bắt đầu "(VÍ DỤ)". Thiếu ngày: publish=false → cảnh báo (giữ draft), publish=true →
+  lỗi. Đổi publish về false rồi nạp lại → về draft.
+- API (JWT, chỉ đọc, không lọc tuổi): GET /training/programs, /training/programs/{slug},
+  /training/programs/{slug}/days/{n}. Chương trình draft hoặc không tồn tại → 404; ngày ngoài khoảng → 404. Mục
+  theo position; label trống thì dùng title video. total_minutes/required_minutes chỉ cộng mục có thời lượng, null
+  (không phải 0) khi không mục nào có; kèm items_without_duration. Phòng thủ: mục trỏ tới video không published bị
+  ẩn và không tính phút.
+- Frontend: /training (thẻ chữ, không ảnh), /training/[slug], /training/[slug]/days/[n] (tham số đọc bằng
+  useParams vì repo chưa có route động mẫu và không có node_modules/next/dist/docs). Nút "Bắt đầu" là
+  `<a target="_blank" rel="noopener noreferrer">`, client chỉ mở url đúng dạng chuẩn. Hộp lưu ý an toàn cố định;
+  goal weight_loss thêm dòng "không hứa kết quả giảm cân"; tuổi < 18 (đọc GET /profile, lỗi thì bỏ qua) thêm dòng
+  nhắc tập cùng người lớn, hiện trên mọi trang tập. Liên kết "Tập luyện" ở dashboard, nhật ký ăn uống, chat.
+- Dữ liệu: data/training/ chỉ có mẫu "(VÍ DỤ)" không link (nguoi-moi-14, toan-than-28, đều draft). Bộ thử trên máy
+  ở data/training_dev/ (gitignore) do người dùng điền; DB dev đang có chương trình `thu-nghiem` (published, 3 ngày,
+  2 video chưa có thời lượng/kênh) nạp từ đó.
+
+Thiết kế cho lát 9b (CHƯA có migration; 9a không cần sửa bảng):
+- `program_enrollments`: id, user_id (FK CASCADE), program_id (FK RESTRICT), started_on, status
+  active | completed | abandoned, created_at, ended_on; unique index một phần: MỘT enrollment active mỗi người.
+- `program_day_completions`: id, enrollment_id (FK CASCADE), day_number (lưu theo SỐ NGÀY, không FK tới
+  program_days.id, để nạp lại lịch không phá lịch sử), completed_on, minutes_done; UNIQUE (enrollment_id, day_number).
+- "Tập lại chương trình" tạo enrollment mới, không xoá lịch sử.
+- Cần xử lý ở 9b: chương trình đang có người theo mà bị đưa về draft thì API trả 404; duration_days giảm (hoặc
+  ngày bị xoá khi nạp lại) có thể làm tiến độ trỏ tới ngày không còn. Chương trình có trong DB nhưng không có trong
+  CSV thì trình nạp chỉ liệt kê, không tính lại trạng thái.
 
 Tài liệu RAG (lát 8b-1, services/knowledge/documents.py, indexing.py, pdf_guard.py; api/routers/admin_documents.py):
 - `knowledge_documents`: origin builtin | upload; status uploaded | indexing | indexed | failed; error_code là mã
@@ -80,7 +133,7 @@ Tài liệu RAG (lát 8b-1, services/knowledge/documents.py, indexing.py, pdf_gu
 - Lưu file: mount ghi được `./data/knowledge/uploads:/app/uploads` (đã áp dụng). Thư mục gitignore, giữ .gitkeep;
   `backend/uploads/` là điểm mount do Docker tạo.
 - Frontend: tab Tài liệu trong /admin (tự tải lại mỗi 3 s khi có tài liệu đang lập chỉ mục; tắt tài liệu builtin
-  phải xác nhận; builtin ẩn nút xoá và lập chỉ mục lại; xem trước hiển thị văn bản thuần). Tab Hội thoại "sắp có".
+  phải xác nhận; builtin ẩn nút xoá và lập chỉ mục lại; xem trước hiển thị văn bản thuần). Tab Hội thoại có từ 8b-2.
 
 Quản trị (lát 8a, services/foods/admin.py, api/routers/admin_foods.py):
 - `users.role`: enum user_role ('user' | 'admin'), NOT NULL, mặc định 'user'. Chỉ đổi được bằng
@@ -199,7 +252,7 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   Dashboard mới chỉ kiểm bằng tsc/next build, chưa thử trên trình duyệt; get_progress_summary chưa thử với
   Gemini thật.
 - Quản trị (8a): trùng tên mới test bằng hai yêu cầu liên tiếp, CHƯA test bằng hai kết nối song song thật (cần
-  commit dữ liệu ra ngoài transaction của test). Chưa có tab Hội thoại (8b-2), chưa quản lý bài tập. Ô trạng thái
+  commit dữ liệu ra ngoài transaction của test). Chưa có giao diện quản lý bài tập (nạp bằng CSV). Ô trạng thái
   sống/chín của dòng VN/USDA chỉ đọc trên giao diện (đổi được qua API). Quy tắc 17 chưa thử với Gemini thật.
 - Tài liệu RAG (8b-1): chưa test hai kết nối lập chỉ mục song song thật (đã test unique index ở mức DB và đường
   409 qua API). python-multipart nhận và lưu tạm cả body trước khi endpoint kiểm giới hạn 20 MB (không chặn sớm
@@ -208,16 +261,28 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
 - Giao diện: frontend đã build lại sau lát 8b-1, nhưng CHƯA có ghi nhận thử trên trình duyệt cho dashboard, trang
   /admin (tab Thực phẩm, tab Tài liệu, xác nhận khi tắt tài liệu builtin, tải file lớn); mới kiểm bằng tsc/next
   build và gọi API trực tiếp.
+- Hội thoại (8b-2): hội thoại được giữ vô thời hạn (chưa có chính sách lưu trữ).
+- Tập luyện (9a): FR13 và FR14 được đơn giản hoá có chủ đích — chưa có nhóm cơ, lưu ý an toàn riêng từng bài,
+  ghi từng hiệp/lần/mức tạ; mỗi mục chỉ là một video YouTube kèm label. Chưa có theo dõi hoàn thành ngày, ghi số
+  phút, gợi ý chương trình, công cụ chatbot. Dữ liệu thật của nguoi-moi-14 và toan-than-28 do người dùng điền
+  (chưa có; hiện chưa chương trình chính thức nào published). Không kiểm link còn xem được (checked_on do người
+  nhập điền). Hai lần nạp chạy cùng lúc không có khoá (ràng buộc UNIQUE sẽ báo lỗi). Trang /training chưa thử trên
+  trình duyệt, container frontend chưa build lại sau 9a.
 
 ## 7. Việc còn lại (thứ tự dự kiến)
 1. Thử trên trình duyệt: dashboard, /admin tab Thực phẩm và tab Tài liệu (tải lên, lập chỉ mục, xem trước, bật/tắt,
    xoá); thử get_progress_summary, một dòng ADMIN_MANUAL qua lookup_food và search_knowledge có tài liệu tải lên
    với Gemini thật (vài lượt).
-2. Quản trị 8b-2 (FR20): tab Hội thoại — xem nhật ký hội thoại ẩn danh để đánh giá chất lượng.
-3. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
-4. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
-5. Thể dục (FR12–14: bài tập, lịch tập, nhật ký tập), kèm phần quản trị bài tập của FR19.
+   Thêm: tab Hội thoại (8b-2), nút xoá phiên trong chat, trang /training sau khi build lại frontend.
+2. Người dùng điền dữ liệu thật cho nguoi-moi-14 và toan-than-28 (data/training/*.csv), chạy
+   `seed_training.py --dry-run` rồi nạp thật.
+3. Tập luyện 9b: program_enrollments + program_day_completions (thiết kế ở mục 2), đánh dấu hoàn thành ngày, ghi số
+   phút, "Tập lại chương trình". Sau đó 9d: gợi ý chương trình và công cụ chatbot. Quản trị bài tập của FR19 (hiện
+   nạp bằng CSV) chưa xếp lát.
+4. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
+5. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
 6. Lọc câu hỏi y khoa (guardrail riêng, ngoài quy tắc prompt hiện có).
-7. Cập nhật hành vi mong đợi C04/C08/C09/C10 (bản v2), rồi đo lần 2 và so với mốc eade8b0. Có thể thêm
+7. Chính sách lưu trữ hội thoại (hiện giữ vô thời hạn).
+8. Cập nhật hành vi mong đợi C04/C08/C09/C10 (bản v2), rồi đo lần 2 và so với mốc eade8b0. Có thể thêm
    câu đánh giá cho tiến độ và cho dòng quản trị viên nhập.
 Thứ tự trên là dự kiến của người dùng; chi tiết từng lát chưa chốt (chưa chắc).
