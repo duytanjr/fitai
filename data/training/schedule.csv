@@ -1,0 +1,7 @@
+program_slug,day_number,is_rest,position,label,required,url,title,channel,duration_min,category,intensity,impact,equipment,level,notes,checked_on
+nguoi-moi-14,1,false,1,Khởi động,true,,(VÍ DỤ) video khởi động 5 phút,(VÍ DỤ) tên kênh,5,warmup,low,low,không,beginner,,
+nguoi-moi-14,1,false,2,Bài chính,true,,(VÍ DỤ) video toàn thân cho người mới,(VÍ DỤ) tên kênh,15,strength,moderate,low,không,beginner,,
+nguoi-moi-14,1,false,3,Giãn cơ,false,,(VÍ DỤ) video giãn cơ 5 phút,(VÍ DỤ) tên kênh,5,cooldown,low,none,thảm,beginner,,
+nguoi-moi-14,2,true,,,,,,,,,,,,,Nghỉ ngơi hoặc đi bộ nhẹ,
+nguoi-moi-14,3,false,1,Cardio nhẹ,true,,(VÍ DỤ) video cardio tác động thấp,(VÍ DỤ) tên kênh,10,cardio,low,low,không,beginner,,
+toan-than-28,1,false,1,Bài chính,true,,(VÍ DỤ) video toàn thân 20 phút,(VÍ DỤ) tên kênh,20,strength,moderate,low,không,intermediate,,

@@ -255,6 +255,9 @@ export function MealLogView() {
             <Link href="/chat" className="text-sm font-medium text-gray-600 hover:text-gray-900">
               Chat với AI
             </Link>
+            <Link href="/training" className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              Tập luyện
+            </Link>
           </nav>
         </div>
       </header>

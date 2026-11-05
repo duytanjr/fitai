@@ -119,3 +119,6 @@ backend/eval_results/
 
 # Dữ liệu thô USDA FoodData Central (45 MB) — chỉ commit file con data/foods/usda_selected.csv
 data/foods/external/
+
+# Bộ dữ liệu tập luyện thử trên máy phát triển (link tự điền, không commit)
+data/training_dev/

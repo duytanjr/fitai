@@ -274,6 +274,9 @@ export function ChatView() {
             <Link href="/meals" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
               Nhật ký ăn uống
             </Link>
+            <Link href="/training" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+              Tập luyện
+            </Link>
             <div className="md:hidden">
               <Button size="sm" variant="ghost" onClick={handleNewSession}>
                 + Cuộc trò chuyện mới

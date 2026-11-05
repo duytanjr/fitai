@@ -169,6 +169,9 @@ export function DashboardView() {
             <Link href="/chat" className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900">
               Chat với AI
             </Link>
+            <Link href="/training" className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900">
+              Tập luyện
+            </Link>
             {user?.role === "admin" && (
               <Link href="/admin" className="text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700">
                 Quản trị
