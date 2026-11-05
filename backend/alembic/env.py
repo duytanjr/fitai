@@ -25,6 +25,7 @@ from models.body_metric import BodyMetric  # noqa: F401
 from models.admin_audit_log import AdminAuditLog  # noqa: F401
 from models.knowledge_document import KnowledgeDocument  # noqa: F401
 from models.training import ProgramDay, ProgramDayItem, TrainingProgram, WorkoutVideo  # noqa: F401
+from models.training_progress import ProgramDayCompletion, ProgramEnrollment  # noqa: F401
 
 # ─── Alembic Config ──────────────────────────────────────────────────
 config = context.config

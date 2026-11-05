@@ -23,6 +23,7 @@ import { BodyMetricsPanel } from "@/components/dashboard/BodyMetricsPanel";
 import { CalorieChart } from "@/components/dashboard/CalorieChart";
 import { ProfileInvite, TodayCard } from "@/components/dashboard/TodayCard";
 import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
+import { TrainingWeekCard } from "@/components/dashboard/TrainingWeekCard";
 import { WeightChart } from "@/components/dashboard/WeightChart";
 
 /** Cộng/trừ số ngày cho chuỗi YYYY-MM-DD (tính theo UTC để không lệch múi giờ máy). */
@@ -292,6 +293,8 @@ export function DashboardView() {
             onNext={() => setWeekStart(addDays(weekStart, 7))}
           />
         )}
+
+        <TrainingWeekCard onUnauthorized={handleUnauthorized} />
 
         <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white shadow-lg">
           <h2 className="text-lg font-bold">Hỏi AI về tiến độ</h2>

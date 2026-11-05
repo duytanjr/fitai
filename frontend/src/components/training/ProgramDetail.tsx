@@ -1,28 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
+import { Button } from "@/components/ui/Button";
+import { ConfirmBox } from "@/components/training/ConfirmBox";
 import { TrainingShell, useTrainingUnauthorized } from "@/components/training/TrainingShell";
 import {
   GOAL_LABELS,
   LEVEL_LABELS,
   SLUG_RE,
+  friendlyTrainingError,
   itemsText,
   minutesText,
   trainingApi,
+  type Enrollment,
   type ProgramDetail as Program,
 } from "@/lib/training";
 
-/** Trang một chương trình: danh sách ngày (ngày nghỉ / ngày tập kèm số bài và số phút). */
+type Pending = { replace: boolean; message: string; label: string } | null;
+
+/** Trang một chương trình: danh sách ngày, bắt đầu / tập lại chương trình, dấu tích ngày đã xong. */
 export function ProgramDetail() {
   const params = useParams<{ slug: string }>();
   const slug = typeof params?.slug === "string" ? params.slug : "";
   const { isAuthenticated } = useAuthStore();
   const onUnauthorized = useTrainingUnauthorized();
   const [program, setProgram] = useState<Program | null>(null);
+  const [active, setActive] = useState<Enrollment | null>(null);
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [pending, setPending] = useState<Pending>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [p, cur] = await Promise.all([trainingApi.get(slug), trainingApi.current()]);
+      setProgram(p);
+      setActive(cur.enrollment);
+    } catch (err: any) {
+      if (err?.status === 401) return onUnauthorized();
+      setError(err?.status === 404 ? "Không tìm thấy chương trình." : "Không tải được chương trình. Vui lòng thử lại sau.");
+    }
+  }, [slug, onUnauthorized]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -32,11 +53,47 @@ export function ProgramDetail() {
     }
     setProgram(null);
     setError("");
-    trainingApi.get(slug).then(setProgram).catch((err) => {
-      if (err?.status === 401) return onUnauthorized();
-      setError(err?.status === 404 ? "Không tìm thấy chương trình." : "Không tải được chương trình. Vui lòng thử lại sau.");
+    load();
+  }, [isAuthenticated, slug, load]);
+
+  const mine = program?.my_enrollment ?? null;
+  const following = mine !== null && mine.status !== "abandoned" ? mine : null;
+  const otherActive = active && active.program_slug !== slug ? active : null;
+  const doneDays = new Set(following?.completed_days.map((c) => c.day_number) ?? []);
+
+  const switchMessage = otherActive
+    ? `Bạn đang theo ${otherActive.program_title}; chuyển sang chương trình này? Tiến độ cũ vẫn được lưu.`
+    : null;
+
+  const askStart = () => {
+    setActionError("");
+    if (switchMessage) setPending({ replace: true, message: switchMessage, label: "Chuyển sang chương trình này" });
+    else runStart(false);
+  };
+
+  const askRestart = () => {
+    setActionError("");
+    setPending({
+      replace: true,
+      message: switchMessage ?? "Tập lại chương trình từ đầu? Tiến độ cũ vẫn được lưu.",
+      label: "Tập lại chương trình",
     });
-  }, [isAuthenticated, slug, onUnauthorized]);
+  };
+
+  const runStart = async (replace: boolean) => {
+    setBusy(true);
+    setActionError("");
+    try {
+      await trainingApi.start(slug, replace);
+      setPending(null);
+      await load();
+    } catch (err: any) {
+      if (err?.status === 401) return onUnauthorized();
+      setActionError(friendlyTrainingError(err, "Không bắt đầu được chương trình. Vui lòng thử lại."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <TrainingShell weightLoss={program?.goal_tag === "weight_loss"}>
@@ -61,6 +118,34 @@ export function ProgramDetail() {
             </p>
           </section>
 
+          <section className="space-y-3">
+            {following?.status === "active" && (
+              <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">
+                Đang theo chương trình này: đã xong {following.training_days_done}/{following.training_days_total} ngày.
+                {following.message && <span className="block text-xs text-emerald-800">{following.message}</span>}
+              </div>
+            )}
+            {following?.status === "completed" && (
+              <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">
+                Bạn đã hoàn thành chương trình này ({following.training_days_done}/{following.training_days_total} ngày).
+              </div>
+            )}
+            {!pending && (
+              <div className="flex flex-wrap gap-2">
+                {following ? (
+                  <Button variant="secondary" onClick={askRestart} disabled={busy}>Tập lại chương trình</Button>
+                ) : (
+                  <Button onClick={askStart} loading={busy}>Bắt đầu chương trình</Button>
+                )}
+              </div>
+            )}
+            {pending && (
+              <ConfirmBox message={pending.message} confirmLabel={pending.label} busy={busy}
+                          onConfirm={() => runStart(pending.replace)} onCancel={() => setPending(null)} />
+            )}
+            {actionError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>}
+          </section>
+
           <ol className="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-100">
             {program.days.map((d) => (
               <li key={d.day_number}>
@@ -74,7 +159,12 @@ export function ProgramDetail() {
                 ) : (
                   <Link href={`/training/${program.slug}/days/${d.day_number}`}
                         className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-3 text-sm hover:bg-indigo-50">
-                    <span className="font-medium text-gray-900">Ngày {d.day_number}</span>
+                    <span className="font-medium text-gray-900">
+                      {doneDays.has(d.day_number) && (
+                        <span className="mr-1.5 text-emerald-600" aria-label="Đã xong">✓</span>
+                      )}
+                      Ngày {d.day_number}
+                    </span>
                     <span className="text-gray-600">
                       {itemsText(d.items_count, d.total_minutes, d.required_minutes, d.items_without_duration)}
                     </span>

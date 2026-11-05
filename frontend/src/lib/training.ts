@@ -44,8 +44,45 @@ export interface ProgramDaySummary {
   items_without_duration: number;
 }
 
+export interface CompletedDay {
+  day_number: number;
+  completed_on: string;
+  /** null khi có mục bắt buộc thiếu thời lượng */
+  minutes_done: number | null;
+}
+
+export interface Enrollment {
+  id: string;
+  program_slug: string;
+  program_title: string;
+  status: "active" | "completed" | "abandoned";
+  started_on: string;
+  ended_on: string | null;
+  /** false khi chương trình tạm thời không khả dụng (đã về draft) */
+  available: boolean;
+  schedule_changed: boolean;
+  message: string | null;
+  training_days_total: number;
+  training_days_done: number;
+  completed_days: CompletedDay[];
+  next_day: number | null;
+}
+
 export interface ProgramDetail extends ProgramSummary {
   days: ProgramDaySummary[];
+  /** enrollment gần nhất của bạn với chương trình này */
+  my_enrollment: Enrollment | null;
+}
+
+/** null (không phải 0) khi không có dữ liệu. */
+export interface TrainingWeekSummary {
+  week_start: string;
+  week_end: string;
+  completed_days: number | null;
+  active_dates: number | null;
+  total_minutes: number | null;
+  days_without_minutes: number | null;
+  series: { date: string; completed_days: number | null; minutes: number | null; days_without_minutes: number | null }[];
 }
 
 export interface DayItem {
@@ -101,4 +138,19 @@ export const trainingApi = {
   get: (slug: string) => apiClient.get<ProgramDetail>(`/training/programs/${encodeURIComponent(slug)}`),
   day: (slug: string, n: number) =>
     apiClient.get<ProgramDay>(`/training/programs/${encodeURIComponent(slug)}/days/${n}`),
+  current: () => apiClient.get<{ enrollment: Enrollment | null }>("/training/enrollments/current"),
+  start: (slug: string, replace: boolean) =>
+    apiClient.post<Enrollment>(`/training/enrollments${replace ? "?replace=true" : ""}`, { program_slug: slug }),
+  complete: (enrollmentId: string, n: number) =>
+    apiClient.post<Enrollment>(`/training/enrollments/${enrollmentId}/days/${n}/complete`, {}),
+  uncomplete: (enrollmentId: string, n: number) =>
+    apiClient.delete<Enrollment>(`/training/enrollments/${enrollmentId}/days/${n}`),
+  summary: () => apiClient.get<TrainingWeekSummary>("/training/summary"),
 };
+
+export function friendlyTrainingError(err: any, fallback: string): string {
+  if ((err?.status === 409 || err?.status === 422 || err?.status === 404) && typeof err?.message === "string") {
+    return err.message;
+  }
+  return fallback;
+}

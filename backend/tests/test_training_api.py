@@ -20,6 +20,7 @@ DRAFT_NO_URL = "zq-chua-link"
 
 
 async def empty_training_tables(db):
+    await db.execute(text("DELETE FROM program_enrollments"))      # FK RESTRICT tới training_programs (9b)
     await db.execute(text("DELETE FROM training_programs"))
     await db.execute(text("DELETE FROM workout_videos"))
 
@@ -158,8 +159,10 @@ async def test_no_write_endpoints(client, catalog, headers):
     for method in ("post", "put", "patch", "delete"):
         res = await getattr(client, method)(f"{URL}/{PUBLISHED}", headers=headers)
         assert res.status_code == 405
-    paths = [p for p in (await client.get("/api/v1/openapi.json")).json()["paths"] if p.startswith("/api/v1/training")]
-    assert sorted(paths) == [URL, f"{URL}/{{slug}}", f"{URL}/{{slug}}/days/{{day_number}}"]
+    spec = (await client.get("/api/v1/openapi.json")).json()["paths"]
+    programs = {p: set(v) for p, v in spec.items() if p.startswith(URL)}
+    # Chương trình chỉ đọc; các endpoint ghi của lát 9b nằm dưới /training/enrollments
+    assert programs == {URL: {"get"}, f"{URL}/{{slug}}": {"get"}, f"{URL}/{{slug}}/days/{{day_number}}": {"get"}}
 
 
 async def test_minimal_program_minutes_null(client, db_session, tmp_path, headers):

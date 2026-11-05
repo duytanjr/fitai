@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProgramSummaryOut(BaseModel):
@@ -27,8 +27,57 @@ class ProgramDaySummaryOut(BaseModel):
     items_without_duration: int
 
 
+class CompletedDayOut(BaseModel):
+    day_number: int
+    completed_on: str
+    minutes_done: Optional[int]           # None khi có mục bắt buộc thiếu thời lượng
+
+
+class EnrollmentOut(BaseModel):
+    id: str
+    program_slug: str
+    program_title: str
+    status: str
+    started_on: str
+    ended_on: Optional[str]
+    available: bool                       # False khi chương trình hiện là draft
+    schedule_changed: bool                # có ngày đã đánh dấu không còn được tính (lịch đổi)
+    message: Optional[str]
+    training_days_total: int
+    training_days_done: int
+    completed_days: list[CompletedDayOut]
+    next_day: Optional[int]
+
+
 class ProgramDetailOut(ProgramSummaryOut):
     days: list[ProgramDaySummaryOut]
+    my_enrollment: Optional[EnrollmentOut] = None     # enrollment gần nhất của người dùng với chương trình này
+
+
+class CurrentEnrollmentOut(BaseModel):
+    enrollment: Optional[EnrollmentOut]
+
+
+class StartEnrollmentIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    program_slug: str = Field(..., min_length=1, max_length=60)
+
+
+class WeekDayOut(BaseModel):
+    date: str
+    completed_days: Optional[int]
+    minutes: Optional[int]
+    days_without_minutes: Optional[int]
+
+
+class TrainingWeekSummaryOut(BaseModel):
+    week_start: str
+    week_end: str
+    completed_days: Optional[int]         # số ngày chương trình đã đánh dấu; None khi không có dữ liệu
+    active_dates: Optional[int]           # số ngày lịch có đánh dấu
+    total_minutes: Optional[int]          # chỉ cộng ngày có minutes_done
+    days_without_minutes: Optional[int]
+    series: list[WeekDayOut]
 
 
 class DayItemOut(BaseModel):

@@ -12,6 +12,7 @@ export function ProgramList() {
   const onUnauthorized = useTrainingUnauthorized();
   const [programs, setPrograms] = useState<ProgramSummary[] | null>(null);
   const [error, setError] = useState("");
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -19,6 +20,8 @@ export function ProgramList() {
       if (err?.status === 401) return onUnauthorized();
       setError("Không tải được danh sách chương trình. Vui lòng thử lại sau.");
     });
+    // Nhãn "Đang theo" chỉ là phần phụ: lỗi thì bỏ qua
+    trainingApi.current().then((c) => setActiveSlug(c.enrollment?.program_slug ?? null)).catch(() => {});
   }, [isAuthenticated, onUnauthorized]);
 
   return (
@@ -43,7 +46,14 @@ export function ProgramList() {
             <li key={p.slug}>
               <Link href={`/training/${p.slug}`}
                     className="block h-full rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 transition hover:ring-indigo-300">
-                <h2 className="text-lg font-semibold text-gray-900">{p.title}</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {p.title}
+                  {p.slug === activeSlug && (
+                    <span className="ml-2 inline-block rounded bg-emerald-50 px-1.5 py-0.5 align-middle text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                      Đang theo
+                    </span>
+                  )}
+                </h2>
                 <p className="mt-1 text-xs text-gray-500">
                   {GOAL_LABELS[p.goal_tag] ?? p.goal_tag} · {LEVEL_LABELS[p.level] ?? p.level}
                   {p.intensity_label && ` · ${p.intensity_label}`}

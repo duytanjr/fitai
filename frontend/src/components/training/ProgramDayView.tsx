@@ -4,13 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
+import { Button } from "@/components/ui/Button";
 import { TrainingShell, useTrainingUnauthorized } from "@/components/training/TrainingShell";
 import {
   CATEGORY_LABELS,
   SLUG_RE,
+  friendlyTrainingError,
   isSafeYoutubeUrl,
   itemsText,
   trainingApi,
+  type Enrollment,
   type ProgramDay,
 } from "@/lib/training";
 
@@ -23,6 +26,10 @@ export function ProgramDayView() {
   const onUnauthorized = useTrainingUnauthorized();
   const [day, setDay] = useState<ProgramDay | null>(null);
   const [error, setError] = useState("");
+  // enrollment gần nhất của bạn với chương trình này (từ trang chương trình); lỗi thì chỉ ẩn phần đánh dấu
+  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [markError, setMarkError] = useState("");
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -32,11 +39,30 @@ export function ProgramDayView() {
     }
     setDay(null);
     setError("");
+    setEnrollment(null);
     trainingApi.day(slug, n).then(setDay).catch((err) => {
       if (err?.status === 401) return onUnauthorized();
       setError(err?.status === 404 ? "Không tìm thấy ngày tập." : "Không tải được ngày tập. Vui lòng thử lại sau.");
     });
+    trainingApi.get(slug).then((p) => setEnrollment(p.my_enrollment)).catch(() => {});
   }, [isAuthenticated, slug, n, onUnauthorized]);
+
+  const following = enrollment && enrollment.status !== "abandoned" ? enrollment : null;
+  const completion = following?.completed_days.find((c) => c.day_number === n) ?? null;
+
+  const mark = async (done: boolean) => {
+    if (!following || busy) return;
+    setBusy(true);
+    setMarkError("");
+    try {
+      setEnrollment(done ? await trainingApi.complete(following.id, n) : await trainingApi.uncomplete(following.id, n));
+    } catch (err: any) {
+      if (err?.status === 401) return onUnauthorized();
+      setMarkError(friendlyTrainingError(err, "Không lưu được. Vui lòng thử lại."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <TrainingShell weightLoss={day?.goal_tag === "weight_loss"}>
@@ -114,6 +140,43 @@ export function ProgramDayView() {
                 </li>
               ))}
             </ol>
+          )}
+
+          {!day.is_rest && (
+            <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+              {!following && (
+                <p className="text-sm text-gray-600">
+                  Bạn chưa theo chương trình này.{" "}
+                  <Link href={`/training/${day.program_slug}`} className="font-medium text-indigo-600 hover:text-indigo-700">
+                    Bắt đầu chương trình
+                  </Link>{" "}
+                  để đánh dấu các ngày đã tập.
+                </p>
+              )}
+              {following && completion && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="font-medium text-emerald-700">✓ Đã hoàn thành</span>
+                  <Button size="sm" variant="ghost" onClick={() => mark(false)} loading={busy}>Bỏ đánh dấu</Button>
+                </div>
+              )}
+              {following && !completion && (
+                <Button onClick={() => mark(true)} loading={busy} disabled={busy || !following.available}>
+                  Hoàn thành các bài tập
+                </Button>
+              )}
+              {following && !following.available && following.message && (
+                <p className="mt-2 text-xs text-gray-500">{following.message}</p>
+              )}
+              {following?.status === "completed" && (
+                <p className="mt-2 text-sm text-emerald-800">Bạn đã hoàn thành chương trình này.</p>
+              )}
+              {markError && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{markError}</p>}
+              {following && (
+                <p className="mt-2 text-xs text-gray-400">
+                  Hệ thống không kiểm tra bạn có xem video hay không; đây là số bạn tự đánh dấu.
+                </p>
+              )}
+            </section>
           )}
         </>
       )}
