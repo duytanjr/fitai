@@ -18,10 +18,15 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | 8a (FR19 thực phẩm + phân quyền) | a719799 | users.role, admin_audit_log, nguồn ADMIN_MANUAL, /admin/foods, make_admin, trang /admin |
 | 8b-1 (FR18 tài liệu RAG) | 8e1bbfa | knowledge_documents, /admin/documents, lập chỉ mục hai pha, bộ lọc doc_enabled, pdf_guard, tab Tài liệu |
 | 8b-2 (FR20 hội thoại ẩn danh) | b6e8256 | /admin/conversations (tắt mặc định), bí danh HMAC, che nội dung, nhật ký xem, người dùng tự xoá phiên |
-| 9a (một phần FR12–13) | chưa commit | workout_videos, training_programs, program_days, program_day_items, seed_training.py, /training |
+| 9a (một phần FR12–13) | b71a0f2 | workout_videos, training_programs, program_days, program_day_items, seed_training.py, /training |
+| 9b (một phần FR14) | b9f206e | program_enrollments, program_day_completions, /training/enrollments, /training/summary, thẻ Tập luyện tuần này |
 
-- pytest hiện tại: 822 passed, 0 skipped (sau lát 9a; sau 8b-2 là 689, sau 8b-1 là 628, sau 8a là 580, sau lát 7
-  là 487).
+- pytest hiện tại: 862 passed, 0 skipped (sau lát 9b; sau 9a là 822, sau 8b-2 là 689, sau 8b-1 là 628, sau 8a là
+  580, sau lát 7 là 487).
+- md5 trước/sau migration d2a6f9c3e8b1 (trùng nhau): foods, meal_logs, body_metrics, chat_sessions như dòng 9a bên
+  dưới; users 80 dòng `45add6f9c99a77675bdb856963d98f93`; workout_videos 2 dòng `a8f9331b5237cf67edb66f7dad117fb5`;
+  training_programs 1 dòng `8d94dc027929a48eec087fc37364fd21`. Sau thử đầu-cuối 9b chỉ users đổi (81 dòng
+  `a3aa166522bb9ba09ed8f9af75f2cfc7`, thêm tài khoản thử). Bản pg_dump trước migration ở scratchpad, ngoài git.
 - md5 trước/sau migration c4b8e2f7a915 và sau thử đầu-cuối 9a (trùng nhau): foods 529 dòng
   `88900310ebf5772e3286d73e84e48edc`, meal_logs 23 dòng `5e937f6981948a0875c85edb6653f239`, body_metrics 7 dòng
   `fdbf4752cc5d4016195a6d5d28a0040f`, users 80 dòng `45add6f9c99a77675bdb856963d98f93`, chat_sessions 38 dòng
@@ -53,7 +58,8 @@ nhất", không nói "tuần này", kèm calorie_note, không dùng từ đánh 
 
 Bảng chính: users (role), user_profiles, chat_sessions, chat_messages (sources JSON), foods, food_sources,
 meal_logs (FK RESTRICT tới foods), body_metrics, admin_audit_log, knowledge_documents, workout_videos,
-training_programs, program_days, program_day_items. Migration head: c4b8e2f7a915.
+training_programs, program_days, program_day_items, program_enrollments, program_day_completions.
+Migration head: d2a6f9c3e8b1.
 
 Tập luyện (lát 9a, models/training.py, services/training/{youtube,seed,catalog}.py, api/routers/training.py):
 - Bảng: `workout_videos` (youtube_id 11 ký tự UNIQUE, url chuẩn `https://www.youtube.com/watch?v=<id>`; title bắt
@@ -90,15 +96,41 @@ Tập luyện (lát 9a, models/training.py, services/training/{youtube,seed,cata
   ở data/training_dev/ (gitignore) do người dùng điền; DB dev đang có chương trình `thu-nghiem` (published, 3 ngày,
   2 video chưa có thời lượng/kênh) nạp từ đó.
 
-Thiết kế cho lát 9b (CHƯA có migration; 9a không cần sửa bảng):
-- `program_enrollments`: id, user_id (FK CASCADE), program_id (FK RESTRICT), started_on, status
-  active | completed | abandoned, created_at, ended_on; unique index một phần: MỘT enrollment active mỗi người.
-- `program_day_completions`: id, enrollment_id (FK CASCADE), day_number (lưu theo SỐ NGÀY, không FK tới
-  program_days.id, để nạp lại lịch không phá lịch sử), completed_on, minutes_done; UNIQUE (enrollment_id, day_number).
-- "Tập lại chương trình" tạo enrollment mới, không xoá lịch sử.
-- Cần xử lý ở 9b: chương trình đang có người theo mà bị đưa về draft thì API trả 404; duration_days giảm (hoặc
-  ngày bị xoá khi nạp lại) có thể làm tiến độ trỏ tới ngày không còn. Chương trình có trong DB nhưng không có trong
-  CSV thì trình nạp chỉ liệt kê, không tính lại trạng thái.
+Theo chương trình (lát 9b, models/training_progress.py, services/training/progress.py, api/routers/training.py):
+- `program_enrollments`: id UUID, user_id (FK CASCADE), program_id (FK RESTRICT), started_on / ended_on (ngày giờ
+  VN), status enum enrollment_status (active | completed | abandoned), created_at mặc định `clock_timestamp()` (không
+  phải now(), để thứ tự đúng khi nhiều dòng tạo trong một transaction). Unique index một phần: MỘT enrollment active
+  mỗi người; CHECK ended_on NULL đúng khi active.
+- `program_day_completions`: id UUID, enrollment_id (FK CASCADE), day_number ≥ 1 (theo SỐ NGÀY, không FK tới
+  program_days), completed_on (today_vn), minutes_done NULL hoặc 0–600; UNIQUE (enrollment_id, day_number).
+- minutes_done được chụp lúc đánh dấu: tổng duration_min các mục BẮT BUỘC, chỉ khi MỌI mục bắt buộc của ngày đều có
+  thời lượng; thiếu bất kỳ mục nào → null (không cộng thiếu một phần). Mục không bắt buộc không tính.
+- API (JWT, user từ token, của người khác → 404):
+  - POST /training/enrollments {program_slug} (extra=forbid): draft/không tồn tại → 404; đang có active → 409 kèm
+    tên chương trình; `?replace=true` chuyển cái cũ sang abandoned (đặt ended_on, giữ lịch sử) rồi tạo mới — "Tập
+    lại" cũng là lệnh này.
+  - GET /training/enrollments/current → `{"enrollment": … | null}` kèm tiến độ (training_days_done /
+    training_days_total chỉ đếm ngày hiện là ngày tập trong 1..duration_days, completed_days, next_day). Chương
+    trình về draft → available=false + "Chương trình tạm thời không khả dụng"; ngày đã đánh dấu vượt duration_days
+    hoặc đã thành ngày nghỉ → bỏ qua, schedule_changed=true.
+  - POST /training/enrollments/{id}/days/{n}/complete: idempotent (đã có bản ghi → 200 không đổi, kể cả khi
+    completed); ngày nghỉ / ngoài khoảng → 422; enrollment không active hoặc chương trình draft → 409. Không bắt
+    theo thứ tự ngày. Xong mọi ngày tập → completed (đặt ended_on).
+  - DELETE /training/enrollments/{id}/days/{n}: bỏ đánh dấu; abandoned → 409; ngày chưa đánh dấu → 404; enrollment
+    completed quay lại active (đang có active khác → 409).
+  - GET /training/summary?week_start= (mặc định tuần hiện tại, thứ Hai giờ VN; không phải thứ Hai hoặc tuần tương
+    lai → 422): trên MỌI enrollment; completed_days (số ngày chương trình), active_dates (số ngày lịch),
+    total_minutes (chỉ ngày có minutes_done), days_without_minutes, series 7 ngày; không có dữ liệu → null, không 0.
+    Logic ở `build_week_summary` (thuần) + `weekly_summary` (DB) để lát 9d dùng lại làm công cụ chatbot.
+  - GET /training/programs/{slug} thêm `my_enrollment` (enrollment gần nhất của người dùng với chương trình, ưu
+    tiên active).
+- Frontend: trang chương trình có "Bắt đầu chương trình" (đang theo chương trình khác → hộp xác nhận trong trang,
+  không dùng window.confirm), banner "Đang theo…: đã xong a/b ngày", dấu tích ngày đã xong, "Tập lại chương trình";
+  trang ngày có "Hoàn thành các bài tập" / "Đã hoàn thành" + "Bỏ đánh dấu" và ghi chú tự đánh dấu (chưa theo → mời
+  bắt đầu); danh sách có nhãn "Đang theo"; dashboard có thẻ "Tập luyện tuần này" (đã tập N ngày, tổng phút bạn đánh
+  dấu, "chưa tính N ngày chưa đủ thời lượng", "Chưa có dữ liệu thời lượng" khi mọi ngày thiếu; câu tham khảo WHO
+  trung lập, không "đạt/chưa đạt", không kcal).
+- Còn để ý: chương trình có trong DB nhưng không có trong CSV thì trình nạp chỉ liệt kê, không tính lại trạng thái.
 
 Tài liệu RAG (lát 8b-1, services/knowledge/documents.py, indexing.py, pdf_guard.py; api/routers/admin_documents.py):
 - `knowledge_documents`: origin builtin | upload; status uploaded | indexing | indexed | failed; error_code là mã
@@ -206,7 +238,8 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
 - DB dev có các user thử: e2e-…@example.com (thử tay), eval-mau / eval-chua-ho-so / eval-nhat-ky-trong
   @example.com (bộ đánh giá, chạy lại cho cùng trạng thái). Không tự xoá. Miền .local bị validation từ chối.
   `admin-e2e-050b60@example.com` đang là admin (thử lát 8a); `user-e2e-050b60@example.com` là user thường;
-  `admin-docs-e2e-37892b@example.com` đang là admin (thử lát 8b-1).
+  `admin-docs-e2e-37892b@example.com` đang là admin (thử lát 8b-1). `train9b-e2e-010ec9@example.com` là user
+  thường (thử lát 9b; enrollment thử đã xoá cùng chương trình giả).
 - Test cần Chroma dùng collection TẠM (`test_docs_<uuid>`, xoá sau mỗi test), embedding giả; PDF test tạo bằng
   code (tests/pdf_factory.py, văn bản ASCII). So rag_smoke trước/sau bằng vector câu hỏi nhúng một lần rồi lưu.
 
@@ -268,17 +301,22 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   (chưa có; hiện chưa chương trình chính thức nào published). Không kiểm link còn xem được (checked_on do người
   nhập điền). Hai lần nạp chạy cùng lúc không có khoá (ràng buộc UNIQUE sẽ báo lỗi). Trang /training chưa thử trên
   trình duyệt, container frontend chưa build lại sau 9a.
+- Tập luyện (9b): chưa test hai kết nối đồng thời thật (mới dựa vào unique index, khoá FOR UPDATE và đường 409).
+  minutes_done chụp lúc đánh dấu nên nạp lại lịch sau đó không cập nhật số phút đã lưu. Số ngày giảm chỉ phát hiện
+  được khi có ngày đã đánh dấu vượt khoảng (không lưu số ngày lúc bắt đầu). Số phút là do người dùng tự đánh dấu,
+  hệ thống không kiểm tra có xem video. Access log có id enrollment và số ngày trong đường dẫn (không có tên
+  chương trình hay số phút). Trang tập luyện và thẻ dashboard chưa thử trên trình duyệt.
 
 ## 7. Việc còn lại (thứ tự dự kiến)
 1. Thử trên trình duyệt: dashboard, /admin tab Thực phẩm và tab Tài liệu (tải lên, lập chỉ mục, xem trước, bật/tắt,
    xoá); thử get_progress_summary, một dòng ADMIN_MANUAL qua lookup_food và search_knowledge có tài liệu tải lên
    với Gemini thật (vài lượt).
-   Thêm: tab Hội thoại (8b-2), nút xoá phiên trong chat, trang /training sau khi build lại frontend.
+   Thêm: tab Hội thoại (8b-2), nút xoá phiên trong chat, trang /training (bắt đầu, đánh dấu, tập lại) và thẻ Tập
+   luyện tuần này sau khi build lại frontend.
 2. Người dùng điền dữ liệu thật cho nguoi-moi-14 và toan-than-28 (data/training/*.csv), chạy
    `seed_training.py --dry-run` rồi nạp thật.
-3. Tập luyện 9b: program_enrollments + program_day_completions (thiết kế ở mục 2), đánh dấu hoàn thành ngày, ghi số
-   phút, "Tập lại chương trình". Sau đó 9d: gợi ý chương trình và công cụ chatbot. Quản trị bài tập của FR19 (hiện
-   nạp bằng CSV) chưa xếp lát.
+3. Tập luyện 9d: gợi ý chương trình và công cụ chatbot (dùng lại `weekly_summary` của 9b). Quản trị bài tập của
+   FR19 (hiện nạp bằng CSV) chưa xếp lát.
 4. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
 5. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
 6. Lọc câu hỏi y khoa (guardrail riêng, ngoài quy tắc prompt hiện có).
