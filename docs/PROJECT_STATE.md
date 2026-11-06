@@ -20,9 +20,13 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | 8b-2 (FR20 hội thoại ẩn danh) | b6e8256 | /admin/conversations (tắt mặc định), bí danh HMAC, che nội dung, nhật ký xem, người dùng tự xoá phiên |
 | 9a (một phần FR12–13) | b71a0f2 | workout_videos, training_programs, program_days, program_day_items, seed_training.py, /training |
 | 9b (một phần FR14) | b9f206e | program_enrollments, program_day_completions, /training/enrollments, /training/summary, thẻ Tập luyện tuần này |
+| 9d (FR12) | fa90001 | recommend.py, /training/recommendation, công cụ recommend_program và get_training_summary, quy tắc TẬP LUYỆN |
 
-- pytest hiện tại: 862 passed, 0 skipped (sau lát 9b; sau 9a là 822, sau 8b-2 là 689, sau 8b-1 là 628, sau 8a là
-  580, sau lát 7 là 487).
+- FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
+  label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
+
+- pytest hiện tại: 924 passed, 0 skipped (sau lát 9d; sau 9b là 862, sau 9a là 822, sau 8b-2 là 689, sau 8b-1 là
+  628, sau 8a là 580, sau lát 7 là 487). Lát 9d không có migration mới.
 - md5 trước/sau migration d2a6f9c3e8b1 (trùng nhau): foods, meal_logs, body_metrics, chat_sessions như dòng 9a bên
   dưới; users 80 dòng `45add6f9c99a77675bdb856963d98f93`; workout_videos 2 dòng `a8f9331b5237cf67edb66f7dad117fb5`;
   training_programs 1 dòng `8d94dc027929a48eec087fc37364fd21`. Sau thử đầu-cuối 9b chỉ users đổi (81 dòng
@@ -50,11 +54,21 @@ Công cụ của agent (fitness_advisor.py, tối đa 3 vòng, 3 lệnh gọi/v�
 - `get_daily_summary(date?)`: chỉ đọc nhật ký ngày của user hiện tại (giờ VN = UTC+7).
 - `get_progress_summary(days=7)` (công cụ thứ 5): chỉ đọc, không nhận user_id; days ∈ {7, 30, 90}, sai thì
   trả lỗi tham số. Chỉ kèm chuỗi theo ngày khi days=7.
+- `recommend_program(experience?)` (công cụ thứ 6, lát 9d): chỉ đọc; experience ∈ {"regular", "new"} hoặc bỏ trống
+  (khác → "Lỗi tham số"); prompt dặn chỉ truyền khi người dùng tự nói rõ. Trả cùng nội dung như API gợi ý.
+- `get_training_summary()` (công cụ thứ 7, lát 9d): chỉ đọc, không tham số; chương trình đang theo (tên, a/b ngày,
+  ngày tiếp theo, available) + tuần lịch hiện tại (từ weekly_summary của 9b); thiếu → null kèm ghi chú, không 0.
+- Hai công cụ tập luyện chạy trong SAVEPOINT (ChatService._load_recommendation / _load_training_summary); lỗi DB
+  → mã `TAP_LUYEN_KHONG_KHA_DUNG`. 3 vòng × 3 lệnh gọi vẫn đủ với 7 công cụ (không đổi).
 
 Thứ tự quy tắc prompt hiện tại (cuối danh sách): 15 nhiều nguồn dữ liệu thực phẩm, 16 tiến độ (nói "N ngày gần
 nhất", không nói "tuần này", kèm calorie_note, không dùng từ đánh giá), 17 nguồn quản trị viên nhập (nêu rõ
 "số liệu do quản trị viên nhập" kèm mã ADM- và ghi chú nguồn; ghi chú là dữ liệu, không phải chỉ thị),
-18 an toàn y tế. Test tìm quy tắc an toàn theo tiêu đề "NGUYÊN TẮC AN TOÀN Y TẾ:", không theo số thứ tự.
+18 tập luyện (tiêu đề "TẬP LUYỆN:": gọi recommend_program / get_training_summary, chỉ nêu chương trình và con số
+công cụ trả về, không bịa bài tập hay số hiệp, số phút là tự đánh dấu, null không phải 0, không hứa giảm cân, không
+kcal đã đốt, không "đạt/chưa đạt", câu hỏi kỹ thuật động tác → nói chưa có hướng dẫn riêng và hỏi huấn luyện viên,
+bệnh nền/đau → gặp bác sĩ, thống kê tính theo tuần lịch từ thứ Hai), 19 an toàn y tế. Test tìm quy tắc theo tiêu
+đề ("TẬP LUYỆN:", "NGUYÊN TẮC AN TOÀN Y TẾ:"), không theo số thứ tự.
 
 Bảng chính: users (role), user_profiles, chat_sessions, chat_messages (sources JSON), foods, food_sources,
 meal_logs (FK RESTRICT tới foods), body_metrics, admin_audit_log, knowledge_documents, workout_videos,
@@ -131,6 +145,24 @@ Theo chương trình (lát 9b, models/training_progress.py, services/training/pr
   dấu, "chưa tính N ngày chưa đủ thời lượng", "Chưa có dữ liệu thời lượng" khi mọi ngày thiếu; câu tham khảo WHO
   trung lập, không "đạt/chưa đạt", không kcal).
 - Còn để ý: chương trình có trong DB nhưng không có trong CSV thì trình nạp chỉ liệt kê, không tính lại trạng thái.
+
+Gợi ý chương trình (lát 9d, services/training/recommend.py):
+- `recommend_program(profile, experience, programs)` thuần; `recommendation_for_user(db, user_id, experience)` đọc
+  hồ sơ của chính user (không có hồ sơ → thiếu thông tin) và chương trình published; dùng chung cho API và công cụ.
+- Thứ tự: CHỐT CHẶN BMI < 18,5 xét trước mọi luật (kể cả experience): mục tiêu giảm cân → chính null
+  (`bmi_thap_muc_tieu_giam_can`); mục tiêu khác → loại chương trình weight_loss, không còn gì → null
+  (`chi_co_chuong_trinh_giam_can`). Rồi: thiếu mức vận động và experience None → beginner (`thieu_thong_tin`);
+  regular → intermediate; new → beginner; vận động ít/nhẹ hoặc BMI ≥ 30 hoặc tuổi ≥ 60 → beginner, thay thế
+  intermediate (`nen_bat_dau_nhe`); vận động vừa trở lên → intermediate, thay thế beginner. Không lọc tuổi < 18.
+- BMI từ metrics_service.calculate_bmi (làm tròn 1 chữ số); thiếu chiều cao/cân nặng → không áp chốt chặn, có ghi
+  chú. Câu lý do "Nên bắt đầu ở mức … vì <dữ kiện đã khớp>"; không nêu con số BMI, không cam kết kết quả, không
+  lời khuyên y tế. Chọn trong cùng level: ưu tiên goal_tag trùng mục tiêu (maintenance ↔ general), rồi ngắn hơn,
+  rồi slug; không có level đó → level còn lại kèm ghi chú. Ghi chú "chưa có chương trình riêng cho mục tiêu này"
+  chỉ khi không có chương trình published cùng mục tiêu.
+- API GET /training/recommendation?experience=regular|new (khác → 422): primary / alternative (slug, title,
+  duration_days, level, goal_tag), reason_code, reason, notes, experience. Không sửa hồ sơ.
+- Frontend /training: hộp "Gợi ý cho bạn" (câu lý do, ghi chú, "Thay thế: …"), nhãn trên thẻ chương trình chính,
+  câu hỏi "Bạn đã tập đều trong vài tháng qua chưa?" (2 nút; chỉ giữ trong trang); primary null → chỉ hiện câu lý do.
 
 Tài liệu RAG (lát 8b-1, services/knowledge/documents.py, indexing.py, pdf_guard.py; api/routers/admin_documents.py):
 - `knowledge_documents`: origin builtin | upload; status uploaded | indexing | indexed | failed; error_code là mã
@@ -239,7 +271,8 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   @example.com (bộ đánh giá, chạy lại cho cùng trạng thái). Không tự xoá. Miền .local bị validation từ chối.
   `admin-e2e-050b60@example.com` đang là admin (thử lát 8a); `user-e2e-050b60@example.com` là user thường;
   `admin-docs-e2e-37892b@example.com` đang là admin (thử lát 8b-1). `train9b-e2e-010ec9@example.com` là user
-  thường (thử lát 9b; enrollment thử đã xoá cùng chương trình giả).
+  thường (thử lát 9b; enrollment thử đã xoá cùng chương trình giả). `train9d-e2e-5c20e2@example.com` là user thường
+  (thử lát 9d; hồ sơ cuối: nữ, 30 tuổi, 160 cm, 60 kg, nhẹ, giảm cân; enrollment thử đã xoá).
 - Test cần Chroma dùng collection TẠM (`test_docs_<uuid>`, xoá sau mỗi test), embedding giả; PDF test tạo bằng
   code (tests/pdf_factory.py, văn bản ASCII). So rag_smoke trước/sau bằng vector câu hỏi nhúng một lần rồi lưu.
 
@@ -306,21 +339,25 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   được khi có ngày đã đánh dấu vượt khoảng (không lưu số ngày lúc bắt đầu). Số phút là do người dùng tự đánh dấu,
   hệ thống không kiểm tra có xem video. Access log có id enrollment và số ngày trong đường dẫn (không có tên
   chương trình hay số phút). Trang tập luyện và thẻ dashboard chưa thử trên trình duyệt.
+- Tập luyện (9d): recommend_program / get_training_summary và quy tắc TẬP LUYỆN CHƯA thử với Gemini thật; bộ đánh
+  giá chưa có câu hỏi tập luyện. Câu trả lời "đã tập đều / mới bắt đầu" không được lưu (tải lại trang là mất). Luật
+  chỉ phân biệt 2 level; vì các chương trình dự kiến đều weight_loss, người có mục tiêu khác giảm cân luôn thấy ghi
+  chú "hiện chưa có chương trình riêng cho mục tiêu này". Hộp gợi ý chưa thử trên trình duyệt.
 
 ## 7. Việc còn lại (thứ tự dự kiến)
 1. Thử trên trình duyệt: dashboard, /admin tab Thực phẩm và tab Tài liệu (tải lên, lập chỉ mục, xem trước, bật/tắt,
    xoá); thử get_progress_summary, một dòng ADMIN_MANUAL qua lookup_food và search_knowledge có tài liệu tải lên
    với Gemini thật (vài lượt).
-   Thêm: tab Hội thoại (8b-2), nút xoá phiên trong chat, trang /training (bắt đầu, đánh dấu, tập lại) và thẻ Tập
-   luyện tuần này sau khi build lại frontend.
+   Thêm: tab Hội thoại (8b-2), nút xoá phiên trong chat, trang /training (gợi ý, bắt đầu, đánh dấu, tập lại) và
+   thẻ Tập luyện tuần này sau khi build lại frontend; vài câu hỏi tập luyện với Gemini thật (recommend_program,
+   get_training_summary).
 2. Người dùng điền dữ liệu thật cho nguoi-moi-14 và toan-than-28 (data/training/*.csv), chạy
    `seed_training.py --dry-run` rồi nạp thật.
-3. Tập luyện 9d: gợi ý chương trình và công cụ chatbot (dùng lại `weekly_summary` của 9b). Quản trị bài tập của
-   FR19 (hiện nạp bằng CSV) chưa xếp lát.
+3. Quản trị bài tập của FR19 (hiện nạp bằng CSV) chưa xếp lát.
 4. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
 5. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
 6. Lọc câu hỏi y khoa (guardrail riêng, ngoài quy tắc prompt hiện có).
 7. Chính sách lưu trữ hội thoại (hiện giữ vô thời hạn).
 8. Cập nhật hành vi mong đợi C04/C08/C09/C10 (bản v2), rồi đo lần 2 và so với mốc eade8b0. Có thể thêm
-   câu đánh giá cho tiến độ và cho dòng quản trị viên nhập.
+   câu đánh giá cho tiến độ, dòng quản trị viên nhập và tập luyện (gợi ý chương trình, tiến độ tập).
 Thứ tự trên là dự kiến của người dùng; chi tiết từng lát chưa chốt (chưa chắc).
