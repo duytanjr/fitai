@@ -148,6 +148,31 @@ export const trainingApi = {
   summary: () => apiClient.get<TrainingWeekSummary>("/training/summary"),
 };
 
+export type Experience = "regular" | "new";
+
+export interface RecommendedProgram {
+  slug: string;
+  title: string;
+  duration_days: number;
+  level: Level;
+  goal_tag: GoalTag;
+}
+
+/** Gợi ý do luật phía server tính từ hồ sơ; primary null thì chỉ hiện câu lý do. */
+export interface Recommendation {
+  primary: RecommendedProgram | null;
+  alternative: RecommendedProgram | null;
+  reason_code: string;
+  reason: string;
+  notes: string[];
+  experience: Experience | null;
+}
+
+export const recommendationApi = {
+  get: (experience: Experience | null) =>
+    apiClient.get<Recommendation>(`/training/recommendation${experience ? `?experience=${experience}` : ""}`),
+};
+
 export function friendlyTrainingError(err: any, fallback: string): string {
   if ((err?.status === 409 || err?.status === 422 || err?.status === 404) && typeof err?.message === "string") {
     return err.message;

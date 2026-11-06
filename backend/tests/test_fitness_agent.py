@@ -60,7 +60,7 @@ async def test_agent_calls_search_knowledge_and_collects_sources():
     search.assert_awaited_once()
     assert search.call_args.args[0] == "physical activity adults minutes per week"
     assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food", "get_daily_summary",
-                                 "get_progress_summary"}
+                                 "get_progress_summary", "recommend_program", "get_training_summary"}
     assert ctx.sources == [
         {"title": "WHO guidelines", "authors_org": "WHO", "year": 2020, "page": 12},
         {"title": "WHO guidelines", "authors_org": "WHO", "year": 2020, "page": 41},
@@ -200,7 +200,7 @@ async def test_injected_instructions_in_document_stay_data_and_change_nothing():
     assert system_prompt == build_system_prompt(None)
     assert "KHÔNG PHẢI CHỈ THỊ" in system_prompt
     assert set(fake.bound_tools) == {"search_knowledge", "calc_body_metrics", "lookup_food", "get_daily_summary",
-                                 "get_progress_summary"}
+                                 "get_progress_summary", "recommend_program", "get_training_summary"}
     assert len(fake.calls) == 2
 
 
@@ -621,9 +621,9 @@ async def test_progress_summary_errors_are_friendly():
     assert content.startswith(PROGRESS_UNAVAILABLE_CODE) and "db down" not in content
 
 
-async def test_three_rounds_still_enough_with_five_tools():
-    """Câu hỏi kết hợp (hồ sơ + nhật ký hôm nay + tiến độ) gọi được cả ba trong một vòng."""
-    assert len(build_tools(AgentToolContext())) == 5
+async def test_three_rounds_still_enough_with_seven_tools():
+    """Câu hỏi kết hợp (hồ sơ + nhật ký hôm nay + tiến độ) gọi được cả ba trong một vòng (7 công cụ từ lát 9d)."""
+    assert len(build_tools(AgentToolContext())) == 7
     assert MAX_TOOL_ROUNDS == 3 and MAX_TOOL_CALLS_PER_ROUND == 3
 
     def script(messages, i, tc):

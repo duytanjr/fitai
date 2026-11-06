@@ -12,6 +12,8 @@ from services.ai_agents.fitness_advisor import AgentToolContext, ChatAgentExcept
 from services.foods.lookup import search_foods
 from services.meals import daily_summary
 from services.progress import progress_summary_for_agent
+from services.training.progress import training_summary_for_agent
+from services.training.recommend import recommendation_for_user
 
 
 class ChatService:
@@ -86,12 +88,15 @@ class ChatService:
         # ── Bước 4: Gọi FitnessAdvisorAgent ────────────────────────────────────
         # Công cụ calc_body_metrics chỉ đọc được hồ sơ của user_id lấy từ JWT;
         # lookup_food tra bảng foods bằng phiên DB của request (trong SAVEPOINT);
-        # get_daily_summary / get_progress_summary chỉ đọc dữ liệu của chính user_id này
+        # get_daily_summary / get_progress_summary / recommend_program / get_training_summary chỉ đọc dữ liệu
+        # của chính user_id này
         tool_context = AgentToolContext(
             load_profile=lambda: self._load_profile(user_id),
             lookup_food=lambda query: search_foods(self.db, query),
             load_daily_summary=lambda day: self._load_daily_summary(user_id, day),
             load_progress_summary=lambda days: self._load_progress_summary(user_id, days),
+            load_recommendation=lambda experience: self._load_recommendation(user_id, experience),
+            load_training_summary=lambda: self._load_training_summary(user_id),
         )
         try:
             ai_reply = await fitness_agent.chat(
@@ -153,6 +158,14 @@ class ChatService:
     async def _load_progress_summary(self, user_id: uuid.UUID, days: int) -> dict:
         async with self.db.begin_nested():
             return await progress_summary_for_agent(self.db, user_id, days)
+
+    async def _load_recommendation(self, user_id: uuid.UUID, experience) -> dict:
+        async with self.db.begin_nested():
+            return await recommendation_for_user(self.db, user_id, experience)
+
+    async def _load_training_summary(self, user_id: uuid.UUID) -> dict:
+        async with self.db.begin_nested():
+            return await training_summary_for_agent(self.db, user_id)
 
     async def _load_profile(self, user_id: uuid.UUID) -> Optional[UserProfile]:
         res = await self.db.execute(select(UserProfile).where(UserProfile.user_id == user_id))

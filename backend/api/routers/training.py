@@ -5,7 +5,7 @@ user_id luôn lấy từ token; enrollment của người khác trả 404.
 """
 import uuid
 from datetime import date
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,12 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies.auth import get_current_user
 from api.schemas.training import (
     CurrentEnrollmentOut, EnrollmentOut, ProgramDayOut, ProgramDetailOut, ProgramSummaryOut, StartEnrollmentIn,
-    TrainingWeekSummaryOut,
+    RecommendationOut, TrainingWeekSummaryOut,
 )
 from core.database import get_db
 from models.user import User
 from services.training import catalog
 from services.training import progress as progress_service
+from services.training import recommend as recommend_service
 
 router = APIRouter(prefix="/training", tags=["Training"])
 
@@ -58,6 +59,17 @@ async def get_program_day(
         return await catalog.program_day(db, slug, day_number)
     except catalog.ProgramNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND)
+
+
+@router.get("/recommendation", response_model=RecommendationOut)
+async def get_recommendation(
+    experience: Optional[Literal["regular", "new"]] = Query(
+        None, description="regular = đã tập đều vài tháng qua, new = mới bắt đầu; bỏ trống nếu chưa trả lời"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gợi ý chương trình từ hồ sơ của chính người dùng (đọc từ DB). Không sửa hồ sơ."""
+    return await recommend_service.recommendation_for_user(db, current_user.id, experience)
 
 
 # ── Theo chương trình (9b) ───────────────────────────────────────────────────

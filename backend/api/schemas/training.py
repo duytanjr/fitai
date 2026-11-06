@@ -104,3 +104,20 @@ class ProgramDayOut(BaseModel):
     required_minutes: Optional[int]
     items_without_duration: int
     items: list[DayItemOut]
+
+
+class RecommendedProgramOut(BaseModel):
+    slug: str
+    title: str
+    duration_days: int
+    level: str
+    goal_tag: str
+
+
+class RecommendationOut(BaseModel):
+    primary: Optional[RecommendedProgramOut]           # None: không gợi ý (xem reason)
+    alternative: Optional[RecommendedProgramOut]
+    reason_code: str
+    reason: str
+    notes: list[str]
+    experience: Optional[str]

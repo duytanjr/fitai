@@ -270,3 +270,24 @@ async def weekly_summary(db: AsyncSession, user_id: uuid.UUID, week_start: date 
                ProgramDayCompletion.completed_on >= start_day, ProgramDayCompletion.completed_on <= end_day)
     )).all()
     return build_week_summary(start_day, [(d, m) for d, m in rows])
+
+
+async def training_summary_for_agent(db: AsyncSession, user_id: uuid.UUID) -> dict:
+    """Dữ liệu cho công cụ get_training_summary: chương trình đang theo + tuần hiện tại. Thiếu → null kèm ghi chú."""
+    enrollment = await current(db, user_id)
+    week = await weekly_summary(db, user_id, None)
+    out: dict = {"current_program": None, "this_week": {k: week[k] for k in (
+        "week_start", "week_end", "completed_days", "active_dates", "total_minutes", "days_without_minutes")}}
+    if enrollment is None:
+        out["current_program_note"] = "Người dùng hiện chưa theo chương trình nào."
+    else:
+        out["current_program"] = {k: enrollment[k] for k in (
+            "program_title", "training_days_done", "training_days_total", "next_day", "available", "message")}
+    if week["completed_days"] is None:
+        out["this_week_note"] = "Chưa có dữ liệu tập luyện trong tuần này (không phải 0)."
+    elif week["total_minutes"] is None:
+        out["this_week_note"] = ("Chưa có dữ liệu thời lượng: các ngày đã đánh dấu đều có bài bắt buộc thiếu "
+                                 "thời lượng.")
+    out["minutes_note"] = ("Số phút là người dùng tự đánh dấu (hệ thống không kiểm tra có xem video), chỉ cộng "
+                           "các ngày đủ thời lượng và gồm cả bài không phải aerobic.")
+    return out
