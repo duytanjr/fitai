@@ -13,9 +13,24 @@ import {
   isSafeYoutubeUrl,
   itemsText,
   trainingApi,
+  youtubeThumbUrl,
   type Enrollment,
   type ProgramDay,
 } from "@/lib/training";
+
+/** Ảnh xem trước cỡ cố định (16:9); ảnh lỗi thì ẩn, giữ khối màu trung tính để không vỡ bố cục. */
+function VideoThumb({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="aspect-video w-24 shrink-0 overflow-hidden rounded-lg bg-gray-200 sm:w-40">
+      {!failed && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)}
+             className="h-full w-full object-cover" />
+      )}
+    </div>
+  );
+}
 
 /** Trang một ngày tập: các mục theo thứ tự; "Bắt đầu" mở video YouTube ở tab mới. Văn bản thuần. */
 export function ProgramDayView() {
@@ -107,36 +122,45 @@ export function ProgramDayView() {
           ) : (
             <ol className="space-y-3">
               {day.items.map((item) => (
-                <li key={item.position} className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      {(item.category || item.duration_min !== null) && (
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                          {[item.category && (CATEGORY_LABELS[item.category] ?? item.category),
-                            item.duration_min !== null && `${item.duration_min} phút`].filter(Boolean).join(" · ")}
-                        </p>
-                      )}
-                      <p className="mt-0.5 font-medium text-gray-900">
-                        {item.position}. {item.label}
-                        {!item.required && <span className="ml-1 text-sm font-normal text-gray-500">(không bắt buộc)</span>}
+                <li key={item.position} className="flex gap-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:gap-4">
+                  {youtubeThumbUrl(item.youtube_id) && (isSafeYoutubeUrl(item.url) ? (
+                    // trùng đích với nút "Bắt đầu" nên bỏ khỏi thứ tự Tab và trình đọc màn hình
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true"
+                       className="shrink-0 self-start">
+                      <VideoThumb key={item.youtube_id} src={youtubeThumbUrl(item.youtube_id)!} />
+                    </a>
+                  ) : (
+                    <VideoThumb key={item.youtube_id} src={youtubeThumbUrl(item.youtube_id)!} />
+                  ))}
+                  <div className="min-w-0 flex-1">
+                    {(item.category || item.duration_min !== null) && (
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                        {[item.category && (CATEGORY_LABELS[item.category] ?? item.category),
+                          item.duration_min !== null && `${item.duration_min} phút`].filter(Boolean).join(" · ")}
                       </p>
-                      {item.channel && (
-                        <p className="mt-0.5 break-words text-xs text-gray-500">Video: {item.video_title} · {item.channel}</p>
+                    )}
+                    <p className="mt-0.5 break-words font-medium text-gray-900">
+                      {item.position}. {item.label}
+                      {!item.required && <span className="ml-1 text-sm font-normal text-gray-500">(không bắt buộc)</span>}
+                    </p>
+                    {item.channel && (
+                      <p className="mt-0.5 break-words text-xs text-gray-500">Video: {item.video_title} · {item.channel}</p>
+                    )}
+                    <div className="mt-2">
+                      {isSafeYoutubeUrl(item.url) ? (
+                        <a href={item.url} target="_blank" rel="noopener noreferrer"
+                           className="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                          Bắt đầu
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400">Link không hợp lệ</span>
                       )}
                     </div>
-                    {isSafeYoutubeUrl(item.url) ? (
-                      <a href={item.url} target="_blank" rel="noopener noreferrer"
-                         className="inline-flex shrink-0 items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                        Bắt đầu
-                      </a>
-                    ) : (
-                      <span className="text-xs text-gray-400">Link không hợp lệ</span>
-                    )}
+                    <p className="mt-2 text-xs text-gray-400">
+                      {item.channel ? `Video của kênh ${item.channel} trên YouTube` : "Video trên YouTube"}; link có thể không
+                      còn khả dụng.
+                    </p>
                   </div>
-                  <p className="mt-2 text-xs text-gray-400">
-                    {item.channel ? `Video của kênh ${item.channel} trên YouTube` : "Video trên YouTube"}; link có thể không
-                    còn khả dụng.
-                  </p>
                 </li>
               ))}
             </ol>
@@ -177,6 +201,10 @@ export function ProgramDayView() {
                 </p>
               )}
             </section>
+          )}
+
+          {!day.is_rest && day.items.some((i) => youtubeThumbUrl(i.youtube_id)) && (
+            <p className="text-xs text-gray-400">Ảnh xem trước tải từ YouTube; bản quyền video thuộc kênh đăng tải.</p>
           )}
         </>
       )}

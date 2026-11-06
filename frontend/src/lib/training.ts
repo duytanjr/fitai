@@ -115,6 +115,12 @@ export interface ProgramDay {
 const SAFE_YOUTUBE = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/;
 export const isSafeYoutubeUrl = (url: string) => SAFE_YOUTUBE.test(url);
 
+const YOUTUBE_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+
+/** Ảnh xem trước của video; null khi youtube_id không hợp lệ (khi đó không hiện ảnh). */
+export const youtubeThumbUrl = (id: string | null | undefined): string | null =>
+  id && YOUTUBE_ID_RE.test(id) ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
+
 export const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** Chuỗi thời lượng; "" khi không mục nào có thời lượng (khi đó chỉ hiện số bài). */
