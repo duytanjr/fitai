@@ -22,11 +22,13 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | 9b (một phần FR14) | b9f206e | program_enrollments, program_day_completions, /training/enrollments, /training/summary, thẻ Tập luyện tuần này |
 | 9d (FR12) | fa90001 | recommend.py, /training/recommendation, công cụ recommend_program và get_training_summary, quy tắc TẬP LUYỆN |
 | Dữ liệu tập luyện + ảnh xem trước | 5af1b21, 7f4def5, 76b89a7 | nội dung nguoi-moi-14 và toan-than-28 trong data/training/, ảnh xem trước YouTube trên trang ngày tập |
+| Nạp món ăn thủ công (FR19) | (chưa commit) | scripts/import_admin_foods.py, services/foods/admin_import.py, data/foods/manual/ |
 
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
 
-- pytest hiện tại: 924 passed, 0 skipped (sau lát 9d; sau 9b là 862, sau 9a là 822, sau 8b-2 là 689, sau 8b-1 là
+- pytest hiện tại: 955 passed, 0 skipped (sau script nạp món ăn thủ công: +28 test import, test dữ liệu tập luyện
+  trong repo 1 → 4; sau 9d là 924, sau 9b là 862, sau 9a là 822, sau 8b-2 là 689, sau 8b-1 là
   628, sau 8a là 580, sau lát 7 là 487). Lát 9d không có migration mới.
 - md5 trước/sau migration d2a6f9c3e8b1 (trùng nhau): foods, meal_logs, body_metrics, chat_sessions như dòng 9a bên
   dưới; users 80 dòng `45add6f9c99a77675bdb856963d98f93`; workout_videos 2 dòng `a8f9331b5237cf67edb66f7dad117fb5`;
@@ -124,6 +126,10 @@ Tập luyện (lát 9a, models/training.py, services/training/{youtube,seed,cata
   `docker compose exec backend python scripts/seed_training.py --dry-run` rồi chạy lại không có `--dry-run`. DB
   dev (kiểm ngày 2026-11-07): nguoi-moi-14 và toan-than-28 published; `thu-nghiem` (từ data/training_dev/,
   gitignore) đã về draft; 45 video published (43 + 2 video của thu-nghiem).
+- Test dữ liệu repo (tests/test_training_seed.py, chỉ chạy bước kiểm tra load_dir, không ghi DB): data/training/
+  nạp không lỗi; mọi chương trình publish=true đều published, đủ ngày 1..duration_days, mọi mục trỏ tới video
+  published có url YouTube hợp lệ (parse_youtube_url); dòng mẫu "(VÍ DỤ)" hoặc video không link không bao giờ
+  published (kể cả bản sao dữ liệu repo đổi title một chương trình thành "(VÍ DỤ)" → draft dù publish=true).
 
 Theo chương trình (lát 9b, models/training_progress.py, services/training/progress.py, api/routers/training.py):
 - `program_enrollments`: id UUID, user_id (FK CASCADE), program_id (FK RESTRICT), started_on / ended_on (ngày giờ
@@ -234,6 +240,23 @@ Quản trị (lát 8a, services/foods/admin.py, api/routers/admin_foods.py):
 - Ghi chú nguồn trong kết quả lookup_food và trích dẫn chat (trường `note`) được cắt còn 300 ký tự, bao trong
   «…»; giao diện hiển thị dạng văn bản thuần. Script nạp VN/USDA và backfill_food_preparation không đụng dòng
   ADMIN_MANUAL (có test).
+- Nạp nhiều món từ CSV (services/foods/admin_import.py, scripts/import_admin_foods.py; chưa commit):
+  `docker compose exec backend python scripts/import_admin_foods.py --admin-email <email admin> [--file F]
+  [--dry-run] [--update-existing]`, mặc định /app/data/foods/manual/dishes.csv. Kiểm tra từng dòng bằng chính
+  AdminFoodCreate + check_mass_sum + normalize_search, ghi qua create_food / update_food nên cùng mã ADM-xxxxx, cờ
+  atwater_lech_15pct, chặn trùng tên và audit (food.create; food.update before/after như PATCH). Cột bắt buộc:
+  name_vi, energy_kcal, protein_g, fat_g, carb_g (glucid không gồm xơ, trên 100 g), source_note; tuỳ chọn (vắng
+  cột hoặc ô trống = không có số liệu): fiber_g, water_g, refuse_pct, group_name, preparation (raw / cooked /
+  processed / dried / unknown), name_original. Đọc CSV bằng read_csv của trình nạp tập luyện (`,` `;` tab,
+  utf-8-sig, cắt khoảng trắng); số nhận "1,5" và "1.5", từ chối dấu hàng nghìn. Kiểm tra TOÀN BỘ trước (kể cả
+  tổng chất sau khi gộp với món đã có): một lỗi → không ghi gì, mã thoát 1, liệt kê mọi lỗi kèm số dòng CSV.
+  Trùng tên (không phân biệt dấu) với món ADMIN_MANUAL đã có → bỏ qua và báo; --update-existing → cập nhật (cột
+  có trong file ghi đè, ô trống xoá giá trị; cột vắng giữ nguyên; không đổi gì → không ghi audit). Trùng tên
+  trong cùng file là lỗi. Dòng "(VÍ DỤ)" luôn bỏ qua; cột lạ chỉ cảnh báo. --admin-email bắt buộc cả khi
+  --dry-run (không có / không phải admin / bị khoá → mã thoát 1); dry-run không tiêu số ADM-. Báo cáo: số thêm
+  mới, cập nhật, không đổi, bỏ qua, và danh sách món lệch Atwater > 15%. data/foods/manual/ (được commit):
+  README.md (cột, quy đổi nhãn sang 100 g, vd. sữa 180 ml 120 kcal → 66,7 kcal/100 g) và dishes_template.csv
+  (tiêu đề + 1 dòng "(VÍ DỤ)"); dishes.csv chưa có.
 - Frontend: trang /admin (hỏi lại /users/me; không phải admin → /dashboard, chưa đăng nhập → /login), tab
   Thực phẩm (bảng tìm/lọc, thêm/sửa/xoá chỉ dòng ADMIN_MANUAL, form kiểm tra như backend). Liên kết "Quản trị"
   trên dashboard chỉ hiện khi role là admin.
@@ -335,6 +358,11 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
 - Quản trị (8a): trùng tên mới test bằng hai yêu cầu liên tiếp, CHƯA test bằng hai kết nối song song thật (cần
   commit dữ liệu ra ngoài transaction của test). Chưa có giao diện quản lý bài tập (nạp bằng CSV). Ô trạng thái
   sống/chín của dòng VN/USDA chỉ đọc trên giao diện (đổi được qua API). Quy tắc 17 chưa thử với Gemini thật.
+- Nạp món ăn thủ công: CHƯA nạp món chế biến thật nào (chưa có data/foods/manual/dishes.csv; mới thử --dry-run
+  trên DB dev). Số liệu món chế biến (cơm tấm, phở…) sẽ là ước tính từ nguồn tham khảo (nhãn, công thức, tài
+  liệu công bố), không phải phân tích phòng thí nghiệm — phải ghi rõ trong source_note; lookup_food chỉ hiện nhãn
+  "Quản trị viên nhập" kèm ghi chú nguồn, không phân biệt món ước tính với số liệu nhãn. Chưa test hai lần nạp
+  song song thật (dựa vào unique index như 8a). Module thực phẩm dùng read_csv của services/training/seed.py.
 - Tài liệu RAG (8b-1): chưa test hai kết nối lập chỉ mục song song thật (đã test unique index ở mức DB và đường
   409 qua API). python-multipart nhận và lưu tạm cả body trước khi endpoint kiểm giới hạn 20 MB (không chặn sớm
   theo header). Văn bản PDF test viết không dấu (font Helvetica trong PDF tạo bằng code). Lập chỉ mục chạy trong
@@ -374,7 +402,9 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
    vài câu hỏi tập luyện với Gemini thật (recommend_program, get_training_summary).
 2. Dữ liệu tập luyện: kiểm chứng bằng mắt hai video dùng chung (toan-than-28 ngày 5 và ngày 13), điền
    duration_min (và kênh nếu muốn) cho 43 video rồi nạp lại; định kỳ kiểm link còn xem được.
-3. Quản trị bài tập của FR19 (hiện nạp bằng CSV) chưa xếp lát.
+3. Món ăn thủ công: điền data/foods/manual/dishes.csv (món chế biến phổ biến, ghi nguồn tham khảo trong
+   source_note), chạy import_admin_foods.py --dry-run rồi nạp thật; thử lookup_food với vài món đó.
+   Quản trị bài tập của FR19 (hiện nạp bằng CSV) chưa xếp lát.
 4. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
 5. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
 6. Lọc câu hỏi y khoa (guardrail riêng, ngoài quy tắc prompt hiện có).

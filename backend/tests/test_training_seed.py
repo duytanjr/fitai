@@ -3,6 +3,9 @@
 CSV tạo trong tmp_path (link giả chỉ tồn tại trong test, không đưa vào data/training). Phần ghi DB dùng Postgres
 thật trong transaction rollback. Không gọi Gemini hay embedding.
 """
+import csv
+import io
+import shutil
 from pathlib import Path
 
 import pytest
@@ -10,6 +13,7 @@ from sqlalchemy import func, select
 
 from models.training import ProgramDay, ProgramDayItem, TrainingProgram, TrainingStatus, WorkoutVideo
 from services.training.seed import apply_plan, is_example, load_dir, plan_summary
+from services.training.youtube import parse_youtube_url
 from tests.test_meals_api import require_postgres  # noqa: F401
 
 PROGRAM_HEAD = ["slug", "title", "description", "goal_tag", "level", "duration_days", "intensity_label", "publish"]
@@ -331,16 +335,60 @@ def test_checked_on_empty_is_only_warning(tmp_path):
     assert any("zqTestVid01 chưa có checked_on" in w for w in plan.warnings)
 
 
-def test_repo_sample_data_loads_as_draft():
-    sample = Path(__file__).resolve().parents[1] / "data" / "training"   # trong container: /app/data/training
-    if not (sample / "programs.csv").exists():
+REPO_TRAINING = Path(__file__).resolve().parents[1] / "data" / "training"   # trong container: /app/data/training
+
+
+@pytest.fixture
+def repo_plan():
+    if not (REPO_TRAINING / "programs.csv").exists():
         pytest.skip("không thấy data/training")
-    plan = load_dir(sample)
+    return load_dir(REPO_TRAINING)
+
+
+def test_repo_data_loads_without_errors(repo_plan):
+    """Dữ liệu thật trong repo: chỉ chạy bước kiểm tra của trình nạp, không ghi DB."""
+    assert repo_plan.ok, repo_plan.errors
+    assert {"nguoi-moi-14", "toan-than-28"} <= set(repo_plan.programs)
+
+
+def test_repo_published_programs_are_complete_with_valid_links(repo_plan):
+    published = [p for p in repo_plan.programs.values() if p.publish]
+    assert published
+    for prog in published:
+        assert prog.status == TrainingStatus.PUBLISHED, prog.slug
+        assert set(prog.days) == set(range(1, prog.duration_days + 1)), prog.slug
+        for day in prog.days.values():
+            assert day.is_rest or day.items, (prog.slug, day.day_number)
+            for it in day.items:
+                video = repo_plan.videos[it.video_key]
+                assert video.url is not None, (prog.slug, day.day_number, it.position)
+                assert parse_youtube_url(video.url) == (video.youtube_id, video.url)
+                assert video.status == TrainingStatus.PUBLISHED, (prog.slug, day.day_number, it.position)
+
+
+def test_repo_example_rows_never_published(repo_plan):
+    for prog in repo_plan.programs.values():
+        if is_example(prog.title) or is_example(prog.description):
+            assert prog.status == TrainingStatus.DRAFT, prog.slug
+    for video in repo_plan.videos.values():
+        if is_example(video.title) or video.url is None:
+            assert video.status == TrainingStatus.DRAFT, video.title
+
+
+def test_example_title_in_copy_of_repo_data_stays_draft(repo_plan, tmp_path):
+    """Bản sao dữ liệu repo (không sửa file gốc): đổi title một chương trình thành mẫu (VÍ DỤ) → draft dù publish=true."""
+    text = (REPO_TRAINING / "programs.csv").read_text(encoding="utf-8-sig")
+    rows = list(csv.reader(io.StringIO(text, newline="")))
+    slug_col, title_col = rows[0].index("slug"), rows[0].index("title")
+    target = next(r for r in rows[1:] if r[slug_col] == "nguoi-moi-14")
+    target[title_col] = f"(VÍ DỤ) {target[title_col]}"
+    with (tmp_path / "programs.csv").open("w", encoding="utf-8", newline="") as f:
+        csv.writer(f).writerows(rows)
+    shutil.copy(REPO_TRAINING / "schedule.csv", tmp_path / "schedule.csv")
+    plan = load_dir(tmp_path)
     assert plan.ok, plan.errors
-    assert set(plan.programs) == {"nguoi-moi-14", "toan-than-28"}
-    assert all(p.status == TrainingStatus.DRAFT for p in plan.programs.values())
-    assert all(v.url is None and v.status == TrainingStatus.DRAFT for v in plan.videos.values())
-    assert plan.programs["nguoi-moi-14"].duration_days == 14 and plan.programs["toan-than-28"].duration_days == 28
+    assert plan.programs["nguoi-moi-14"].publish and plan.programs["nguoi-moi-14"].status == TrainingStatus.DRAFT
+    assert plan.programs["toan-than-28"].status == TrainingStatus.PUBLISHED
 
 
 # ── Ghi DB ───────────────────────────────────────────────────────────────────
