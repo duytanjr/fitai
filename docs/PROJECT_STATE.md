@@ -21,6 +21,7 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | 9a (một phần FR12–13) | b71a0f2 | workout_videos, training_programs, program_days, program_day_items, seed_training.py, /training |
 | 9b (một phần FR14) | b9f206e | program_enrollments, program_day_completions, /training/enrollments, /training/summary, thẻ Tập luyện tuần này |
 | 9d (FR12) | fa90001 | recommend.py, /training/recommendation, công cụ recommend_program và get_training_summary, quy tắc TẬP LUYỆN |
+| Dữ liệu tập luyện + ảnh xem trước | 5af1b21, 7f4def5, 76b89a7 | nội dung nguoi-moi-14 và toan-than-28 trong data/training/, ảnh xem trước YouTube trên trang ngày tập |
 
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
@@ -106,9 +107,23 @@ Tập luyện (lát 9a, models/training.py, services/training/{youtube,seed,cata
   `<a target="_blank" rel="noopener noreferrer">`, client chỉ mở url đúng dạng chuẩn. Hộp lưu ý an toàn cố định;
   goal weight_loss thêm dòng "không hứa kết quả giảm cân"; tuổi < 18 (đọc GET /profile, lỗi thì bỏ qua) thêm dòng
   nhắc tập cùng người lớn, hiện trên mọi trang tập. Liên kết "Tập luyện" ở dashboard, nhật ký ăn uống, chat.
-- Dữ liệu: data/training/ chỉ có mẫu "(VÍ DỤ)" không link (nguoi-moi-14, toan-than-28, đều draft). Bộ thử trên máy
-  ở data/training_dev/ (gitignore) do người dùng điền; DB dev đang có chương trình `thu-nghiem` (published, 3 ngày,
-  2 video chưa có thời lượng/kênh) nạp từ đó.
+- Ảnh xem trước (76b89a7, chỉ frontend, ProgramDayView + `youtubeThumbUrl` trong lib/training.ts): mỗi mục của
+  trang ngày tập là một thẻ, ảnh bên trái, tiêu đề và nút "Bắt đầu" bên phải. Ảnh lấy từ
+  `https://i.ytimg.com/vi/<youtube_id>/hqdefault.jpg`, chỉ dựng khi youtube_id khớp `^[A-Za-z0-9_-]{11}$` (không
+  khớp → không hiện ảnh). Thẻ `<img>` thường (không next/image, không sửa next.config): loading="lazy",
+  referrerPolicy="no-referrer", alt="" (ảnh trang trí), 16:9 object-cover, rộng w-24 (màn hẹp) / w-40 (từ sm), vẫn
+  cạnh tiêu đề. Ảnh lỗi → ẩn, giữ khối xám cùng kích thước. Ảnh bọc trong `<a>` cùng đích với "Bắt đầu"
+  (tabIndex -1, aria-hidden vì trùng nút); url không hợp lệ thì ảnh không bấm được. Chú thích cuối trang "Ảnh xem
+  trước tải từ YouTube; bản quyền video thuộc kênh đăng tải." (chỉ khi có ít nhất một ảnh). Trang /training và
+  trang chương trình vẫn chỉ có chữ.
+- Dữ liệu (5af1b21, 7f4def5): data/training/ có nội dung thật của hai chương trình, cả hai publish=true:
+  `nguoi-moi-14` (beginner, weight_loss, 14 ngày, 3 ngày nghỉ, 17 video khác nhau) và `toan-than-28`
+  (intermediate, weight_loss, 28 ngày, 5 ngày nghỉ, 28 video khác nhau); tổng 43 video YouTube khác nhau vì 2 video
+  dùng chung giữa hai chương trình (toan-than-28 ngày 5 mục 3 và ngày 13 mục 4). schedule.csv chỉ dùng đúng 7 cột
+  bắt buộc + duration_min (để trống ở mọi dòng); không có kênh, thời lượng, checked_on. Cách nạp:
+  `docker compose exec backend python scripts/seed_training.py --dry-run` rồi chạy lại không có `--dry-run`. DB
+  dev (kiểm ngày 2026-11-07): nguoi-moi-14 và toan-than-28 published; `thu-nghiem` (từ data/training_dev/,
+  gitignore) đã về draft; 45 video published (43 + 2 video của thu-nghiem).
 
 Theo chương trình (lát 9b, models/training_progress.py, services/training/progress.py, api/routers/training.py):
 - `program_enrollments`: id UUID, user_id (FK CASCADE), program_id (FK RESTRICT), started_on / ended_on (ngày giờ
@@ -330,8 +345,7 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
 - Hội thoại (8b-2): hội thoại được giữ vô thời hạn (chưa có chính sách lưu trữ).
 - Tập luyện (9a): FR13 và FR14 được đơn giản hoá có chủ đích — chưa có nhóm cơ, lưu ý an toàn riêng từng bài,
   ghi từng hiệp/lần/mức tạ; mỗi mục chỉ là một video YouTube kèm label. Chưa có theo dõi hoàn thành ngày, ghi số
-  phút, gợi ý chương trình, công cụ chatbot. Dữ liệu thật của nguoi-moi-14 và toan-than-28 do người dùng điền
-  (chưa có; hiện chưa chương trình chính thức nào published). Không kiểm link còn xem được (checked_on do người
+  phút, gợi ý chương trình, công cụ chatbot (đã làm ở 9b/9d). Không kiểm link còn xem được (checked_on do người
   nhập điền). Hai lần nạp chạy cùng lúc không có khoá (ràng buộc UNIQUE sẽ báo lỗi). Trang /training chưa thử trên
   trình duyệt, container frontend chưa build lại sau 9a.
 - Tập luyện (9b): chưa test hai kết nối đồng thời thật (mới dựa vào unique index, khoá FOR UPDATE và đường 409).
@@ -343,16 +357,23 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   giá chưa có câu hỏi tập luyện. Câu trả lời "đã tập đều / mới bắt đầu" không được lưu (tải lại trang là mất). Luật
   chỉ phân biệt 2 level; vì các chương trình dự kiến đều weight_loss, người có mục tiêu khác giảm cân luôn thấy ghi
   chú "hiện chưa có chương trình riêng cho mục tiêu này". Hộp gợi ý chưa thử trên trình duyệt.
+- Tập luyện (dữ liệu, ảnh xem trước): link YouTube có thể bị kênh gỡ hoặc đặt riêng tư bất cứ lúc nào; hệ thống
+  không tự kiểm (ảnh lỗi chỉ hiện khối xám, nút vẫn mở link). Chưa có thời lượng từng video nên total_minutes,
+  minutes_done của hai chương trình là null và thẻ dashboard hiện "chưa có dữ liệu thời lượng". Hai bài dùng lại
+  link của nguoi-moi-14 trong toan-than-28 chưa được kiểm chứng bằng mắt, nhất là ngày 13 mục 4 (label "10 phút
+  cánh tay và cơ bụng", trùng video với "10 phút tập bụng và cánh tay" ngày 1 của nguoi-moi-14). Ảnh xem trước tải
+  thẳng từ i.ytimg.com (trình duyệt người dùng gửi IP tới Google, không gửi referrer); mới kiểm bằng tsc/next
+  build, chưa thử trên trình duyệt.
 
 ## 7. Việc còn lại (thứ tự dự kiến)
 1. Thử trên trình duyệt: dashboard, /admin tab Thực phẩm và tab Tài liệu (tải lên, lập chỉ mục, xem trước, bật/tắt,
    xoá); thử get_progress_summary, một dòng ADMIN_MANUAL qua lookup_food và search_knowledge có tài liệu tải lên
    với Gemini thật (vài lượt).
    Thêm: tab Hội thoại (8b-2), nút xoá phiên trong chat, trang /training (gợi ý, bắt đầu, đánh dấu, tập lại) và
-   thẻ Tập luyện tuần này sau khi build lại frontend; vài câu hỏi tập luyện với Gemini thật (recommend_program,
-   get_training_summary).
-2. Người dùng điền dữ liệu thật cho nguoi-moi-14 và toan-than-28 (data/training/*.csv), chạy
-   `seed_training.py --dry-run` rồi nạp thật.
+   thẻ Tập luyện tuần này sau khi build lại frontend, ảnh xem trước trên trang ngày tập (cả màn hẹp và ảnh lỗi);
+   vài câu hỏi tập luyện với Gemini thật (recommend_program, get_training_summary).
+2. Dữ liệu tập luyện: kiểm chứng bằng mắt hai video dùng chung (toan-than-28 ngày 5 và ngày 13), điền
+   duration_min (và kênh nếu muốn) cho 43 video rồi nạp lại; định kỳ kiểm link còn xem được.
 3. Quản trị bài tập của FR19 (hiện nạp bằng CSV) chưa xếp lát.
 4. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
 5. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
