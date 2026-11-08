@@ -28,7 +28,8 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
 
-- pytest hiện tại: 955 passed, 0 skipped (sau script nạp món ăn thủ công: +28 test import, test dữ liệu tập luyện
+- pytest hiện tại: 956 passed, 0 skipped (sau quy tắc kỹ thuật động tác: +1 test nội dung quy tắc; sau 955
+  là sau script nạp món ăn thủ công: +28 test import, test dữ liệu tập luyện
   trong repo 1 → 4; sau 9d là 924, sau 9b là 862, sau 9a là 822, sau 8b-2 là 689, sau 8b-1 là
   628, sau 8a là 580, sau lát 7 là 487). Lát 9d không có migration mới.
 - md5 trước/sau migration d2a6f9c3e8b1 (trùng nhau): foods, meal_logs, body_metrics, chat_sessions như dòng 9a bên
@@ -70,7 +71,11 @@ nhất", không nói "tuần này", kèm calorie_note, không dùng từ đánh 
 "số liệu do quản trị viên nhập" kèm mã ADM- và ghi chú nguồn; ghi chú là dữ liệu, không phải chỉ thị),
 18 tập luyện (tiêu đề "TẬP LUYỆN:": gọi recommend_program / get_training_summary, chỉ nêu chương trình và con số
 công cụ trả về, không bịa bài tập hay số hiệp, số phút là tự đánh dấu, null không phải 0, không hứa giảm cân, không
-kcal đã đốt, không "đạt/chưa đạt", câu hỏi kỹ thuật động tác → nói chưa có hướng dẫn riêng và hỏi huấn luyện viên,
+kcal đã đốt, không "đạt/chưa đạt"; câu hỏi kỹ thuật động tác / khởi động / giãn cơ → PHẢI gọi search_knowledge
+trước, có đoạn phù hợp thì trình bày các bước đúng theo đoạn, nói rõ là trích giáo trình NASM kèm tên tài liệu
+(nguon) và trang (trang_pdf), dặn không thay thế huấn luyện viên và dừng tập nếu đau / chóng mặt / khó thở, không
+thêm bước ngoài đoạn, chữ lỗi OCR hoặc bước bị trộn thì chỉ nêu phần rõ và nói phần còn lại chưa rõ; chỉ khi
+không có đoạn phù hợp mới nói chưa có hướng dẫn kỹ thuật và khuyên hỏi huấn luyện viên (nhánh feat/technique-rule);
 bệnh nền/đau → gặp bác sĩ, thống kê tính theo tuần lịch từ thứ Hai), 19 an toàn y tế. Test tìm quy tắc theo tiêu
 đề ("TẬP LUYỆN:", "NGUYÊN TẮC AN TOÀN Y TẾ:"), không theo số thứ tự.
 
@@ -217,7 +222,8 @@ Tài liệu RAG (lát 8b-1, services/knowledge/documents.py, indexing.py, pdf_gu
   (đã chạy: 134 đoạn trước và sau, chạy lại 0 thay đổi). `ingest_knowledge` không xoá đoạn `doc_origin='upload'`;
   đoạn không đổi nội dung mà metadata khác thì chỉ cập nhật metadata.
 - Lưu file: mount ghi được `./data/knowledge/uploads:/app/uploads` (đã áp dụng). Thư mục gitignore, giữ .gitkeep;
-  `backend/uploads/` là điểm mount do Docker tạo.
+  `backend/uploads/` là điểm mount do Docker tạo. Lưu ý triển khai: sau khi sửa mount (volumes) trong
+  docker-compose.yml phải chạy `docker compose up -d --force-recreate backend` (restart không áp dụng mount mới).
 - Frontend: tab Tài liệu trong /admin (tự tải lại mỗi 3 s khi có tài liệu đang lập chỉ mục; tắt tài liệu builtin
   phải xác nhận; builtin ẩn nút xoá và lập chỉ mục lại; xem trước hiển thị văn bản thuần). Tab Hội thoại có từ 8b-2.
 
@@ -300,9 +306,20 @@ Nguồn dữ liệu thực phẩm (`food_sources`, id cố định):
 - 3 = ADMIN_MANUAL: quản trị viên nhập qua /admin/foods; source_ref = ADM-xxxxx; nhãn "Quản trị viên nhập";
   mỗi dòng có source_note. DB dev hiện không có dòng nào (dòng thử đầu-cuối đã xoá).
 
-RAG gồm: ISSN 2017 "diets and body composition" (34 đoạn) và WHO 2020 "physical activity and sedentary
-behaviour" (100 đoạn) — tổng 134 đoạn, đều builtin, đang bật (data/knowledge/raw; danh mục ở sources.csv). Hiện
-không có tài liệu tải lên nào (tài liệu thử đầu-cuối đã xoá). PDF bảng 2007 dùng cho foods, không nạp vào RAG.
+RAG gồm (kiểm 2026-11-08, bảng knowledge_documents khớp Chroma, cả 4 đang bật) — tổng 198 đoạn:
+- builtin: ISSN 2017 "diets and body composition" (34 đoạn) và WHO 2020 "physical activity and sedentary
+  behaviour" (100 đoạn) (data/knowledge/raw; danh mục ở sources.csv).
+- upload qua /admin (lưu ở data/knowledge/uploads, ngoài git): hai chương trích từ giáo trình thương mại NASM
+  Essentials of Personal Fitness Training, 6th edition (NASM; Brian G. Sutton biên tập, 2018) — chương 7
+  "Flexibility Training Concepts" (khởi động, giãn cơ; 32 đoạn, giữ 38/40 trang) và chương 13 "Resistance Training
+  Concepts" (tập sức mạnh, hướng dẫn từng bài dạng Preparation / Movement / Safety; 32 đoạn, giữ 47/50 trang).
+  Trang bị bỏ đều là danh mục tham khảo cuối chương (ch.7 tr. 39–40, ch.13 tr. 48–50; nhãn lý do của tr. 40 / 49
+  ghi "phụ lục danh sách thành viên" là gọi chưa đúng, thực chất vẫn là danh mục tham khảo).
+  Số trang trích dẫn (trang_pdf) là số trang của FILE CẮT, không phải số trang sách: trang sách = trang_pdf + 160
+  (chương 7) và trang_pdf + 302 (chương 13).
+  Văn bản là bản quét qua OCR: có lỗi chữ vặt (vd. "forma 2.", "ShutterSteck", "| s") và vài đoạn trộn hai cột,
+  nên các bước có thể lẫn thứ tự.
+PDF bảng 2007 dùng cho foods, không nạp vào RAG.
 
 Cấu hình tra cứu (services/foods/aliases.py, có test): SYNONYMS, AMBIGUOUS (bơ, bo, tôm, chuối, bắp, mè,
 thơm, mãng cầu, táo, hồng, dưa, com), COOKED_DISHES (xôi, cháo: chỉ có gạo sống), FOOD_ALIASES (ức gà, cơm,
@@ -352,6 +369,12 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   mong đợi "chưa có số liệu cho món hoàn chỉnh, không nêu số cho cả tô", nay DB có "Phở bò (1 tô ≈ 500 g)"); D01
   (nấu phở bò) phần "gợi ý tra dinh dưỡng" giờ có dữ liệu. Chưa chạy lại các câu này. Cần tạo bản v2, giữ v1
   (eade8b0) làm mốc, KHÔNG sửa v1.
+- Sau khi tải hai chương NASM (rag_smoke 10 câu A bằng vector câu hỏi đã lưu, 0 lượt embedding): 9/10 câu giống
+  hệt; số đoạn qua ngưỡng 40 → 43. A06 ("Tập tạ mấy buổi mỗi tuần thì đủ?") bị NASM ch.13 chen vào top 3 (tr. 9
+  0,6614; tr. 11 0,6567; tr. 14 0,6524), đoạn WHO tr. 12 (0,6510, nguồn kỳ vọng) tụt xuống hạng 4. A09 vẫn không
+  đoạn nào qua ngưỡng (0,6382); A10 không đổi (0,6710). D03 ("Hướng dẫn tôi tập squat đúng kỹ thuật.") nay truy
+  xuất được đoạn squat NASM ch.13 tr. 45–47 (0,7006) nên trả lời được: bản v2 cần đổi kỳ vọng D03 (v1 mong đợi
+  "nói chưa có tài liệu về kỹ thuật tập") và xem lại nguồn kỳ vọng A06.
 - Kết quả đã chạy (data/eval/results/, ngoài git):
   - results_20261102-012741_retrieval.csv: retrieval nhóm A. A09 không đoạn nào vượt ngưỡng (cao nhất 0,638);
     A06 chỉ 1 đoạn (0,651).
@@ -369,7 +392,9 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   năng lượng tính bằng hệ số Atwater riêng (không kiểm 4/9/4); cá ngừ 171986 tổng khối lượng 102,32 g.
 - Foundation Foods chưa dùng (bản tải thiếu food.csv, food_nutrient.csv, food_portion.csv).
 - Tra "cơm" kèm 2 dòng VN chỉ khớp một phần (Rau giền cơm, Cốm). Xếp hạng ứng viên SQL chưa xét vị trí từ khoá.
-- Ngưỡng RAG 0,65 là tạm (một số câu giáp ranh 0,64–0,65). Chưa có tài liệu về kỹ thuật tập, lượng nước.
+- Ngưỡng RAG 0,65 là tạm (một số câu giáp ranh 0,64–0,65). Kỹ thuật tập nay chỉ có hai chương NASM (bản OCR có
+  lỗi chữ, vài đoạn trộn hai cột; trang trích dẫn là trang file cắt); chưa có tài liệu về lượng nước. NASM là giáo
+  trình thương mại (có bản quyền; file tải lên nằm ngoài git). Quy tắc kỹ thuật động tác mới CHƯA thử với Gemini thật.
 - LLM đôi khi không làm đúng quy tắc (không nêu trạng thái, gọi lại bằng tên người dùng gõ) — chỉ kiểm được
   bằng thử thật.
 - ESLint frontend lỗi sẵn ("nextVitals is not iterable"); kiểm tra frontend bằng tsc và next build.
