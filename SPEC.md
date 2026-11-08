@@ -270,7 +270,39 @@ Tài liệu (PDF/Word/Web) → Trích xuất văn bản → Làm sạch
 
 ---
 
-## 4. Gợi ý bước tiếp theo
+## 4. Trạng thái thực hiện
+
+Cập nhật 2026-11-08, căn cứ docs/PROJECT_STATE.md (commit của từng lát ghi ở đó) và mã nguồn hiện có. Mục 3 ở
+trên là thiết kế ban đầu; một số thành phần (`plan_meals`, `plan_workout`, `exercises`, `workout_logs`,
+`/plan/meal`, `/plan/workout`, màn hình Thực đơn) KHÔNG được xây dựng, xem bảng dưới. "Cần xác nhận" là mục mà
+tài liệu chưa ghi rõ có phải đơn giản hóa có chủ đích hay không.
+
+| FR | Trạng thái | Giải thích | Lát / file thực hiện |
+| --- | --- | --- | --- |
+| FR1 | Đã làm | Đăng ký, đăng nhập (JWT), nút Đăng xuất trên dashboard. | Lát FR1–2; `frontend/src/store/auth-store.ts` |
+| FR2 | Cần xác nhận | Hồ sơ có tuổi, giới tính, chiều cao, cân nặng, mức vận động, mục tiêu, dị ứng/kiêng cữ (`dietary_restrictions`); KHÔNG có trường thiết bị tập có sẵn. | Lát FR1–2; `backend/models/profile.py`, onboarding |
+| FR3 | Đã làm | BMI, BMR, TDEE, calo mục tiêu, macro theo mục tiêu; công cụ `calc_body_metrics`. | Lát FR3; `backend/services/metrics_service.py` |
+| FR4 | Đã làm | Chatbot tiếng Việt (Gemini) có lịch sử phiên. | Lát FR4, FR6; `backend/services/chat_service.py` |
+| FR5 | Đã làm | RAG trên ChromaDB, công cụ `search_knowledge`, trích dẫn nguồn trong câu trả lời. | Lát FR5 (RAG); `backend/services/ai_agents/fitness_advisor.py` |
+| FR6 | Đã làm | Ghi nhớ lịch sử hội thoại trong phiên và cá nhân hóa theo hồ sơ. | Lát FR4, FR6 |
+| FR7 | Đã làm | Quy tắc "NGUYÊN TẮC AN TOÀN Y TẾ" trong system prompt, dòng cảnh báo cố định dưới ô nhập chat, nhóm câu hỏi E (An toàn) trong bộ đánh giá. CHƯA có bộ lọc câu hỏi y khoa bằng code: việc từ chối / khuyến cáo gặp bác sĩ phụ thuộc vào việc mô hình tuân theo prompt. | `fitness_advisor.py` (quy tắc 19), `frontend/src/components/chat/ChatView.tsx`, `data/eval/eval_questions.csv` (E01–E06) |
+| FR8 | Đã làm | Tra cứu `lookup_food` trên bảng foods: VN 2007, 20 mục USDA SR Legacy, 70 món nguồn Quản trị viên nhập (món Việt chế biến là ước tính tham khảo); trích nguồn từng dòng. | Lát 5a, 5d-1, 5d-2, 8a; `backend/services/foods/lookup.py`, `data/foods/manual/` |
+| FR9 | Cần xác nhận | Nhật ký bữa ăn ghi bằng cách tìm thực phẩm rồi nhập số gam (API nhận `food_id` + `grams`); hệ thống tính calo, macro và tổng ngày. KHÔNG phân tích câu văn tự do như ví dụ "sáng nay ăn 1 tô phở bò". | Lát 5b; `backend/api/schemas/meals.py`, `frontend/src/components/meals/` |
+| FR10 | Ngoài phạm vi có chủ đích | Không làm gợi ý thực đơn ngày/tuần. | — |
+| FR11 | Ngoài phạm vi có chủ đích | Không làm thay thế món ăn tương đương. | — |
+| FR12 | Cần xác nhận | Gợi ý chương trình tập (luật do code quyết định) theo mức vận động, BMI, tuổi, mục tiêu và câu trả lời "đã tập đều / mới bắt đầu"; chỉ 2 level, 2 chương trình giảm cân. KHÔNG xét thời gian rảnh và dụng cụ. PROJECT_STATE ghi FR12 là xong. | Lát 9d; `backend/services/training/recommend.py` |
+| FR13 | Đơn giản hóa có chủ đích | Hướng dẫn bài tập bằng video YouTube theo từng ngày của chương trình; không có nhóm cơ, số hiệp/lần, lưu ý an toàn riêng từng bài (chỉ có hộp lưu ý an toàn chung). | Lát 9a; `backend/services/training/catalog.py`, `data/training/` |
+| FR14 | Đơn giản hóa có chủ đích | Theo dõi theo ngày hoàn thành và số phút (khi video có thời lượng); không ghi số hiệp, số lần, mức tạ. | Lát 9b; `backend/services/training/progress.py` |
+| FR15 | Đã làm | Ghi cân nặng, vòng eo theo ngày. | Lát 7; `backend/services/progress.py` |
+| FR16 | Cần xác nhận | Dashboard có biểu đồ calo và cân nặng (SVG tự vẽ) và thẻ "Tập luyện tuần này"; chưa thấy biểu đồ macro theo thời gian và biểu đồ khối lượng tập. | Lát 7, 9b; `frontend/src/components/dashboard/` |
+| FR17 | Cần xác nhận | Có báo cáo tuần (nhận xét trung tính do code tạo) và công cụ `get_progress_summary`; CHƯA tự điều chỉnh kế hoạch theo tiến độ (gợi ý cập nhật cân nặng hồ sơ vẫn nằm trong việc còn lại). | Lát 7 |
+| FR18 | Đã làm | Tải lên, bật/tắt, xóa tài liệu tri thức, lập chỉ mục lại. | Lát 8b-1; `/admin/documents` |
+| FR19 | Cần xác nhận | Thực phẩm: quản lý qua `/admin/foods` (chỉ nguồn Quản trị viên nhập) và script `scripts/import_admin_foods.py`. Bài tập: chỉ nạp bằng CSV (`scripts/seed_training.py`), chưa có giao diện quản trị. | Lát 8a; `backend/services/foods/admin.py`, `admin_import.py` |
+| FR20 | Đã làm | Xem hội thoại ẩn danh (bí danh HMAC, che nội dung, nhật ký xem); tắt mặc định. | Lát 8b-2; `/admin/conversations` |
+
+---
+
+## 5. Gợi ý bước tiếp theo
 
 1. Hoàn thiện khảo sát người dùng và số liệu cho mục 1.
 2. Vẽ lại các biểu đồ (use case, tuần tự, ERD) bằng draw.io hoặc StarUML để đưa vào báo cáo.

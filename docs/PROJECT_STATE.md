@@ -1,6 +1,6 @@
 # Trạng thái dự án FitAI (ghi chú bàn giao giữa các phiên)
 
-Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-06.
+Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-08.
 
 ## 1. Các lát đã xong (git log)
 | Lát | Commit | Nội dung chính |
@@ -434,10 +434,14 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
    bò", tên trùng giữa dòng "(Tu Farm)" và VN 2007) với Gemini thật.
    Quản trị bài tập của FR19 (hiện nạp bằng CSV) chưa xếp lát.
 4. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
-5. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
-6. Lọc câu hỏi y khoa (guardrail riêng, ngoài quy tắc prompt hiện có).
-7. Chính sách lưu trữ hội thoại (hiện giữ vô thời hạn).
+5. Chính sách lưu trữ hội thoại (hiện giữ vô thời hạn).
+6. Chốt mô hình cho demo (hiện gemini-2.5-flash, giới hạn ~20 lượt/ngày/mô hình ở gói miễn phí).
+7. Đóng gói và README: hướng dẫn chạy từ đầu (docker compose, migration, các script nạp dữ liệu, tạo admin),
+   repo hiện chưa có README ở thư mục gốc.
 8. Tạo bản v2 của bộ đánh giá: cập nhật hành vi mong đợi C04/C08/C09/C10, câu phở bò C05 (và D01) theo 70 món
    ADMIN_MANUAL, giữ nguyên v1 ở eade8b0 làm mốc, rồi đo lần 2 và so với mốc eade8b0. Có thể thêm
    câu đánh giá cho tiến độ, dòng quản trị viên nhập và tập luyện (gợi ý chương trình, tiến độ tập).
+9. Báo cáo đồ án (bảng "Trạng thái thực hiện" ở SPEC.md mục 4 là căn cứ phạm vi).
+Đã bỏ có chủ đích: gợi ý thực đơn / thay món (FR10–11 ngoài phạm vi) và bộ lọc câu hỏi y khoa riêng bằng code
+(FR7 đáp ứng bằng quy tắc prompt, dòng cảnh báo dưới ô nhập và nhóm câu hỏi E).
 Thứ tự trên là dự kiến của người dùng; chi tiết từng lát chưa chốt (chưa chắc).
