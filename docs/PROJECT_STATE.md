@@ -22,7 +22,8 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | 9b (một phần FR14) | b9f206e | program_enrollments, program_day_completions, /training/enrollments, /training/summary, thẻ Tập luyện tuần này |
 | 9d (FR12) | fa90001 | recommend.py, /training/recommendation, công cụ recommend_program và get_training_summary, quy tắc TẬP LUYỆN |
 | Dữ liệu tập luyện + ảnh xem trước | 5af1b21, 7f4def5, 76b89a7 | nội dung nguoi-moi-14 và toan-than-28 trong data/training/, ảnh xem trước YouTube trên trang ngày tập |
-| Nạp món ăn thủ công (FR19) | (chưa commit) | scripts/import_admin_foods.py, services/foods/admin_import.py, data/foods/manual/ |
+| Nạp món ăn thủ công (FR19) | 2fab762, d5da112 | scripts/import_admin_foods.py, services/foods/admin_import.py, data/foods/manual/ |
+| 8 món chế biến + đồ uống (ADMIN_MANUAL) | (dishes.csv, dishes_sources.md chưa commit) | đã nạp vào DB dev từ data/foods/manual/dishes.csv |
 
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
@@ -240,7 +241,7 @@ Quản trị (lát 8a, services/foods/admin.py, api/routers/admin_foods.py):
 - Ghi chú nguồn trong kết quả lookup_food và trích dẫn chat (trường `note`) được cắt còn 300 ký tự, bao trong
   «…»; giao diện hiển thị dạng văn bản thuần. Script nạp VN/USDA và backfill_food_preparation không đụng dòng
   ADMIN_MANUAL (có test).
-- Nạp nhiều món từ CSV (services/foods/admin_import.py, scripts/import_admin_foods.py; chưa commit):
+- Nạp nhiều món từ CSV (services/foods/admin_import.py, scripts/import_admin_foods.py; 2fab762):
   `docker compose exec backend python scripts/import_admin_foods.py --admin-email <email admin> [--file F]
   [--dry-run] [--update-existing]`, mặc định /app/data/foods/manual/dishes.csv. Kiểm tra từng dòng bằng chính
   AdminFoodCreate + check_mass_sum + normalize_search, ghi qua create_food / update_food nên cùng mã ADM-xxxxx, cờ
@@ -256,7 +257,13 @@ Quản trị (lát 8a, services/foods/admin.py, api/routers/admin_foods.py):
   --dry-run (không có / không phải admin / bị khoá → mã thoát 1); dry-run không tiêu số ADM-. Báo cáo: số thêm
   mới, cập nhật, không đổi, bỏ qua, và danh sách món lệch Atwater > 15%. data/foods/manual/ (được commit):
   README.md (cột, quy đổi nhãn sang 100 g, vd. sữa 180 ml 120 kcal → 66,7 kcal/100 g) và dishes_template.csv
-  (tiêu đề + 1 dòng "(VÍ DỤ)"); dishes.csv chưa có.
+  (tiêu đề + 1 dòng "(VÍ DỤ)").
+- Món chế biến đã nạp (DB dev, kiểm ngày 2026-11-08: ADMIN_MANUAL có đúng 8 dòng ADM-00658…ADM-00665) từ
+  data/foods/manual/dishes.csv: Phở bò (1 tô ≈ 500 g), Bún bò Huế (1 tô ≈ 500 g), Cơm tấm sườn (1 đĩa ≈ 400 g),
+  Bánh mì thịt (1 ổ ≈ 200 g), Bún chả (1 phần ≈ 400 g), Cơm gà (1 đĩa ≈ 400 g), Trà sữa trân châu (1 ly 500 ml),
+  Cà phê sữa đá (1 ly 250 ml). Số liệu vẫn tính trên 100 g; khẩu phần giả định chỉ ghi trong tên món (không có
+  cột khẩu phần). Là ƯỚC TÍNH THAM KHẢO, chủ yếu từ bảng dinh dưỡng của chuỗi Roll'd (Úc) và dữ liệu ứng dụng đếm
+  calo; nguồn từng món ghi trong data/foods/manual/dishes_sources.md và tóm tắt trong source_note.
 - Frontend: trang /admin (hỏi lại /users/me; không phải admin → /dashboard, chưa đăng nhập → /login), tab
   Thực phẩm (bảng tìm/lọc, thêm/sửa/xoá chỉ dòng ADMIN_MANUAL, form kiểm tra như backend). Liên kết "Quản trị"
   trên dashboard chỉ hiện khi role là admin.
@@ -329,6 +336,10 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   (hiện trống cả 38 dòng).
 - Câu lỗi thời sau 5d-2 (dữ liệu đã có món): C04 (ức gà), C08 (bông cải xanh giờ trỏ USDA), C09 (cơm),
   C10 (yến mạch). auto_check của các câu này có thể gây hiểu nhầm.
+- Câu lỗi thời sau khi nạp 8 món ADMIN_MANUAL: C05 ("Một tô phở bò bao nhiêu calo?" — v1 mong đợi "chưa có số
+  liệu cho món hoàn chỉnh, không nêu số cho cả tô", nay DB có "Phở bò (1 tô ≈ 500 g)" nguồn Quản trị viên
+  nhập; chưa chạy lại câu này) và một số câu món ăn khác (vd. D01 nấu phở bò — phần "gợi ý tra dinh dưỡng" giờ có dữ liệu). Cần bản
+  v2; KHÔNG sửa v1.
 - Kết quả đã chạy (data/eval/results/, ngoài git):
   - results_20261102-012741_retrieval.csv: retrieval nhóm A. A09 không đoạn nào vượt ngưỡng (cao nhất 0,638);
     A06 chỉ 1 đoạn (0,651).
@@ -358,9 +369,10 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
 - Quản trị (8a): trùng tên mới test bằng hai yêu cầu liên tiếp, CHƯA test bằng hai kết nối song song thật (cần
   commit dữ liệu ra ngoài transaction của test). Chưa có giao diện quản lý bài tập (nạp bằng CSV). Ô trạng thái
   sống/chín của dòng VN/USDA chỉ đọc trên giao diện (đổi được qua API). Quy tắc 17 chưa thử với Gemini thật.
-- Nạp món ăn thủ công: CHƯA nạp món chế biến thật nào (chưa có data/foods/manual/dishes.csv; mới thử --dry-run
-  trên DB dev). Số liệu món chế biến (cơm tấm, phở…) sẽ là ước tính từ nguồn tham khảo (nhãn, công thức, tài
-  liệu công bố), không phải phân tích phòng thí nghiệm — phải ghi rõ trong source_note; lookup_food chỉ hiện nhãn
+- Nạp món ăn thủ công: 8 món đã nạp là ước tính tham khảo (Roll'd Úc, ứng dụng đếm calo), không phải phân tích
+  phòng thí nghiệm hay bảng thành phần chính thức; món thật lệch nhiều giữa các quán (lượng bánh/cơm, thịt, nước
+  dùng, đường, sữa đặc). Cơm tấm sườn chỉ có một nguồn macro. Chưa có hủ tiếu và mì Quảng (FNDDS cũng không có ứng
+  viên hợp lý). Khẩu phần chỉ nằm trong tên món nên số "1 tô / 1 ly" phải tự nhân từ số trên 100 g. lookup_food chỉ hiện nhãn
   "Quản trị viên nhập" kèm ghi chú nguồn, không phân biệt món ước tính với số liệu nhãn. Chưa test hai lần nạp
   song song thật (dựa vào unique index như 8a). Module thực phẩm dùng read_csv của services/training/seed.py.
 - Tài liệu RAG (8b-1): chưa test hai kết nối lập chỉ mục song song thật (đã test unique index ở mức DB và đường
@@ -402,13 +414,14 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
    vài câu hỏi tập luyện với Gemini thật (recommend_program, get_training_summary).
 2. Dữ liệu tập luyện: kiểm chứng bằng mắt hai video dùng chung (toan-than-28 ngày 5 và ngày 13), điền
    duration_min (và kênh nếu muốn) cho 43 video rồi nạp lại; định kỳ kiểm link còn xem được.
-3. Món ăn thủ công: điền data/foods/manual/dishes.csv (món chế biến phổ biến, ghi nguồn tham khảo trong
-   source_note), chạy import_admin_foods.py --dry-run rồi nạp thật; thử lookup_food với vài món đó.
+3. Món ăn thủ công: commit dishes.csv + dishes_sources.md; thử lookup_food với 8 món (vd. "1 tô phở bò") với
+   Gemini thật; bổ sung hủ tiếu, mì Quảng và nguồn thứ hai cho cơm tấm sườn (--update-existing khi đổi số).
    Quản trị bài tập của FR19 (hiện nạp bằng CSV) chưa xếp lát.
 4. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
 5. Gợi ý thực đơn (FR10–11), có thể dùng food_portion sau khi xử lý đơn vị Mỹ.
 6. Lọc câu hỏi y khoa (guardrail riêng, ngoài quy tắc prompt hiện có).
 7. Chính sách lưu trữ hội thoại (hiện giữ vô thời hạn).
-8. Cập nhật hành vi mong đợi C04/C08/C09/C10 (bản v2), rồi đo lần 2 và so với mốc eade8b0. Có thể thêm
+8. Tạo bản v2 của bộ đánh giá: cập nhật hành vi mong đợi C04/C08/C09/C10, C05 và các câu món ăn bị ảnh hưởng
+   bởi 8 món ADMIN_MANUAL (giữ nguyên v1 ở eade8b0), rồi đo lần 2 và so với mốc eade8b0. Có thể thêm
    câu đánh giá cho tiến độ, dòng quản trị viên nhập và tập luyện (gợi ý chương trình, tiến độ tập).
 Thứ tự trên là dự kiến của người dùng; chi tiết từng lát chưa chốt (chưa chắc).
