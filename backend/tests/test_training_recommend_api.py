@@ -231,13 +231,29 @@ def test_system_prompt_training_rule():
     for phrase in ["PHẢI gọi recommend_program", "TỰ NÓI rõ", "không đoán", "PHẢI gọi get_training_summary",
                    "không tự bịa chương trình, bài tập, động tác hay số hiệp", "người dùng tự đánh dấu",
                    "không bao giờ nói là 0", "Không hứa kết quả giảm cân", "không nêu số kcal đã đốt",
-                   "\"đã đạt\" hay \"chưa đạt\"", "chưa có hướng dẫn kỹ thuật riêng từng bài",
-                   "hỏi huấn luyện viên", "bệnh nền", "gặp bác sĩ", TRAINING_UNAVAILABLE_CODE, "tuần lịch từ thứ Hai"]:
+                   "\"đã đạt\" hay \"chưa đạt\"", "hỏi huấn luyện viên", "bệnh nền", "gặp bác sĩ", TRAINING_UNAVAILABLE_CODE, "tuần lịch từ thứ Hai"]:
         assert phrase in rule, phrase
     # quy tắc cũ giữ nguyên, an toàn y tế vẫn ở cuối
     for old in ["16. TIẾN ĐỘ", "17. NGUỒN QUẢN TRỊ VIÊN NHẬP", "10. KHÔNG CÓ ĐÚNG MỤC THỰC PHẨM"]:
         assert old in prompt
     assert prompt.index("NGUYÊN TẮC AN TOÀN Y TẾ:") > start
+
+
+def test_system_prompt_technique_rule_uses_knowledge_first():
+    prompt = build_system_prompt(None)
+    start = prompt.index("TẬP LUYỆN:")
+    rule = prompt[start:prompt.index("NGUYÊN TẮC AN TOÀN Y TẾ:")]
+    assert "chưa có hướng dẫn kỹ thuật riêng từng bài" not in rule       # câu cũ đã thay
+    technique = rule[rule.index("kỹ thuật động tác, khởi động hay giãn cơ"):]
+    for phrase in ["PHẢI gọi search_knowledge trước", "theo đúng đoạn đó", "giáo trình NASM", "nguon", "trang_pdf",
+                   "không thay thế huấn luyện viên", "đau, chóng mặt hay khó thở", "không tự thêm bước ngoài đoạn",
+                   "chữ lỗi", "bị trộn lẫn", "phần còn lại chưa rõ"]:
+        assert phrase in technique, phrase
+    # chỉ khi không có đoạn phù hợp mới nói chưa có hướng dẫn
+    fallback = technique.index("Chỉ khi không có đoạn phù hợp")
+    assert technique.index("PHẢI gọi search_knowledge trước") < fallback
+    assert technique.index("chưa có hướng dẫn kỹ thuật cho động tác đó", fallback) > fallback
+    assert "hỏi huấn luyện viên" in technique[fallback:]
 
 
 async def test_no_profile_or_program_in_logs(client, programs, caplog):
