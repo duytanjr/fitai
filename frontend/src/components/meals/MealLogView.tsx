@@ -244,7 +244,7 @@ export function MealLogView() {
     <div className="min-h-screen bg-canvas">
       <AppHeader />
 
-      <PageContainer width="sm" className="space-y-6">
+      <PageContainer className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Nhật ký ăn uống</h1>
@@ -295,7 +295,7 @@ export function MealLogView() {
         )}
 
         {dayMeals && (
-          <div className="space-y-4">
+          <div className="grid items-start gap-4 md:grid-cols-2">
             {MEAL_TYPES.map(({ value, label }) => {
               const entries = dayMeals.meals[value] ?? [];
               return (

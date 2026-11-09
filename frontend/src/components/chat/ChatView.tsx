@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { chatApi, type ChatMessage } from "@/lib/chat";
 import { useChatStore } from "@/store/chat-store";
 import { useAuthStore } from "@/store/auth-store";
-import { ChatBubble } from "@/components/chat/ChatBubble";
+import { ChatBubble, TypingIndicator } from "@/components/chat/ChatBubble";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { Button } from "@/components/ui/Button";
 import { AppHeader } from "@/components/layout/AppHeader";
@@ -306,21 +306,7 @@ export function ChatView() {
               ))}
 
               {/* Trạng thái đang trả lời (Typing indicator) */}
-              {isSending && (
-                <div className="flex w-full gap-3 justify-start">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-700 text-white text-xs font-bold select-none">
-                    AI
-                  </div>
-                  <div className="rounded-2xl rounded-tl-sm bg-white px-4 py-3 text-sm text-gray-600 shadow-sm ring-1 ring-gray-200 flex items-center gap-1.5">
-                    <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-brand-700 [animation-delay:-0.3s]" />
-                    <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-brand-700 [animation-delay:-0.15s]" />
-                    <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-brand-700" />
-                    <span className="ml-1 text-xs text-gray-400">
-                      FitAI đang suy nghĩ...
-                    </span>
-                  </div>
-                </div>
-              )}
+              {isSending && <TypingIndicator />}
 
               <div ref={bottomRef} />
             </div>

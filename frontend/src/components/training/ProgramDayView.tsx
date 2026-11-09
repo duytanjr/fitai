@@ -80,7 +80,7 @@ export function ProgramDayView() {
   };
 
   return (
-    <TrainingShell weightLoss={day?.goal_tag === "weight_loss"}>
+    <TrainingShell narrow weightLoss={day?.goal_tag === "weight_loss"}>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <Link href={SLUG_RE.test(slug) ? `/training/${slug}` : "/training"}
               className="font-medium text-brand-700 hover:text-brand-800">

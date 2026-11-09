@@ -8,6 +8,7 @@ import type { LucideIcon } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { authApi } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { CONTAINER_CLASS } from "./Container";
 
 interface NavItem {
   href: string;
@@ -68,8 +69,8 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/85">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
-        <Link href="/dashboard" className="flex items-center gap-2.5 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">
+      <div className={cn(CONTAINER_CLASS, "flex flex-wrap items-center gap-x-4 gap-y-2 py-3")}>
+        <Link href="/dashboard" className="flex items-center gap-2.5 rounded-control outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-brand-600">
           <span className="flex h-9 w-9 items-center justify-center rounded-control bg-brand-700 text-sm font-bold text-white shadow-sm">
             F
           </span>
@@ -79,7 +80,7 @@ export function AppHeader() {
         <button
           type="button"
           onClick={handleLogout}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-control px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 hover:text-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 md:order-last md:ml-0"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-control px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 hover:text-red-800 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-red-600 md:order-last md:ml-0"
         >
           <LogOut aria-hidden className="h-4 w-4" />
           Đăng xuất
@@ -99,7 +100,7 @@ export function AppHeader() {
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "inline-flex items-center gap-1.5 whitespace-nowrap rounded-control px-3 py-2 text-sm font-medium transition-colors",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
+                      "outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-brand-600",
                       active ? "bg-brand-50 text-brand-800" : "text-muted hover:bg-gray-100 hover:text-ink"
                     )}
                   >

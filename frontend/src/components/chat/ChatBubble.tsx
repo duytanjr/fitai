@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { ChatSource } from "@/lib/chat";
+import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
 
 interface ChatBubbleProps {
   role: "user" | "assistant";
@@ -35,27 +36,27 @@ export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProp
             "rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
             isUser
               ? "rounded-tr-sm bg-brand-700 text-white"
-              : "rounded-tl-sm bg-white text-gray-800 ring-1 ring-gray-200"
+              : "rounded-tl-sm border border-line bg-surface text-ink"
           )}
         >
-          {/* Render newlines */}
-          {content.split("\n").map((line, i) => (
-            <span key={i}>
-              {line}
-              {i < content.split("\n").length - 1 && <br />}
-            </span>
-          ))}
+          {isUser ? (
+            // Tin của người dùng: văn bản thuần (React tự escape), giữ xuống dòng.
+            <p className="whitespace-pre-wrap break-words">{content}</p>
+          ) : (
+            // Tin của AI: Markdown an toàn (không HTML, chỉ liên kết http/https).
+            <ChatMarkdown content={content} />
+          )}
 
           {/* Nguồn trích dẫn (FR5) — chỉ hiện khi câu trả lời có dùng tài liệu */}
           {showSources && (
-            <div className="mt-3 border-t border-gray-100 pt-2 text-xs text-gray-500">
-              <p className="font-semibold text-gray-600">Tài liệu tham khảo</p>
+            <div className="mt-3 border-t border-line pt-2 text-xs text-muted">
+              <p className="font-semibold text-ink">Tài liệu tham khảo</p>
               <ol className="mt-1 list-decimal space-y-0.5 pl-4">
                 {sources!.map((source, i) => (
                   <li key={`${source.title}-${source.page ?? source.ref}-${i}`}>
                     {formatSource(source)}
                     {/* Văn bản thuần (React tự escape), không render HTML */}
-                    {source.note && <span className="block text-gray-400">Ghi chú nguồn: {source.note}</span>}
+                    {source.note && <span className="block text-muted">Ghi chú nguồn: {source.note}</span>}
                   </li>
                 ))}
               </ol>
@@ -64,7 +65,7 @@ export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProp
         </div>
 
         {createdAt && (
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-muted">
             {new Date(createdAt).toLocaleTimeString("vi-VN", {
               hour: "2-digit",
               minute: "2-digit",
@@ -79,6 +80,23 @@ export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProp
           U
         </div>
       )}
+    </div>
+  );
+}
+
+/** Chỉ báo "đang trả lời" khi chờ phản hồi của AI. */
+export function TypingIndicator() {
+  return (
+    <div className="flex w-full justify-start gap-3" role="status" aria-live="polite">
+      <div className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-white">
+        AI
+      </div>
+      <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-sm border border-line bg-surface px-4 py-3 text-sm shadow-sm">
+        <span aria-hidden className="inline-block h-2 w-2 animate-bounce rounded-full bg-brand-600 [animation-delay:-0.3s]" />
+        <span aria-hidden className="inline-block h-2 w-2 animate-bounce rounded-full bg-brand-600 [animation-delay:-0.15s]" />
+        <span aria-hidden className="inline-block h-2 w-2 animate-bounce rounded-full bg-brand-600" />
+        <span className="ml-1 text-xs text-muted">FitAI đang suy nghĩ...</span>
+      </div>
     </div>
   );
 }

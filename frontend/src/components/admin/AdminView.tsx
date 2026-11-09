@@ -66,7 +66,7 @@ export function AdminView() {
     <div className="min-h-screen bg-canvas">
       <AppHeader />
 
-      <PageContainer width="lg" className="space-y-4 py-6">
+      <PageContainer className="space-y-4 py-6">
         <h1 className="text-2xl font-bold text-ink">FitAI · Quản trị</h1>
         <nav className="flex gap-1 border-b border-gray-200" role="tablist" aria-label="Mục quản trị">
           {TABS.map((t) => (

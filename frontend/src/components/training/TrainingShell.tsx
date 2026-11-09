@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { authApi } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
 
@@ -36,11 +37,13 @@ export function TrainingSafetyNotice({ weightLoss = false, age }: { weightLoss?:
 
 interface Props {
   weightLoss?: boolean;
+  /** Trang đọc dài (chi tiết, buổi tập): giữ độ rộng đọc max-w-3xl, canh trái thẳng với logo. */
+  narrow?: boolean;
   children: React.ReactNode;
 }
 
 /** Khung chung các trang tập luyện: thanh điều hướng, kiểm tra đăng nhập, hộp lưu ý an toàn cố định. */
-export function TrainingShell({ weightLoss = false, children }: Props) {
+export function TrainingShell({ weightLoss = false, narrow = false, children }: Props) {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const age = useProfileAge(isAuthenticated);
@@ -52,9 +55,11 @@ export function TrainingShell({ weightLoss = false, children }: Props) {
   return (
     <div className="min-h-screen bg-canvas">
       <AppHeader />
-      <PageContainer width="sm" className="space-y-5">
-        <TrainingSafetyNotice weightLoss={weightLoss} age={age} />
-        {children}
+      <PageContainer>
+        <div className={cn("space-y-5", narrow && "max-w-3xl")}>
+          <TrainingSafetyNotice weightLoss={weightLoss} age={age} />
+          {children}
+        </div>
       </PageContainer>
     </div>
   );

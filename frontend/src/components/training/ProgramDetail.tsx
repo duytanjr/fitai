@@ -96,7 +96,7 @@ export function ProgramDetail() {
   };
 
   return (
-    <TrainingShell weightLoss={program?.goal_tag === "weight_loss"}>
+    <TrainingShell narrow weightLoss={program?.goal_tag === "weight_loss"}>
       <Link href="/training" className="text-sm font-medium text-brand-700 hover:text-brand-800">← Tất cả chương trình</Link>
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {!program && !error && <p className="text-sm text-gray-500">Đang tải…</p>}

@@ -104,7 +104,7 @@ export function ProgramList() {
         </div>
       )}
       {programs && programs.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {programs.map((p) => (
             <li key={p.slug}>
               <Link href={`/training/${p.slug}`}
