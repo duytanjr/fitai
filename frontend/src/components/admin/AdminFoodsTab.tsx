@@ -123,7 +123,7 @@ export function AdminFoodsTab({ onUnauthorized, onForbidden }: AdminFoodsTabProp
             onChange={(e) => setQuery(e.target.value)}
             placeholder="có dấu hoặc không dấu, vd. gao te"
             maxLength={100}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
           />
         </label>
         <label className="text-sm text-gray-700">

@@ -13,7 +13,7 @@ const MACROS: { key: keyof MacroValues; label: string; unit: string }[] = [
 
 export function ProfileInvite({ missing }: { missing: string[] }) {
   return (
-    <div className="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+    <div className="rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-800">
       Hồ sơ chưa đủ thông tin ({missing.join(", ")}) nên chưa so được với mục tiêu.{" "}
       <Link href="/onboarding" className="font-medium underline">
         Hoàn tất hồ sơ
@@ -70,7 +70,7 @@ export function TodayCard({ summary, latest }: { summary: DailySummary; latest: 
                   aria-valuemin={0}
                   aria-valuemax={100}
                 >
-                  <div className="h-1.5 rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
+                  <div className="h-1.5 rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
                 </div>
               )}
             </div>

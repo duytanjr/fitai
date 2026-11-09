@@ -54,7 +54,7 @@ export function TrainingWeekCard({ onUnauthorized }: { onUnauthorized: () => voi
         WHO khuyến nghị người lớn 150-300 phút hoạt động thể lực vừa mỗi tuần; số phút ở đây là bạn tự đánh dấu và gồm
         cả bài không phải aerobic, nên chỉ để tham khảo.
       </p>
-      <Link href="/training" className="mt-2 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700">
+      <Link href="/training" className="mt-2 inline-block text-sm font-medium text-brand-700 hover:text-brand-800">
         Xem chương trình tập →
       </Link>
     </section>

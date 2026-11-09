@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { AddMealForm, friendlyError } from "@/components/meals/AddMealForm";
 import { cn } from "@/lib/utils";
@@ -71,7 +73,7 @@ function SummaryCard({ summary }: { summary: DailySummary }) {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-gray-100" role="progressbar"
                      aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
-                  <div className={cn("h-full rounded-full", over ? "bg-red-500" : "bg-indigo-500")}
+                  <div className={cn("h-full rounded-full", over ? "bg-red-500" : "bg-brand-600")}
                        style={{ width: `${pct}%` }} />
                 </div>
               </div>
@@ -89,7 +91,7 @@ function SummaryCard({ summary }: { summary: DailySummary }) {
               </div>
             ))}
           </div>
-          <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+          <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-900">
             Hoàn tất hồ sơ (tuổi, giới tính, chiều cao, cân nặng, mức vận động, mục tiêu) để so với mục tiêu calo và
             macro của bạn.{" "}
             <Link href="/onboarding" className="font-medium underline">
@@ -177,7 +179,7 @@ function MealRow({
             max={MAX_GRAMS}
             value={gramsText}
             onChange={(e) => setGramsText(e.target.value)}
-            className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
             aria-label="Số gam"
           />
           <span className="text-sm text-gray-500">g</span>
@@ -239,30 +241,10 @@ export function MealLogView() {
   const isToday = date === todayVN();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white px-6 py-4 shadow-sm">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-              F
-            </div>
-            <span className="text-lg font-semibold text-gray-900">FitAI</span>
-          </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-              Tổng quan
-            </Link>
-            <Link href="/chat" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-              Chat với AI
-            </Link>
-            <Link href="/training" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-              Tập luyện
-            </Link>
-          </nav>
-        </div>
-      </header>
+    <div className="min-h-screen bg-canvas">
+      <AppHeader />
 
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
+      <PageContainer width="sm" className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Nhật ký ăn uống</h1>
@@ -273,7 +255,7 @@ export function MealLogView() {
               type="date"
               value={date}
               onChange={(e) => e.target.value && setDate(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
               aria-label="Chọn ngày"
             />
             {!isToday && (
@@ -334,7 +316,7 @@ export function MealLogView() {
             })}
           </div>
         )}
-      </main>
+      </PageContainer>
     </div>
   );
 }

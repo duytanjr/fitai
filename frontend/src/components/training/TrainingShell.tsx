@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { authApi } from "@/lib/auth";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 /** Tuổi từ hồ sơ; lỗi hay chưa có hồ sơ → null (chỉ bỏ dòng nhắc, không chặn trang). */
 function useProfileAge(enabled: boolean): number | null {
@@ -49,35 +50,12 @@ export function TrainingShell({ weightLoss = false, children }: Props) {
   }, [isAuthenticated, router]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white px-6 py-4 shadow-sm">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-              F
-            </div>
-            <span className="text-lg font-semibold text-gray-900">FitAI</span>
-          </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-              Tổng quan
-            </Link>
-            <Link href="/meals" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-              Nhật ký ăn uống
-            </Link>
-            <Link href="/chat" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-              Chat với AI
-            </Link>
-            <Link href="/training" className="text-sm font-medium text-indigo-600 hover:text-indigo-700" aria-current="page">
-              Tập luyện
-            </Link>
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto max-w-3xl space-y-5 px-4 py-8 sm:px-6">
+    <div className="min-h-screen bg-canvas">
+      <AppHeader />
+      <PageContainer width="sm" className="space-y-5">
         <TrainingSafetyNotice weightLoss={weightLoss} age={age} />
         {children}
-      </main>
+      </PageContainer>
     </div>
   );
 }

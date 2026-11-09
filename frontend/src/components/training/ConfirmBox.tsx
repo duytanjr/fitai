@@ -13,7 +13,7 @@ interface Props {
 /** Hộp xác nhận ngay trong trang (không dùng window.confirm). Văn bản thuần. */
 export function ConfirmBox({ message, confirmLabel, busy, onConfirm, onCancel }: Props) {
   return (
-    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900" role="alertdialog"
+    <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900" role="alertdialog"
          aria-live="polite">
       <p>{message}</p>
       <div className="mt-3 flex gap-2">

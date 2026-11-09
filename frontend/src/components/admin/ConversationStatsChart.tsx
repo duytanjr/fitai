@@ -33,7 +33,7 @@ export function ConversationStatsChart({ stats }: { stats: ConversationStats }) 
           return (
             <g key={d.date}>
               {d.sessions > 0 && (
-                <rect x={x} y={y(d.sessions)} width={barW} height={PAD.top + plotH - y(d.sessions)} fill="#818cf8" rx="2">
+                <rect x={x} y={y(d.sessions)} width={barW} height={PAD.top + plotH - y(d.sessions)} fill="#6ee7b7" rx="2">
                   <title>{`${d.date}: ${d.sessions} phiên, ${d.messages} tin nhắn`}</title>
                 </rect>
               )}
@@ -47,7 +47,7 @@ export function ConversationStatsChart({ stats }: { stats: ConversationStats }) 
         <line x1={PAD.left} x2={W - PAD.right} y1={PAD.top + plotH} y2={PAD.top + plotH} stroke="#9ca3af" />
       </svg>
       <p className="mt-1 text-xs text-gray-500">
-        <span className="mr-1 inline-block h-2 w-3 rounded-sm bg-indigo-400 align-middle" />số phiên mới
+        <span className="mr-1 inline-block h-2 w-3 rounded-sm bg-brand-300 align-middle" />số phiên mới
         <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-teal-700 align-middle" />số tin nhắn
       </p>
     </div>

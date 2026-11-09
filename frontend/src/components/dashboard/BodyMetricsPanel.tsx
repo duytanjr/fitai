@@ -23,7 +23,7 @@ interface BodyMetricsPanelProps {
 
 const parse = (text: string) => Number(text.trim().replace(",", "."));
 const inputClass =
-  "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-100";
+  "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 disabled:bg-gray-100";
 
 /** Form ghi cân nặng (vòng eo tuỳ chọn) và danh sách lần đo có sửa / xoá.
  *  Ghi lại cùng ngày = cập nhật bản ghi của ngày đó (server upsert). */

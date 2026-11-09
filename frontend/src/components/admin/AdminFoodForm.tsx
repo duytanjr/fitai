@@ -34,7 +34,7 @@ const MASS_FIELDS: NumberField[] = ["water_g", "protein_g", "fat_g", "carb_g", "
 const PREPARATIONS = Object.keys(PREPARATION_LABELS) as Preparation[];
 
 const inputClass =
-  "mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-100";
+  "mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 disabled:bg-gray-100";
 
 const toText = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 const parse = (text: string) => Number(text.trim().replace(",", "."));

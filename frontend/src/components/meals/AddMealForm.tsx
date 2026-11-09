@@ -45,7 +45,7 @@ function PreparationBadge({ value }: { value: Preparation }) {
 
 function SourceBadge({ label }: { label: string }) {
   return (
-    <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] text-violet-700 ring-1 ring-inset ring-violet-200">
+    <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800 ring-1 ring-inset ring-teal-200">
       {label}
     </span>
   );
@@ -168,7 +168,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Tìm thực phẩm, ví dụ: gạo tẻ máy, bánh phở…"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
             maxLength={100}
           />
           <div className="mt-3 space-y-2">
@@ -228,7 +228,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
                 key={item.id}
                 type="button"
                 onClick={() => setSelected(item)}
-                className="flex w-full items-start justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 text-left hover:border-indigo-300 hover:bg-indigo-50/40"
+                className="flex w-full items-start justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 text-left hover:border-brand-300 hover:bg-brand-50/40"
               >
                 <span>
                   <span className="block text-sm font-medium text-gray-900">{item.name_vi}</span>
@@ -237,7 +237,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
                   )}
                   <span className="block text-xs text-gray-500">{item.group_name}</span>
                   {item.matched_via && (
-                    <span className="block text-xs text-indigo-700">
+                    <span className="block text-xs text-brand-700">
                       Bảng ghi là: {item.name_vi}
                       {item.name_original || item.name_en ? ` (${item.name_original || item.name_en})` : ""} — khớp qua{" "}
                       {item.matched_via.startsWith("từ khoá") ? item.matched_via : `từ đồng nghĩa “${item.matched_via}”`}
@@ -310,7 +310,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
                 max={MAX_GRAMS}
                 value={gramsText}
                 onChange={(e) => setGramsText(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
               />
               {!gramsValid && (
                 <span className="mt-1 block text-xs text-red-600">Nhập số gam lớn hơn 0 và tối đa {MAX_GRAMS} g.</span>
@@ -321,7 +321,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
               <select
                 value={mealType}
                 onChange={(e) => setMealType(e.target.value as MealType)}
-                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
               >
                 {MEAL_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -333,7 +333,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
           </div>
 
           {gramsValid && (
-            <div className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+            <div className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-900">
               Sẽ ghi: <strong>{formatValue(scalePreview(selected.per_100g.energy_kcal, grams), "kcal")}</strong> ·
               protein {formatValue(scalePreview(selected.per_100g.protein_g, grams), "g")} · chất béo{" "}
               {formatValue(scalePreview(selected.per_100g.fat_g, grams), "g")} · {carbText(selected, grams)}

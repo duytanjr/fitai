@@ -205,7 +205,7 @@ export function AdminDocumentsTab({ onUnauthorized, onForbidden }: Props) {
                   </p>
                   <p className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                     <span className={cn("rounded px-1.5 py-0.5 ring-1", STATUS_BADGE[d.status])}>{STATUS_LABELS[d.status]}</span>
-                    <span className={cn("rounded px-1.5 py-0.5 ring-1", d.enabled ? "bg-indigo-50 text-indigo-700 ring-indigo-200" : "bg-gray-100 text-gray-500 ring-gray-200")}>
+                    <span className={cn("rounded px-1.5 py-0.5 ring-1", d.enabled ? "bg-brand-50 text-brand-700 ring-brand-200" : "bg-gray-100 text-gray-500 ring-gray-200")}>
                       {d.enabled ? "Đang bật" : "Đã tắt"}
                     </span>
                     <span className="text-gray-500">

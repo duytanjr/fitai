@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { authApi } from "@/lib/auth";
@@ -53,7 +55,7 @@ function Card({ title, children, right }: { title: string; children: React.React
 
 export function DashboardView() {
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const [days, setDays] = useState<ProgressDays>(7);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [today, setToday] = useState<DailySummary | null>(null);
@@ -144,51 +146,15 @@ export function DashboardView() {
     loadWeekly(weekStart);
   };
 
-  const handleLogout = () => {
-    logout();
-    router.replace("/login");
-  };
-
   const stats = progress?.stats;
   const kcalComparison = stats?.comparison?.energy_kcal ?? null;
   const currentMonday = mondayOf(todayVN());
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white px-6 py-4 shadow-sm">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-              F
-            </div>
-            <span className="text-lg font-semibold text-gray-900">FitAI</span>
-          </div>
-          <nav className="flex items-center gap-4">
-            <Link href="/meals" className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900">
-              Nhật ký ăn uống
-            </Link>
-            <Link href="/chat" className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900">
-              Chat với AI
-            </Link>
-            <Link href="/training" className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900">
-              Tập luyện
-            </Link>
-            {user?.role === "admin" && (
-              <Link href="/admin" className="text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700">
-                Quản trị
-              </Link>
-            )}
-            <button
-              onClick={handleLogout}
-              className="text-sm font-medium text-red-500 transition-colors hover:text-red-600"
-            >
-              Đăng xuất
-            </button>
-          </nav>
-        </div>
-      </header>
+    <div className="min-h-screen bg-canvas">
+      <AppHeader />
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+      <PageContainer width="md" className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Tiến độ</h1>
           <p className="mt-1 text-gray-500">Xin chào, {user?.full_name ?? user?.email ?? "bạn"}.</p>
@@ -222,7 +188,7 @@ export function DashboardView() {
                     aria-pressed={d === days}
                     className={cn(
                       "rounded-md px-3 py-1 text-sm font-medium transition-colors disabled:opacity-60",
-                      d === days ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      d === days ? "bg-brand-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     )}
                   >
                     {d} ngày
@@ -296,14 +262,14 @@ export function DashboardView() {
 
         <TrainingWeekCard onUnauthorized={handleUnauthorized} />
 
-        <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white shadow-lg">
+        <div className="rounded-2xl bg-gradient-to-r from-brand-700 to-teal-700 p-6 text-white shadow-lg">
           <h2 className="text-lg font-bold">Hỏi AI về tiến độ</h2>
-          <p className="mt-1 text-indigo-100">Ví dụ: &quot;7 ngày gần nhất tôi ăn trung bình bao nhiêu calo?&quot;</p>
+          <p className="mt-1 text-brand-50">Ví dụ: &quot;7 ngày gần nhất tôi ăn trung bình bao nhiêu calo?&quot;</p>
           <Link href="/chat" className="mt-3 inline-block">
             <Button variant="secondary">Bắt đầu chat →</Button>
           </Link>
         </div>
-      </main>
+      </PageContainer>
     </div>
   );
 }

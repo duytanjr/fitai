@@ -62,7 +62,7 @@ export function CalorieChart({ series, target }: CalorieChartProps) {
                     y={y(v)}
                     width={barW}
                     height={Math.max(1, PAD.top + plotH - y(v))}
-                    fill={d.incomplete_totals ? "url(#incomplete-hatch)" : "#6366f1"}
+                    fill={d.incomplete_totals ? "url(#incomplete-hatch)" : "#6ee7b7"}
                     rx={2}
                   >
                     <title>
@@ -104,7 +104,7 @@ export function CalorieChart({ series, target }: CalorieChartProps) {
         </svg>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-indigo-500" /> Calo đã ghi</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm bg-brand-300" /> Calo đã ghi</span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded-sm bg-amber-400 ring-1 ring-amber-700" /> ! Tổng chưa đầy đủ (có mục thiếu số liệu)
         </span>

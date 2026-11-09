@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { authApi } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { PageContainer } from "@/components/layout/PageContainer";
 import { AdminConversationsTab } from "@/components/admin/AdminConversationsTab";
 import { AdminDocumentsTab } from "@/components/admin/AdminDocumentsTab";
 import { AdminFoodsTab } from "@/components/admin/AdminFoodsTab";
@@ -62,22 +63,11 @@ export function AdminView() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white px-6 py-4 shadow-sm">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-              F
-            </div>
-            <span className="text-lg font-semibold text-gray-900">FitAI · Quản trị</span>
-          </div>
-          <Link href="/dashboard" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-            ← Về trang chính
-          </Link>
-        </div>
-      </header>
+    <div className="min-h-screen bg-canvas">
+      <AppHeader />
 
-      <main className="mx-auto max-w-6xl space-y-4 px-4 py-6 sm:px-6">
+      <PageContainer width="lg" className="space-y-4 py-6">
+        <h1 className="text-2xl font-bold text-ink">FitAI · Quản trị</h1>
         <nav className="flex gap-1 border-b border-gray-200" role="tablist" aria-label="Mục quản trị">
           {TABS.map((t) => (
             <button
@@ -87,7 +77,7 @@ export function AdminView() {
               onClick={() => setTab(t.key)}
               className={cn(
                 "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-                tab === t.key ? "border-indigo-600 text-indigo-700" : "border-transparent text-gray-500 hover:text-gray-800"
+                tab === t.key ? "border-brand-700 text-brand-700" : "border-transparent text-gray-500 hover:text-gray-800"
               )}
             >
               {t.label}
@@ -107,7 +97,7 @@ export function AdminView() {
             Mục {TABS.find((t) => t.key === tab)?.label.toLowerCase()} sắp có.
           </p>
         )}
-      </main>
+      </PageContainer>
     </div>
   );
 }

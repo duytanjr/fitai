@@ -68,7 +68,7 @@ export function ProgramList() {
           {rec.alternative && (
             <p className="mt-1 text-sm text-gray-600">
               Thay thế:{" "}
-              <Link href={`/training/${rec.alternative.slug}`} className="font-medium text-indigo-600 hover:text-indigo-700">
+              <Link href={`/training/${rec.alternative.slug}`} className="font-medium text-brand-700 hover:text-brand-800">
                 {rec.alternative.title}
               </Link>
             </p>
@@ -84,7 +84,7 @@ export function ProgramList() {
               <button key={c.value} type="button" aria-pressed={experience === c.value}
                       onClick={() => setExperience(experience === c.value ? null : c.value)}
                       className={cn("rounded-md px-3 py-1 font-medium",
-                                    experience === c.value ? "bg-indigo-600 text-white"
+                                    experience === c.value ? "bg-brand-700 text-white"
                                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200")}>
                 {c.label}
               </button>
@@ -108,10 +108,10 @@ export function ProgramList() {
           {programs.map((p) => (
             <li key={p.slug}>
               <Link href={`/training/${p.slug}`}
-                    className={cn("block h-full rounded-xl bg-white p-5 shadow-sm ring-1 transition hover:ring-indigo-300",
-                                  p.slug === recommendedSlug ? "ring-2 ring-indigo-300" : "ring-gray-100")}>
+                    className={cn("block h-full rounded-xl bg-white p-5 shadow-sm ring-1 transition hover:ring-brand-300",
+                                  p.slug === recommendedSlug ? "ring-2 ring-brand-300" : "ring-gray-100")}>
                 {p.slug === recommendedSlug && (
-                  <span className="mb-2 inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200">
+                  <span className="mb-2 inline-block rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                     Gợi ý cho bạn
                   </span>
                 )}

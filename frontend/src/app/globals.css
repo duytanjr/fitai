@@ -1,33 +1,84 @@
 @import "tailwindcss";
 
 /*
- * Ứng dụng chỉ có giao diện sáng (các trang, thẻ, ô nhập đều nền trắng/xám nhạt).
- * Không đổi --foreground theo prefers-color-scheme: trước đây chế độ tối của hệ điều hành
- * làm chữ thành #ededed, và mọi input/textarea/select không đặt màu riêng (kế thừa màu chữ
+ * Design tokens — nơi DUY NHẤT khai báo màu, bo góc, bóng và phông của ứng dụng.
+ * Tailwind v4 sinh class từ các biến này: bg-brand-700, text-ink, text-muted, bg-canvas,
+ * rounded-card, shadow-card, bg-accent-100…
+ *
+ * Quy tắc tương phản (WCAG AA, chữ thường cần ≥ 4,5:1):
+ *  - Nút chính / chữ liên kết: brand-700 (#047857, ~5,5:1 với trắng). Không dùng brand-600 (~3,8:1)
+ *    hay nhạt hơn cho chữ nhỏ hoặc nền nút chữ trắng; brand-600 chỉ dùng cho viền, vòng focus, thanh.
+ *  - Màu nhấn (accent, amber): làm nền nhạt kèm chữ accent-900, hoặc số lớn accent-700 trở lên;
+ *    không dùng làm chữ nhỏ trên nền trắng.
+ *  - Chữ chính ink #111827; chữ phụ muted #4b5563 (~7,6:1 với trắng).
+ */
+@theme {
+  --font-sans: var(--font-be-vietnam-pro), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+
+  /* Màu chủ đạo: xanh lá ngọc (thang emerald) */
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-brand-900: #064e3b;
+
+  /* Màu nhấn ấm (thang amber) cho số liệu nổi bật */
+  --color-accent-50: #fffbeb;
+  --color-accent-100: #fef3c7;
+  --color-accent-200: #fde68a;
+  --color-accent-300: #fcd34d;
+  --color-accent-400: #fbbf24;
+  --color-accent-500: #f59e0b;
+  --color-accent-600: #d97706;
+  --color-accent-700: #b45309;
+  --color-accent-800: #92400e;
+  --color-accent-900: #78350f;
+
+  /* Chữ và nền */
+  --color-ink: #111827;
+  --color-muted: #4b5563;
+  --color-subtle: #9ca3af; /* chỉ cho placeholder / biểu tượng trang trí, không cho chữ cần đọc */
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-line: #e5e7eb;
+
+  /* Bo góc và bóng */
+  --radius-card: 1rem; /* 16px */
+  --radius-control: 0.625rem; /* 10px: nút, ô nhập */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-raised: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+}
+
+/*
+ * Ứng dụng chỉ có giao diện sáng. Không đổi màu theo prefers-color-scheme: trước đây chế độ tối của hệ
+ * điều hành làm chữ thành #ededed, và mọi input/textarea/select không đặt màu riêng (kế thừa màu chữ
  * theo preflight của Tailwind) hiện chữ gần như trắng trên nền trắng.
  */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
   color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }
 
 @layer base {
   input,
   textarea,
   select {
-    color: #111827;
+    color: var(--color-ink);
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: #9ca3af;
+    color: var(--color-subtle);
     opacity: 1;
   }
 }

@@ -83,7 +83,7 @@ export function ProgramDayView() {
     <TrainingShell weightLoss={day?.goal_tag === "weight_loss"}>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <Link href={SLUG_RE.test(slug) ? `/training/${slug}` : "/training"}
-              className="font-medium text-indigo-600 hover:text-indigo-700">
+              className="font-medium text-brand-700 hover:text-brand-800">
           ← {day ? day.program_title : "Chương trình"}
         </Link>
         {day && (
@@ -149,7 +149,7 @@ export function ProgramDayView() {
                     <div className="mt-2">
                       {isSafeYoutubeUrl(item.url) ? (
                         <a href={item.url} target="_blank" rel="noopener noreferrer"
-                           className="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                           className="inline-flex items-center rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800">
                           Bắt đầu
                         </a>
                       ) : (
@@ -171,7 +171,7 @@ export function ProgramDayView() {
               {!following && (
                 <p className="text-sm text-gray-600">
                   Bạn chưa theo chương trình này.{" "}
-                  <Link href={`/training/${day.program_slug}`} className="font-medium text-indigo-600 hover:text-indigo-700">
+                  <Link href={`/training/${day.program_slug}`} className="font-medium text-brand-700 hover:text-brand-800">
                     Bắt đầu chương trình
                   </Link>{" "}
                   để đánh dấu các ngày đã tập.

@@ -97,7 +97,7 @@ export function ProgramDetail() {
 
   return (
     <TrainingShell weightLoss={program?.goal_tag === "weight_loss"}>
-      <Link href="/training" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">← Tất cả chương trình</Link>
+      <Link href="/training" className="text-sm font-medium text-brand-700 hover:text-brand-800">← Tất cả chương trình</Link>
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {!program && !error && <p className="text-sm text-gray-500">Đang tải…</p>}
       {program && (
@@ -158,7 +158,7 @@ export function ProgramDetail() {
                   </div>
                 ) : (
                   <Link href={`/training/${program.slug}/days/${d.day_number}`}
-                        className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-3 text-sm hover:bg-indigo-50">
+                        className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-3 text-sm hover:bg-brand-50">
                     <span className="font-medium text-gray-900">
                       {doneDays.has(d.day_number) && (
                         <span className="mr-1.5 text-emerald-600" aria-label="Đã xong">✓</span>

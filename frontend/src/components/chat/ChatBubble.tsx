@@ -24,7 +24,7 @@ export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProp
     <div className={cn("flex w-full gap-3", isUser ? "justify-end" : "justify-start")}>
       {/* Avatar */}
       {!isUser && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold select-none">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-700 text-white text-xs font-bold select-none">
           AI
         </div>
       )}
@@ -34,7 +34,7 @@ export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProp
           className={cn(
             "rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
             isUser
-              ? "rounded-tr-sm bg-indigo-600 text-white"
+              ? "rounded-tr-sm bg-brand-700 text-white"
               : "rounded-tl-sm bg-white text-gray-800 ring-1 ring-gray-200"
           )}
         >

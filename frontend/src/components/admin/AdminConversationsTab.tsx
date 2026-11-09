@@ -98,7 +98,7 @@ export function AdminConversationsTab({ onUnauthorized, onForbidden }: Props) {
         </div>
       )}
       {status?.enabled && (
-        <div className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900">
+        <div className="rounded-xl bg-brand-50 p-4 text-sm text-brand-900">
           Tính năng đang BẬT. Mỗi lần xem nội dung phải ghi lý do và được ghi nhật ký quản trị. Còn{" "}
           <strong>{status.remaining_today}</strong>/{status.daily_limit} lượt xem hôm nay.
         </div>
@@ -112,7 +112,7 @@ export function AdminConversationsTab({ onUnauthorized, onForbidden }: Props) {
             {STATS_DAYS.map((d) => (
               <button key={d} onClick={() => setDays(d)} aria-pressed={d === days}
                       className={cn("rounded-md px-3 py-1 text-sm font-medium",
-                                    d === days ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200")}>
+                                    d === days ? "bg-brand-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200")}>
                 {d} ngày
               </button>
             ))}

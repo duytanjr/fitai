@@ -66,7 +66,7 @@ export function DocumentUploadForm({ maxUploadMb, maxPages, onUploaded, onCancel
           accept="application/pdf,.pdf"
           disabled={busy}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="mt-1 block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-indigo-700"
+          className="mt-1 block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-brand-700"
         />
         {file && fileError && <span className="text-xs text-red-600">{fileError}</span>}
       </label>

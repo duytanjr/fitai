@@ -153,7 +153,7 @@ export function OnboardingForm() {
     `w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 ${
       fieldErrors[field]
         ? "border-red-400 focus:border-red-400 focus:ring-red-400/20"
-        : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500/20"
+        : "border-gray-300 focus:border-brand-600 focus:ring-brand-500/20"
     }`;
 
   const FieldErr = ({ field }: { field: string }) =>
@@ -172,8 +172,8 @@ export function OnboardingForm() {
       onClick={() => select(field, value)}
       className={`w-full rounded-lg border px-4 py-3 text-left text-sm font-medium transition-all duration-150 ${
         form[field] === value
-          ? "border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500"
-          : "border-gray-200 text-gray-700 hover:border-indigo-300 hover:bg-indigo-50/50"
+          ? "border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-600"
+          : "border-gray-200 text-gray-700 hover:border-brand-300 hover:bg-brand-50/50"
       }`}
     >
       {label}
@@ -183,11 +183,11 @@ export function OnboardingForm() {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-50 to-teal-50 p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white text-xl font-bold">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-700 text-white text-xl font-bold">
             F
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Thiết lập hồ sơ</h1>
@@ -199,7 +199,7 @@ export function OnboardingForm() {
         {/* Progress */}
         <div className="mb-6 h-1.5 w-full rounded-full bg-gray-200">
           <div
-            className="h-1.5 rounded-full bg-indigo-600 transition-all duration-500"
+            className="h-1.5 rounded-full bg-brand-700 transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -331,7 +331,7 @@ export function OnboardingForm() {
                   value={form.dietary_restrictions}
                   onChange={set("dietary_restrictions")}
                   placeholder="Ví dụ: Không ăn hải sản, dị ứng đậu phộng, ăn chay..."
-                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
                 />
               </div>
 

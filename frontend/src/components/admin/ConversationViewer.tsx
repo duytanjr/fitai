@@ -102,7 +102,7 @@ export function ConversationViewer({ session, remaining, onClose, onViewed, onUn
                 maxLength={REASON_MAX + 50}
                 rows={2}
                 disabled={busy || remaining === 0}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
               />
             </label>
             <p className="text-xs text-gray-500">
@@ -127,7 +127,7 @@ export function ConversationViewer({ session, remaining, onClose, onViewed, onUn
                   {m.sources.length > 0 && ` · nguồn: ${m.sources.join("; ")}`}
                 </p>
                 <p className={`whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${
-                  m.role === "user" ? "bg-gray-100 text-gray-800" : "bg-indigo-50 text-gray-800"
+                  m.role === "user" ? "bg-gray-100 text-gray-800" : "bg-brand-50 text-gray-800"
                 }`}>
                   <RedactedText text={m.content} />
                 </p>
