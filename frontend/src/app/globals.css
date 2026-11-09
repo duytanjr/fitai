@@ -1,19 +1,33 @@
 @import "tailwindcss";
 
+/*
+ * Ứng dụng chỉ có giao diện sáng (các trang, thẻ, ô nhập đều nền trắng/xám nhạt).
+ * Không đổi --foreground theo prefers-color-scheme: trước đây chế độ tối của hệ điều hành
+ * làm chữ thành #ededed, và mọi input/textarea/select không đặt màu riêng (kế thừa màu chữ
+ * theo preflight của Tailwind) hiện chữ gần như trắng trên nền trắng.
+ */
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: light;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  input,
+  textarea,
+  select {
+    color: #111827;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+    opacity: 1;
+  }
 }

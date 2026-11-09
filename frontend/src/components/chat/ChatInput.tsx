@@ -31,11 +31,14 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     }
   };
 
-  // Ctrl+Enter or Cmd+Enter to submit
+  // Enter (cả Ctrl/Cmd+Enter) để gửi; Shift+Enter để xuống dòng.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      handleSubmit();
-    }
+    if (e.key !== "Enter" || e.shiftKey) return;
+    // Đang gõ bằng bộ gõ (IME, Telex/VNI): Enter dùng để chốt chữ, không gửi.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    e.preventDefault();
+    // handleSubmit tự bỏ qua khi ô trống/chỉ khoảng trắng hoặc đang chờ trả lời.
+    handleSubmit();
   };
 
   return (
@@ -48,7 +51,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Hỏi về dinh dưỡng, lịch tập, hay mục tiêu của bạn... (Ctrl+Enter để gửi)"
+        placeholder="Hỏi về dinh dưỡng, lịch tập, hay mục tiêu của bạn... (Enter để gửi, Shift+Enter để xuống dòng)"
         rows={1}
         disabled={disabled || loading}
         className={cn(
