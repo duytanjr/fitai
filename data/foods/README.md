@@ -7,7 +7,7 @@ Dữ liệu tra cứu dinh dưỡng của thực phẩm cho công cụ `lookup_f
 * **Bảng thành phần thực phẩm Việt Nam** (Vietnamese Food Composition Table), 2007.
 * Tác giả/tổ chức: **Viện Dinh dưỡng** — Bộ Y tế. Nhà xuất bản: **NXB Y học**.
 * File gốc: `data/knowledge/raw/vn_food_composition_2007_vi.pdf` (567 trang, không đưa lên Git).
-* Bản quyền/giấy phép: (tôi sẽ điền)
+* Bản quyền/giấy phép: Bảng thành phần thực phẩm Việt Nam, Viện Dinh dưỡng (2007); dùng cho mục đích học tập của đồ án, có ghi nguồn.
 
 ## 2. Phạm vi đã nạp
 

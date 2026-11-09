@@ -274,8 +274,7 @@ Quản trị (lát 8a, services/foods/admin.py, api/routers/admin_foods.py):
     khẩu phần. Món có nhiều nguồn lấy trung bình.
   - Nguồn: bảng dinh dưỡng chuỗi Roll'd (Úc), FatSecret, CalorieKing, Arise, công thức tự pha, và bảng calo blog
     Tu Farm (tu-farm.com, tra 08/11/2026) — Tu Farm là NGUỒN THỨ CẤP CHƯA KIỂM CHỨNG. Chi tiết:
-    data/foods/manual/dishes_sources.md, dishes_batch2_sources.md, dishes_batch3_sources.md (kiểm 2026-11-08:
-    hai file batch2/batch3 CHƯA có trong repo, dishes_sources.md chưa nhắc Tu Farm); tóm tắt trong source_note.
+    data/foods/manual/dishes_sources_all.md; tóm tắt trong source_note.
   - 24 thực phẩm cơ bản đặt tên kèm hậu tố "(Tu Farm)" (vd. "Dưa chuột (Tu Farm)") để không trùng tên với dòng
     VN 2007 / USDA (unique index chỉ chặn trùng trong ADMIN_MANUAL; hậu tố giúp người dùng và LLM phân biệt).
   - Cảnh báo số liệu: Bánh tét 408 kcal/100 g cao bất thường (cần kiểm lại). Lệch Atwater > 15% (có cờ
@@ -309,7 +308,9 @@ Nguồn dữ liệu thực phẩm (`food_sources`, id cố định):
 RAG gồm (kiểm 2026-11-08, bảng knowledge_documents khớp Chroma, cả 4 đang bật) — tổng 198 đoạn:
 - builtin: ISSN 2017 "diets and body composition" (34 đoạn) và WHO 2020 "physical activity and sedentary
   behaviour" (100 đoạn) (data/knowledge/raw; danh mục ở sources.csv).
-- upload qua /admin (lưu ở data/knowledge/uploads, ngoài git): hai chương trích từ giáo trình thương mại NASM
+- upload qua /admin (bản đã lập chỉ mục lưu ở data/knowledge/uploads với tên ngẫu nhiên, ngoài git; bản gốc
+  chuong7.pdf, chuong13.pdf nằm trong git ở data/knowledge/extra/ — ingest_knowledge KHÔNG đọc thư mục này,
+  phải tải lên qua /admin): hai chương trích từ giáo trình thương mại NASM
   Essentials of Personal Fitness Training, 6th edition (NASM; Brian G. Sutton biên tập, 2018) — chương 7
   "Flexibility Training Concepts" (khởi động, giãn cơ; 32 đoạn, giữ 38/40 trang) và chương 13 "Resistance Training
   Concepts" (tập sức mạnh, hướng dẫn từng bài dạng Preparation / Movement / Safety; 32 đoạn, giữ 47/50 trang).
@@ -333,8 +334,16 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   alembic/alembic, scripts/scripts: người dùng tự dọn).
 - /app/data trong container mount chỉ đọc: ghi file ra /tmp trong container rồi `docker cp` ra máy.
   Ngoại lệ: data/eval/results mount ghi được tại /app/eval_results; data/knowledge/uploads ghi được tại /app/uploads.
-- Ngoài git: data/knowledge/_review/, data/foods/external/ (USDA thô 45 MB), data/eval/results/* (giữ .gitkeep),
-  backend/eval_results/ (điểm mount do Docker tạo).
+- Ngoài git: data/knowledge/_review/, data/knowledge/uploads/* (giữ .gitkeep), data/training_dev/,
+  data/eval/results/* (giữ .gitkeep), backend/eval_results/ (điểm mount do Docker tạo).
+- Đã nằm trong git (commit d59ceec, thêm bằng git add -f vì .gitignore vẫn còn dòng chặn — file MỚI thêm vào hai
+  thư mục này vẫn cần -f): dữ liệu USDA FoodData Central thô ở data/foods/external/ (SR Legacy, Foundation,
+  Survey/FNDDS; khoảng 75 MB, file lớn nhất 34,7 MB), ba PDF nguồn của RAG / bảng foods ở data/knowledge/raw/
+  (ISSN 2017, WHO 2020, VN 2007) và hai chương NASM ở data/knowledge/extra/.
+- Sau khi push lên GitHub (repo Private), mỗi thành viên nhóm tự dựng dữ liệu trên máy mình: chạy migration, các
+  script nạp dữ liệu (thực phẩm VN 2007 / USDA, kho tri thức, chương trình tập), tạo admin bằng make_admin.py, nạp
+  70 món bằng import_admin_foods.py, tải hai chương NASM qua /admin; bước embedding dùng khóa GOOGLE_API_KEY riêng
+  của từng người (khai trong .env của mình theo .env.example).
 - Trước/sau migration hoặc nạp dữ liệu: so md5 các cột dữ liệu của dòng VN2007 và của meal_logs; sao lưu
   DB bằng pg_dump ra scratchpad trước migration lớn; chạy upgrade → downgrade → upgrade.
 - Script nạp đều có --dry-run; --reset chỉ đụng nguồn của chính script và bị từ chối nếu meal_logs tham chiếu.
@@ -394,11 +403,12 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
 - Tra "cơm" kèm 2 dòng VN chỉ khớp một phần (Rau giền cơm, Cốm). Xếp hạng ứng viên SQL chưa xét vị trí từ khoá.
 - Ngưỡng RAG 0,65 là tạm (một số câu giáp ranh 0,64–0,65). Kỹ thuật tập nay chỉ có hai chương NASM (bản OCR có
   lỗi chữ, vài đoạn trộn hai cột; trang trích dẫn là trang file cắt); chưa có tài liệu về lượng nước. NASM là giáo
-  trình thương mại (có bản quyền; file tải lên nằm ngoài git). Quy tắc kỹ thuật động tác mới CHƯA thử với Gemini thật.
+  trình thương mại (có bản quyền; PDF nằm trong git ở data/knowledge/extra/, repo GitHub để Private). Quy tắc kỹ thuật động tác mới CHƯA thử với Gemini thật.
 - LLM đôi khi không làm đúng quy tắc (không nêu trạng thái, gọi lại bằng tên người dùng gõ) — chỉ kiểm được
   bằng thử thật.
 - ESLint frontend lỗi sẵn ("nextVitals is not iterable"); kiểm tra frontend bằng tsc và next build.
-- Bản quyền bảng 2007 trong data/foods/README.md: người dùng tự điền.
+- Bản quyền bảng 2007 (data/foods/README.md): ghi là dùng cho mục đích học tập của đồ án, có ghi nguồn Viện Dinh
+  dưỡng (2007).
 - Tiến độ: chưa có gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (mục tiêu calo vẫn tính theo cân
   nặng trong hồ sơ). Trung bình calo chỉ tính trên ngày có nhật ký nên thấp hơn thực tế nếu ghi thiếu bữa.
   Dashboard mới chỉ kiểm bằng tsc/next build, chưa thử trên trình duyệt; get_progress_summary chưa thử với
@@ -410,8 +420,7 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   cộng blog Tu Farm (thứ cấp, chưa kiểm chứng) — độ chính xác thấp, không phải phân tích phòng thí nghiệm hay bảng
   thành phần chính thức; mỗi quán khác nhau (lượng bánh/cơm, thịt, nước dùng, đường, sữa đặc). Cơm tấm sườn chỉ
   có hai nguồn. Bánh tét 408 kcal/100 g và 5 dòng lệch Atwater chưa được kiểm lại. Khẩu phần chỉ nằm trong tên
-  món (giả định) nên số "1 tô / 1 ly" phải tự nhân từ số trên 100 g. Tài liệu nguồn batch2/batch3 chưa có trong
-  repo. lookup_food chỉ hiện nhãn
+  món (giả định) nên số "1 tô / 1 ly" phải tự nhân từ số trên 100 g. lookup_food chỉ hiện nhãn
   "Quản trị viên nhập" kèm ghi chú nguồn, không phân biệt món ước tính với số liệu nhãn. Chưa test hai lần nạp
   song song thật (dựa vào unique index như 8a). Module thực phẩm dùng read_csv của services/training/seed.py.
 - Tài liệu RAG (8b-1): chưa test hai kết nối lập chỉ mục song song thật (đã test unique index ở mức DB và đường
@@ -453,8 +462,7 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
    vài câu hỏi tập luyện với Gemini thật (recommend_program, get_training_summary).
 2. Dữ liệu tập luyện: kiểm chứng bằng mắt hai video dùng chung (toan-than-28 ngày 5 và ngày 13), điền
    duration_min (và kênh nếu muốn) cho 43 video rồi nạp lại; định kỳ kiểm link còn xem được.
-3. Món ăn thủ công: đưa dishes_batch2_sources.md, dishes_batch3_sources.md vào repo (hiện chưa có); kiểm lại
-   bánh tét và 5 dòng lệch Atwater (sửa bằng --update-existing nếu cần); tìm nguồn tốt hơn cho món Việt (ưu
+3. Món ăn thủ công: kiểm lại bánh tét và 5 dòng lệch Atwater (sửa bằng --update-existing nếu cần); tìm nguồn tốt hơn cho món Việt (ưu
    tiên nguồn Việt Nam đã công bố) và thêm nguồn cho cơm tấm sườn; thử lookup_food với vài món (vd. "1 tô phở
    bò", tên trùng giữa dòng "(Tu Farm)" và VN 2007) với Gemini thật.
    Quản trị bài tập của FR19 (hiện nạp bằng CSV) chưa xếp lát.
