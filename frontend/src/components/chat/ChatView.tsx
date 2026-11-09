@@ -6,9 +6,17 @@ import { chatApi, type ChatMessage } from "@/lib/chat";
 import { useChatStore } from "@/store/chat-store";
 import { useAuthStore } from "@/store/auth-store";
 import { ChatBubble, TypingIndicator } from "@/components/chat/ChatBubble";
-import { ChatInput } from "@/components/chat/ChatInput";
+import { ChatInput, type ChatInputHandle } from "@/components/chat/ChatInput";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { AppHeader } from "@/components/layout/AppHeader";
+
+const SUGGESTIONS = [
+  "Hôm nay tôi nên ăn bao nhiêu calo?",
+  "Một tô phở bò bao nhiêu calo?",
+  "Tôi nên tập chương trình nào?",
+  "Hướng dẫn tôi tập squat đúng kỹ thuật",
+];
 
 export function ChatView() {
   const router = useRouter();
@@ -27,6 +35,7 @@ export function ChatView() {
 
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const inputRef = useRef<ChatInputHandle>(null);
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -285,13 +294,28 @@ export function ChatView() {
         <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
           {!currentSessionId && messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="mb-4 text-5xl">🏋️</div>
-              <h2 className="text-xl font-bold text-gray-800">
+              <span aria-hidden className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-700 ring-1 ring-brand-200">
+                <Sparkles className="h-7 w-7" />
+              </span>
+              <h2 className="text-xl font-bold text-ink">
                 FitAI Advisor
               </h2>
-              <p className="mt-2 max-w-sm text-sm text-gray-500">
+              <p className="mt-2 max-w-sm text-sm text-muted">
                 Hãy hỏi về bài tập, lịch rèn luyện, chế độ dinh dưỡng hoặc mục tiêu cá nhân của bạn.
               </p>
+              {/* Gợi ý câu hỏi: bấm chỉ điền vào ô nhập, không tự gửi */}
+              <div className="mt-6 grid w-full max-w-xl gap-2 sm:grid-cols-2">
+                {SUGGESTIONS.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => inputRef.current?.setDraft(q)}
+                    className="rounded-control border border-line bg-surface px-4 py-3 text-left text-sm text-ink shadow-card transition-colors hover:border-brand-300 hover:bg-brand-50 outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-4">
@@ -328,7 +352,7 @@ export function ChatView() {
                 </button>
               </div>
             )}
-            <ChatInput onSend={handleSend} disabled={isSending} />
+            <ChatInput ref={inputRef} onSend={handleSend} disabled={isSending} />
             <p className="mt-2 text-center text-xs text-gray-400">
               FitAI có thể mắc lỗi. Luôn tham vấn chuyên gia y tế cho các vấn đề sức khỏe hay chấn thương.
             </p>

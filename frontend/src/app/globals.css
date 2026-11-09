@@ -63,6 +63,11 @@
   color-scheme: light;
 }
 
+/* Luôn chừa chỗ cho thanh cuộn: trang dài và trang ngắn có cùng bề rộng hiển thị, logo không xê dịch. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--color-canvas);
   color: var(--color-ink);

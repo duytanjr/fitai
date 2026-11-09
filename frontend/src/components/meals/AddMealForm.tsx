@@ -77,12 +77,14 @@ export function friendlyError(err: any, fallback: string): string {
 
 interface AddMealFormProps {
   date: string;
+  /** Bữa được chọn sẵn (nút "+ Thêm" ở từng bữa); không có thì chọn theo giờ như cũ. */
+  initialMealType?: MealType;
   onSaved: () => void;
   onCancel: () => void;
   onUnauthorized: () => void;
 }
 
-export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMealFormProps) {
+export function AddMealForm({ date, initialMealType, onSaved, onCancel, onUnauthorized }: AddMealFormProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<FoodSearchItem[]>([]);
   const [ambiguity, setAmbiguity] = useState<Ambiguity | null>(null);
@@ -91,7 +93,7 @@ export function AddMealForm({ date, onSaved, onCancel, onUnauthorized }: AddMeal
   const [searchError, setSearchError] = useState("");
   const [selected, setSelected] = useState<FoodSearchItem | null>(null);
   const [gramsText, setGramsText] = useState("100");
-  const [mealType, setMealType] = useState<MealType>(defaultMealType);
+  const [mealType, setMealType] = useState<MealType>(() => initialMealType ?? defaultMealType());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 

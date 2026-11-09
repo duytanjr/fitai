@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -9,10 +9,28 @@ interface ChatInputProps {
   disabled?: boolean;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+/** Cho phép trang chat điền sẵn nội dung (gợi ý câu hỏi) mà không gửi. */
+export interface ChatInputHandle {
+  /** Thay toàn bộ nội dung ô nhập bằng `text`, đặt con trỏ cuối và focus. Không gửi. */
+  setDraft: (text: string) => void;
+}
+
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput({ onSend, disabled }, ref) {
   const [value, setValue] = useState("");
   const [loading, setLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    setDraft: (text: string) => {
+      setValue(text);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(text.length, text.length);
+      });
+    },
+  }));
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -72,4 +90,4 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
       </Button>
     </form>
   );
-}
+});

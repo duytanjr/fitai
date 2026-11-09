@@ -9,6 +9,9 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { AddMealForm, friendlyError } from "@/components/meals/AddMealForm";
 import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/Card";
+import { Beef, Cookie, Droplet, Flame, Moon, Plus, Sun, Sunrise, TriangleAlert, Wheat } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   MAX_GRAMS,
   MEAL_TYPES,
@@ -19,14 +22,33 @@ import {
   type DayMeals,
   type MacroValues,
   type MealEntry,
+  type MealType,
 } from "@/lib/meals";
 
-const MACROS: { key: keyof MacroValues; label: string; unit: string }[] = [
-  { key: "energy_kcal", label: "Calo", unit: "kcal" },
-  { key: "protein_g", label: "Protein", unit: "g" },
-  { key: "fat_g", label: "Chất béo", unit: "g" },
-  { key: "carb_g", label: "Carb (không gồm xơ)", unit: "g" },
+const MACROS: { key: keyof MacroValues; label: string; unit: string; icon: ReactNode }[] = [
+  { key: "energy_kcal", label: "Calo", unit: "kcal", icon: <Flame className="h-5 w-5" /> },
+  { key: "protein_g", label: "Protein", unit: "g", icon: <Beef className="h-5 w-5" /> },
+  { key: "fat_g", label: "Chất béo", unit: "g", icon: <Droplet className="h-5 w-5" /> },
+  { key: "carb_g", label: "Carb (không gồm xơ)", unit: "g", icon: <Wheat className="h-5 w-5" /> },
 ];
+
+const MEAL_ICONS: Record<MealType, ReactNode> = {
+  sang: <Sunrise className="h-5 w-5" />,
+  trua: <Sun className="h-5 w-5" />,
+  toi: <Moon className="h-5 w-5" />,
+  phu: <Cookie className="h-5 w-5" />,
+};
+
+/** Tổng calo của một bữa: chỉ cộng các mục có số liệu (như tổng ngày của server). */
+function mealKcal(entries: MealEntry[]): { total: number; incomplete: boolean } {
+  let total = 0;
+  let incomplete = false;
+  for (const e of entries) {
+    if (e.energy_kcal === null) incomplete = true;
+    else total += e.energy_kcal;
+  }
+  return { total, incomplete };
+}
 
 const NUTRIENT_NAMES: Record<string, string> = {
   energy_kcal: "năng lượng",
@@ -42,56 +64,69 @@ function SummaryCard({ summary }: { summary: DailySummary }) {
     .join(", ");
 
   return (
-    <section className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-      <h2 className="mb-4 font-semibold text-gray-900">Tóm tắt ngày</h2>
+    <Card>
+      <section aria-labelledby="day-summary-title">
+      <h2 id="day-summary-title" className="mb-4 text-base font-semibold text-ink">Tóm tắt ngày</h2>
 
       {summary.incomplete_totals && (
-        <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p className="mb-4 rounded-control bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Chưa đầy đủ số liệu: {summary.incomplete_entries} mục thiếu số liệu ({missing}). Tổng chỉ cộng các mục có
           số liệu.
         </p>
       )}
 
       {summary.is_complete && summary.target && summary.remaining ? (
-        <div className="space-y-4">
-          {MACROS.map(({ key, label, unit }) => {
-            const eaten = summary.eaten[key];
-            const target = summary.target![key];
-            const remaining = summary.remaining![key];
-            const pct = target > 0 ? Math.min(100, (eaten / target) * 100) : 0;
-            const over = remaining < 0;
-            return (
-              <div key={key}>
-                <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
-                  <span className="font-medium text-gray-800">{label}</span>
-                  <span className="text-gray-600">
-                    Đã ăn {formatValue(eaten, unit)} / mục tiêu {formatValue(target, unit)} ·{" "}
-                    <span className={cn(over ? "font-medium text-red-600" : "text-gray-900")}>
-                      {over ? `vượt ${formatValue(-remaining, unit)}` : `còn ${formatValue(remaining, unit)}`}
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {MACROS.map(({ key, label, unit, icon }) => {
+              const eaten = summary.eaten[key];
+              const target = summary.target![key];
+              const remaining = summary.remaining![key];
+              const pct = target > 0 ? Math.min(100, (eaten / target) * 100) : 0;
+              const over = target > 0 && remaining < 0;
+              return (
+                <div key={key} className="rounded-control border border-line bg-canvas p-3">
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-100 text-accent-800">
+                      {icon}
                     </span>
-                  </span>
+                    <span className="text-sm font-medium text-muted">{label}</span>
+                  </div>
+                  <p className="mt-2 text-sm text-muted">
+                    <span className="text-xl font-bold tabular-nums text-ink">{formatValue(eaten, unit)}</span>
+                    {" "}/ {formatValue(target, unit)}
+                  </p>
+                  <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-gray-200" role="progressbar"
+                       aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
+                    <div className={cn("h-full rounded-full", over ? "bg-accent-500" : "bg-brand-600")}
+                         style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className={cn("mt-1.5 text-xs", over ? "inline-flex items-center gap-1 font-medium text-accent-800" : "text-muted")}>
+                    {over && <TriangleAlert aria-hidden className="h-3.5 w-3.5" />}
+                    {over ? `vượt ${formatValue(-remaining, unit)}` : `còn ${formatValue(remaining, unit)}`}
+                  </p>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-gray-100" role="progressbar"
-                     aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
-                  <div className={cn("h-full rounded-full", over ? "bg-red-500" : "bg-brand-600")}
-                       style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            );
-          })}
-          <p className="text-xs text-gray-500">{summary.carb_note}</p>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted">{summary.carb_note}</p>
         </div>
       ) : (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {MACROS.map(({ key, label, unit }) => (
-              <div key={key} className="rounded-lg bg-gray-50 px-3 py-2">
-                <p className="text-xs text-gray-500">{label} đã ăn</p>
-                <p className="text-sm font-semibold text-gray-900">{formatValue(summary.eaten[key], unit)}</p>
+            {MACROS.map(({ key, label, unit, icon }) => (
+              <div key={key} className="rounded-control border border-line bg-canvas p-3">
+                <div className="flex items-center gap-2">
+                  <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-100 text-accent-800">
+                    {icon}
+                  </span>
+                  <span className="text-xs font-medium text-muted">{label} đã ăn</span>
+                </div>
+                <p className="mt-2 text-lg font-bold tabular-nums text-ink">{formatValue(summary.eaten[key], unit)}</p>
               </div>
             ))}
           </div>
-          <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-900">
+          <p className="rounded-control bg-brand-50 px-3 py-2 text-sm text-brand-900">
             Hoàn tất hồ sơ (tuổi, giới tính, chiều cao, cân nặng, mức vận động, mục tiêu) để so với mục tiêu calo và
             macro của bạn.{" "}
             <Link href="/onboarding" className="font-medium underline">
@@ -100,7 +135,8 @@ function SummaryCard({ summary }: { summary: DailySummary }) {
           </p>
         </div>
       )}
-    </section>
+      </section>
+    </Card>
   );
 }
 
@@ -206,7 +242,17 @@ export function MealLogView() {
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [adding, setAdding] = useState(false);
+  // Form thêm: null = đóng; mealType = bữa chọn sẵn (null = theo giờ như cũ); seq đổi mỗi lần mở để form
+  // được dựng lại (giá trị chọn sẵn mới, ô tìm kiếm tự focus).
+  const [adding, setAdding] = useState<{ mealType: MealType | null; seq: number } | null>(null);
+  const addSeq = useRef(0);
+  const formRef = useRef<HTMLDivElement>(null);
+  const openAdd = (mealType: MealType | null) => setAdding({ mealType, seq: ++addSeq.current });
+
+  // Mở form từ nút "+ Thêm" của một bữa ở phía dưới: cuộn form vào tầm nhìn
+  useEffect(() => {
+    if (adding) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [adding]);
 
   const handleUnauthorized = useCallback(() => router.replace("/login"), [router]);
   // Đổi ngày nhanh: chỉ nhận kết quả của lần tải mới nhất
@@ -282,14 +328,18 @@ export function MealLogView() {
         )}
 
         {adding ? (
-          <AddMealForm
-            date={date}
-            onCancel={() => setAdding(false)}
-            onSaved={() => { setAdding(false); load(date); }}
-            onUnauthorized={handleUnauthorized}
-          />
+          <div ref={formRef} className="scroll-mt-24">
+            <AddMealForm
+              key={adding.seq}
+              date={date}
+              initialMealType={adding.mealType ?? undefined}
+              onCancel={() => setAdding(null)}
+              onSaved={() => { setAdding(null); load(date); }}
+              onUnauthorized={handleUnauthorized}
+            />
+          </div>
         ) : (
-          <Button onClick={() => setAdding(true)} disabled={loading && !dayMeals}>
+          <Button onClick={() => openAdd(null)} disabled={loading && !dayMeals}>
             + Thêm thực phẩm
           </Button>
         )}
@@ -298,20 +348,41 @@ export function MealLogView() {
           <div className="grid items-start gap-4 md:grid-cols-2">
             {MEAL_TYPES.map(({ value, label }) => {
               const entries = dayMeals.meals[value] ?? [];
+              const kcal = mealKcal(entries);
               return (
-                <section key={value} className="rounded-xl bg-white px-5 py-4 shadow-sm ring-1 ring-gray-100">
-                  <h3 className="font-semibold text-gray-900">{label}</h3>
-                  {entries.length === 0 ? (
-                    <p className="py-2 text-sm text-gray-400">Chưa có mục nào.</p>
-                  ) : (
-                    <ul className="divide-y divide-gray-100">
-                      {entries.map((entry) => (
-                        <MealRow key={entry.id} entry={entry} onChanged={() => load(date)}
-                                 onUnauthorized={handleUnauthorized} />
-                      ))}
-                    </ul>
-                  )}
-                </section>
+                <Card key={value} padding="none" className="px-5 py-4">
+                  <section aria-label={label}>
+                    <div className="flex items-center gap-3">
+                      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-brand-50 text-brand-700">
+                        {MEAL_ICONS[value]}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-ink">{label}</h3>
+                        {entries.length > 0 && (
+                          <p className="text-xs text-muted">
+                            {Math.round(kcal.total).toLocaleString("vi-VN")} kcal
+                            {kcal.incomplete && " (chưa đủ số liệu)"}
+                          </p>
+                        )}
+                      </div>
+                      <Button size="sm" variant="secondary" onClick={() => openAdd(value)}
+                              disabled={loading && !dayMeals} aria-label={`Thêm thực phẩm vào ${label.toLowerCase()}`}>
+                        <Plus aria-hidden className="h-4 w-4" />
+                        Thêm
+                      </Button>
+                    </div>
+                    {entries.length === 0 ? (
+                      <p className="mt-3 text-sm text-muted">Chưa ghi món nào, bấm + Thêm để ghi.</p>
+                    ) : (
+                      <ul className="mt-2 divide-y divide-gray-100">
+                        {entries.map((entry) => (
+                          <MealRow key={entry.id} entry={entry} onChanged={() => load(date)}
+                                   onUnauthorized={handleUnauthorized} />
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </Card>
               );
             })}
           </div>

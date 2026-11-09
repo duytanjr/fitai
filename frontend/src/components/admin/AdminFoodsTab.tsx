@@ -211,10 +211,16 @@ export function AdminFoodsTab({ onUnauthorized, onForbidden }: AdminFoodsTabProp
                 <td className="px-3 py-2 text-right tabular-nums">{num(f.fat_g)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{num(f.carb_g)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{num(f.fiber_g)}</td>
-                <td className="px-3 py-2 text-gray-600">{PREPARATION_LABELS[f.preparation]}</td>
+                <td className="px-3 py-2 text-gray-600">
+                  {f.preparation === "unknown" ? (
+                    <span className="text-xs font-normal text-muted">{PREPARATION_LABELS[f.preparation]}</span>
+                  ) : (
+                    PREPARATION_LABELS[f.preparation]
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   {!f.editable ? (
-                    <span className="text-xs text-gray-400">Chỉ đọc</span>
+                    <span className="text-xs font-normal text-muted">Chỉ đọc</span>
                   ) : confirmDeleteId === f.id ? (
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="text-xs text-gray-600">Xoá {f.source.ref}?</span>

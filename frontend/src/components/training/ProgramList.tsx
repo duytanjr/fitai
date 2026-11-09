@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
 import { TrainingShell, useTrainingUnauthorized } from "@/components/training/TrainingShell";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/Badge";
 import {
   GOAL_LABELS,
   LEVEL_LABELS,
   minutesText,
   recommendationApi,
   trainingApi,
+  type Enrollment,
   type Experience,
   type ProgramSummary,
   type Recommendation,
@@ -27,7 +29,8 @@ export function ProgramList() {
   const onUnauthorized = useTrainingUnauthorized();
   const [programs, setPrograms] = useState<ProgramSummary[] | null>(null);
   const [error, setError] = useState("");
-  const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  // Enrollment đang theo: chỉ để hiện nhãn và tiến độ; lỗi hoặc rỗng thì bỏ qua, không báo lỗi trang
+  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   // Câu trả lời chỉ giữ trong trang (không sửa hồ sơ); gợi ý lỗi thì chỉ ẩn hộp gợi ý
   const [experience, setExperience] = useState<Experience | null>(null);
   const [rec, setRec] = useState<Recommendation | null>(null);
@@ -39,7 +42,7 @@ export function ProgramList() {
       setError("Không tải được danh sách chương trình. Vui lòng thử lại sau.");
     });
     // Nhãn "Đang theo" chỉ là phần phụ: lỗi thì bỏ qua
-    trainingApi.current().then((c) => setActiveSlug(c.enrollment?.program_slug ?? null)).catch(() => {});
+    trainingApi.current().then((c) => setEnrollment(c.enrollment ?? null)).catch(() => setEnrollment(null));
   }, [isAuthenticated, onUnauthorized]);
 
   useEffect(() => {
@@ -52,45 +55,58 @@ export function ProgramList() {
   }, [isAuthenticated, experience]);
 
   const recommendedSlug = rec?.primary?.slug ?? null;
+  const activeSlug = enrollment?.program_slug ?? null;
+  const count = programs?.length ?? 0;
+  // Số cột theo số chương trình: không để cột trống lệch về một bên
+  const gridCols = count <= 1 ? "grid-cols-1" : count === 2 ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3";
 
   return (
     <TrainingShell>
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Tập luyện</h1>
-        <p className="text-sm text-gray-500">Chọn một chương trình, mở từng ngày và bấm “Bắt đầu” để xem video.</p>
+        <h1 className="text-2xl font-bold text-ink">Tập luyện</h1>
+        <p className="text-sm text-muted">Chọn một chương trình, mở từng ngày và bấm “Bắt đầu” để xem video.</p>
       </div>
       {rec && programs && programs.length > 0 && (
-        <section className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100" aria-labelledby="rec-title">
-          <h2 id="rec-title" className="text-sm font-semibold text-gray-900">
+        <section className="rounded-card border border-brand-200 bg-brand-50 p-5 shadow-card sm:p-6" aria-labelledby="rec-title">
+          <h2 id="rec-title" className="text-base font-semibold text-ink">
             {rec.primary ? `Gợi ý cho bạn: ${rec.primary.title}` : "Gợi ý chương trình"}
           </h2>
-          <p className="mt-1 text-sm text-gray-700">{rec.reason}</p>
+          <p className="mt-1 text-sm text-ink">{rec.reason}</p>
           {rec.alternative && (
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-muted">
               Thay thế:{" "}
-              <Link href={`/training/${rec.alternative.slug}`} className="font-medium text-brand-700 hover:text-brand-800">
+              <Link href={`/training/${rec.alternative.slug}`} className="font-medium text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline">
                 {rec.alternative.title}
               </Link>
             </p>
           )}
           {rec.notes.length > 0 && (
-            <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-gray-500">
+            <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-muted">
               {rec.notes.map((n) => <li key={n}>{n}</li>)}
             </ul>
           )}
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-gray-600">Bạn đã tập đều trong vài tháng qua chưa?</span>
-            {EXPERIENCE_CHOICES.map((c) => (
-              <button key={c.value} type="button" aria-pressed={experience === c.value}
-                      onClick={() => setExperience(experience === c.value ? null : c.value)}
-                      className={cn("rounded-md px-3 py-1 font-medium",
-                                    experience === c.value ? "bg-brand-700 text-white"
-                                                           : "bg-gray-100 text-gray-700 hover:bg-gray-200")}>
-                {c.label}
-              </button>
-            ))}
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-muted">Bạn đã tập đều trong vài tháng qua chưa?</span>
+            <div className="inline-flex rounded-control border border-brand-200 bg-white/60 p-1" role="group"
+                 aria-label="Mức tập luyện gần đây">
+              {EXPERIENCE_CHOICES.map((c) => {
+                const on = experience === c.value;
+                return (
+                  <button key={c.value} type="button" aria-pressed={on}
+                          onClick={() => setExperience(on ? null : c.value)}
+                          className={cn(
+                            "rounded-[0.5rem] px-3 py-1.5 font-medium transition-colors outline-none",
+                            "focus-visible:ring-2 focus-visible:ring-brand-600",
+                            on ? "bg-white text-brand-800 shadow-sm ring-1 ring-brand-300"
+                               : "text-muted hover:bg-white/70 hover:text-ink"
+                          )}>
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <p className="mt-2 text-xs text-gray-400">Gợi ý dựa trên hồ sơ của bạn; câu trả lời ở đây không sửa hồ sơ.</p>
+          <p className="mt-3 text-xs text-muted">Gợi ý dựa trên hồ sơ của bạn; câu trả lời ở đây không sửa hồ sơ.</p>
         </section>
       )}
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -104,38 +120,67 @@ export function ProgramList() {
         </div>
       )}
       {programs && programs.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {programs.map((p) => (
-            <li key={p.slug}>
-              <Link href={`/training/${p.slug}`}
-                    className={cn("block h-full rounded-xl bg-white p-5 shadow-sm ring-1 transition hover:ring-brand-300",
-                                  p.slug === recommendedSlug ? "ring-2 ring-brand-300" : "ring-gray-100")}>
-                {p.slug === recommendedSlug && (
-                  <span className="mb-2 inline-block rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
-                    Gợi ý cho bạn
-                  </span>
+        <ul className={cn("grid gap-4", gridCols)}>
+          {programs.map((p) => {
+            const following = p.slug === activeSlug && enrollment?.status === "active" ? enrollment : null;
+            const total = following?.training_days_total ?? 0;
+            const done = following?.training_days_done ?? 0;
+            const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0;
+            const actionHref = following?.next_day ? `/training/${p.slug}/days/${following.next_day}` : `/training/${p.slug}`;
+            return (
+              <li key={p.slug}
+                  className={cn(
+                    "relative flex h-full flex-col rounded-card border bg-surface p-5 shadow-card transition",
+                    "hover:border-brand-300 hover:shadow-raised",
+                    "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-600 has-[:focus-visible]:ring-offset-2",
+                    p.slug === recommendedSlug ? "border-brand-300" : "border-line"
+                  )}>
+                {(p.slug === recommendedSlug || p.slug === activeSlug) && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {p.slug === recommendedSlug && <Badge tone="brand">Gợi ý cho bạn</Badge>}
+                    {p.slug === activeSlug && <Badge tone="success">Đang theo</Badge>}
+                  </div>
                 )}
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {p.title}
-                  {p.slug === activeSlug && (
-                    <span className="ml-2 inline-block rounded bg-emerald-50 px-1.5 py-0.5 align-middle text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                      Đang theo
-                    </span>
-                  )}
+                <h2 className="text-lg font-semibold text-ink">
+                  {/* Liên kết kéo giãn: bấm bất cứ đâu trên thẻ cũng mở chương trình */}
+                  <Link href={`/training/${p.slug}`} className="outline-none after:absolute after:inset-0 after:rounded-card">
+                    {p.title}
+                  </Link>
                 </h2>
-                <p className="mt-1 text-xs text-gray-500">
-                  {GOAL_LABELS[p.goal_tag] ?? p.goal_tag} · {LEVEL_LABELS[p.level] ?? p.level}
-                  {p.intensity_label && ` · ${p.intensity_label}`}
-                </p>
-                {p.description && <p className="mt-2 line-clamp-3 text-sm text-gray-700">{p.description}</p>}
-                <p className="mt-3 text-sm text-gray-600">
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Badge tone="brand">{GOAL_LABELS[p.goal_tag] ?? p.goal_tag}</Badge>
+                  <Badge tone="neutral">{LEVEL_LABELS[p.level] ?? p.level}</Badge>
+                  {p.intensity_label && <Badge tone="accent">{p.intensity_label}</Badge>}
+                </div>
+                {p.description && <p className="mt-3 line-clamp-3 text-sm text-ink">{p.description}</p>}
+                <p className="mt-3 text-sm text-muted">
                   {p.duration_days} ngày ({p.training_days} ngày tập)
                   {p.total_minutes !== null &&
                     ` · ${minutesText(p.total_minutes, p.required_minutes, p.items_without_duration)}`}
                 </p>
-              </Link>
-            </li>
-          ))}
+                {following && total > 0 && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-ink">Đã xong {done}/{total} ngày</p>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-gray-100" role="progressbar"
+                         aria-label="Tiến độ chương trình" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+                      <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                )}
+                <div className="mt-auto pt-4">
+                  <Link href={following ? actionHref : `/training/${p.slug}`}
+                        className={cn(
+                          "relative z-10 inline-flex items-center gap-1 rounded-control px-4 py-2 text-sm font-medium transition-colors",
+                          "outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2",
+                          following ? "bg-brand-700 text-white shadow-sm hover:bg-brand-800"
+                                    : "bg-surface text-ink ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                        )}>
+                    {following ? "Tiếp tục" : "Xem chương trình"} →
+                  </Link>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </TrainingShell>

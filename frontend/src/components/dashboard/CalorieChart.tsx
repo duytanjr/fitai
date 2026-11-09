@@ -3,7 +3,7 @@
 import { formatNumber, fullDate, shortDate, type ProgressDay } from "@/lib/progress";
 
 const W = 720;
-const PAD = { top: 24, right: 12, bottom: 28, left: 44 };
+const PAD = { top: 16, right: 12, bottom: 28, left: 44 };
 /** Màu đường mục tiêu: slate-600, ~7,6:1 với nền trắng. Màu cam/vàng chỉ dành cho cột "chưa đủ số liệu". */
 const TARGET_COLOR = "#475569";
 const BAR_COLOR = "#059669"; // brand-600
@@ -20,17 +20,20 @@ export function CalorieChart({ series, target }: CalorieChartProps) {
   const values = series.map((d) => d.energy_kcal).filter((v): v is number => v !== null);
   const max = Math.max(target ?? 0, ...values, 500) * 1.1;
   // Ít ngày (≤ 7) thì biểu đồ thấp hơn cho gọn.
-  const H = series.length <= 7 ? 170 : 220;
+  // Dải riêng phía trên vùng vẽ cho nhãn "Mục tiêu … kcal": nhãn không đè lên lưới, cột hay đường mục tiêu.
+  const BAND = target !== null ? 22 : 0;
+  const plotTop = PAD.top + BAND;
+  const H = (series.length <= 7 ? 170 : 220) + BAND;
   const plotW = W - PAD.left - PAD.right;
-  const plotH = H - PAD.top - PAD.bottom;
+  const plotH = H - plotTop - PAD.bottom;
   const step = plotW / series.length;
   const barW = Math.max(2, Math.min(28, step * 0.7));
-  const y = (v: number) => PAD.top + plotH - (v / max) * plotH;
+  const y = (v: number) => plotTop + plotH - (v / max) * plotH;
   const labelEvery = series.length <= 7 ? 1 : series.length <= 30 ? 5 : 15;
   const ticks = [0, max / 2, max].map((v) => Math.round(v / 100) * 100);
 
   const targetLabel = target !== null ? `Mục tiêu ${formatNumber(target, 0)} kcal` : "";
-  const targetLabelW = targetLabel.length * 6.4 + 12; // ước lượng độ rộng chữ cỡ 11
+  const targetLabelW = targetLabel.length * 6.4; // ước lượng độ rộng chữ cỡ 11, đậm
 
   const latest = [...series].reverse().find((d) => d.has_log && d.energy_kcal !== null);
   const logged = series.filter((d) => d.has_log).length;
@@ -68,7 +71,7 @@ export function CalorieChart({ series, target }: CalorieChartProps) {
                     x={cx - barW / 2}
                     y={y(v)}
                     width={barW}
-                    height={Math.max(1, PAD.top + plotH - y(v))}
+                    height={Math.max(1, plotTop + plotH - y(v))}
                     fill={d.incomplete_totals ? "url(#incomplete-hatch)" : BAR_COLOR}
                     rx={2}
                   >
@@ -102,19 +105,19 @@ export function CalorieChart({ series, target }: CalorieChartProps) {
                 strokeWidth="2"
                 strokeDasharray="6 4"
               />
-              {/* Nhãn đặt phía trên đường, có nền trắng để cột không đè lên chữ. */}
-              <rect
-                x={W - PAD.right - targetLabelW}
-                y={y(target) - 20}
-                width={targetLabelW}
-                height={16}
-                rx={4}
-                fill="#ffffff"
-                fillOpacity={0.92}
+              {/* Nhãn trong dải riêng phía trên vùng vẽ, kèm đoạn nét đứt cùng màu để gắn với đường mục tiêu. */}
+              <line
+                x1={W - PAD.right - targetLabelW - 30}
+                x2={W - PAD.right - targetLabelW - 8}
+                y1={BAND / 2 + 4}
+                y2={BAND / 2 + 4}
+                stroke={TARGET_COLOR}
+                strokeWidth="2"
+                strokeDasharray="6 4"
               />
               <text
-                x={W - PAD.right - 6}
-                y={y(target) - 8}
+                x={W - PAD.right}
+                y={BAND / 2 + 8}
                 textAnchor="end"
                 fontSize="11"
                 fontWeight="600"
@@ -124,7 +127,7 @@ export function CalorieChart({ series, target }: CalorieChartProps) {
               </text>
             </g>
           )}
-          <line x1={PAD.left} x2={W - PAD.right} y1={PAD.top + plotH} y2={PAD.top + plotH} stroke="#9ca3af" />
+          <line x1={PAD.left} x2={W - PAD.right} y1={plotTop + plotH} y2={plotTop + plotH} stroke="#9ca3af" />
         </svg>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
