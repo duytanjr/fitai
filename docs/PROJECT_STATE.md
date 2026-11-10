@@ -325,7 +325,8 @@ Nguồn dữ liệu thực phẩm (`food_sources`, id cố định):
   ADM-xxxxx; nhãn "Quản trị viên nhập"; mỗi dòng có source_note. DB dev hiện có 70 dòng (xem mục món đã nạp ở
   trên).
 
-RAG gồm (kiểm 2026-11-08, bảng knowledge_documents khớp Chroma, cả 4 đang bật) — tổng 198 đoạn:
+RAG gồm 5 tài liệu (kiểm 2026-11-10, bảng knowledge_documents khớp Chroma, không có đoạn mồ côi, cả 5 đang bật) —
+tổng 206 đoạn (198 trước đó + 8 đoạn WHO Healthy diet):
 - builtin: ISSN 2017 "diets and body composition" (34 đoạn) và WHO 2020 "physical activity and sedentary
   behaviour" (100 đoạn) (data/knowledge/raw; danh mục ở sources.csv).
 - upload qua /admin (bản đã lập chỉ mục lưu ở data/knowledge/uploads với tên ngẫu nhiên, ngoài git; bản gốc
@@ -340,6 +341,18 @@ RAG gồm (kiểm 2026-11-08, bảng knowledge_documents khớp Chroma, cả 4 �
   (chương 7) và trang_pdf + 302 (chương 13).
   Văn bản là bản quét qua OCR: có lỗi chữ vặt (vd. "forma 2.", "ShutterSteck", "| s") và vài đoạn trộn hai cột,
   nên các bước có thể lẫn thứ tự.
+- upload qua /admin (2026-11-10): WHO "Healthy diet (fact sheet), WHO, cập nhật 26/01/2026" (World Health
+  Organization, 2026, en; chủ đề nguyên tắc ăn uống lành mạnh, chất béo, đường tự do, muối, chất xơ; nguồn
+  https://www.who.int/news-room/fact-sheets/detail/healthy-diet, truy cập 10/11/2026). Bản gốc
+  who_healthy_diet.pdf ở data/knowledge/extra/ (lúc kiểm chưa được add vào git). 8 đoạn, giữ 6/6 trang (không
+  bỏ trang nào). Lý do nạp: đề cương đồ án có mục "tài liệu và tiêu chuẩn liên quan đến dinh dưỡng", trong khi kho
+  trước đó chỉ có ISSN (đối tượng người tập luyện) về dinh dưỡng. Chữ đọc tốt, không có đoạn rác; riêng đầu đoạn
+  đầu tiên (tr. 1–2) dính khoảng 130 ký tự điều hướng trang web ("Donate Credits … Reading time … العربية 中文
+  Français Русский Español"). Truy xuất thử (vector câu hỏi nhúng một lần): "chế độ ăn lành mạnh gồm những gì",
+  "tối đa bao nhiêu muối" (đoạn có câu "less than 5 grams per day"), "giới hạn chất béo bão hòa" (đoạn có câu
+  "no more than 10% of total energy") đều có 2–3 đoạn qua ngưỡng 0,65 từ tài liệu này; "uống bao nhiêu nước" không
+  đoạn nào qua ngưỡng (tài liệu không nói về lượng nước). A06, A09, A10 của nhóm A không đổi so với sau NASM; 7
+  câu A còn lại CHƯA chạy lại (vector câu hỏi lưu trước đó đã mất khi container khởi động lại).
 PDF bảng 2007 dùng cho foods, không nạp vào RAG.
 
 Cấu hình tra cứu (services/foods/aliases.py, có test): SYNONYMS, AMBIGUOUS (bơ, bo, tôm, chuối, bắp, mè,
@@ -443,7 +456,9 @@ Prompt và chống trích dẫn không nguồn (services/ai_agents/fitness_advis
 - Foundation Foods chưa dùng (bản tải thiếu food.csv, food_nutrient.csv, food_portion.csv).
 - Tra "cơm" kèm 2 dòng VN chỉ khớp một phần (Rau giền cơm, Cốm). Xếp hạng ứng viên SQL chưa xét vị trí từ khoá.
 - Ngưỡng RAG 0,65 là tạm (một số câu giáp ranh 0,64–0,65). Kỹ thuật tập nay chỉ có hai chương NASM (bản OCR có
-  lỗi chữ, vài đoạn trộn hai cột; trang trích dẫn là trang file cắt); chưa có tài liệu về lượng nước. NASM là giáo
+  lỗi chữ, vài đoạn trộn hai cột; trang trích dẫn là trang file cắt); chưa có tài liệu về lượng nước. Kho vẫn thiếu khuyến nghị dinh dưỡng cho người
+  Việt Nam (Quyết định 2615/QĐ-BYT chưa có file dạng chữ để nạp); khuyến nghị dinh dưỡng hiện chỉ có WHO Healthy diet
+  (người lớn nói chung) và ISSN (người tập luyện). NASM là giáo
   trình thương mại (có bản quyền; PDF nằm trong git ở data/knowledge/extra/, repo GitHub để Private). Quy tắc kỹ thuật động tác mới CHƯA thử với Gemini thật.
 - LLM đôi khi không làm đúng quy tắc (không nêu trạng thái, gọi lại bằng tên người dùng gõ) — chỉ kiểm được
   bằng thử thật.

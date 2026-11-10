@@ -109,7 +109,7 @@ docker compose exec backend python scripts/import_admin_foods.py --admin-email <
 
 Cột CSV và cách quy đổi số liệu xem `data/foods/manual/README.md`.
 
-**7) Hai chương NASM:** tải lên qua trang quản trị, xem mục 3.
+**7) Tài liệu tải lên (hai chương NASM, WHO Healthy diet):** tải lên qua trang quản trị, xem mục 3.
 
 ---
 
@@ -120,19 +120,20 @@ Cột CSV và cách quy đổi số liệu xem `data/foods/manual/README.md`.
   (`scripts/build_usda_subset.py`) và tra cứu.
 - **PDF nguồn** ở `data/knowledge/raw/`: ISSN 2017, WHO 2020 (cho RAG) và bảng thành phần thực phẩm VN 2007 (cho
   bảng thực phẩm, không nạp vào RAG). Danh mục ở `data/knowledge/sources.csv`.
-- **Hai chương NASM** ở `data/knowledge/extra/` (`chuong7.pdf`, `chuong13.pdf`): **KHÔNG tự nạp** (`ingest_knowledge.py`
-  không đọc thư mục này). Sau khi chạy xong mục 2: đăng nhập bằng tài khoản admin → vào http://localhost:3000/admin →
-  tab **Tài liệu** → tải lên từng file, điền các ô bên dưới → bấm **Xem trước** rồi **Lập chỉ mục** (mỗi file khoảng
-  32 đoạn, tốn lượt embedding).
+- **Ba tài liệu tải lên** ở `data/knowledge/extra/` (`chuong7.pdf`, `chuong13.pdf`, `who_healthy_diet.pdf`): **KHÔNG tự
+  nạp** (`ingest_knowledge.py` không đọc thư mục này). Sau khi chạy xong mục 2: đăng nhập bằng tài khoản admin → vào
+  http://localhost:3000/admin → tab **Tài liệu** → tải lên từng file, điền các ô bên dưới → bấm **Xem trước** rồi
+  **Lập chỉ mục** (mỗi chương NASM khoảng 32 đoạn, WHO Healthy diet 8 đoạn; tốn lượt embedding).
 
-| Ô | chuong13.pdf | chuong7.pdf |
-|---|---|---|
-| Tiêu đề | NASM Essentials of Personal Fitness Training, 6th edition, chương 13: Resistance Training Concepts (trích) | NASM Essentials of Personal Fitness Training, 6th edition, chương 7: Flexibility Training Concepts (trích) |
-| Tác giả / tổ chức | National Academy of Sports Medicine (NASM); Brian G. Sutton (biên tập) | National Academy of Sports Medicine (NASM); Brian G. Sutton (biên tập) |
-| Năm | 2018 | 2018 |
-| Ngôn ngữ | en | en |
-| Chủ đề | kỹ thuật tập sức mạnh, nguyên tắc tập tạ, tăng dần cường độ | khởi động, giãn cơ, các kỹ thuật giãn cơ |
-| Giấy phép / quyền sử dụng | Giáo trình thương mại của NASM, © 2018 NASM (Jones & Bartlett Learning); chỉ dùng trích đoạn chương 13 cho mục đích học thuật của đồ án, có ghi nguồn | Giáo trình thương mại của NASM, © 2018 NASM (Jones & Bartlett Learning); chỉ dùng trích đoạn chương 7 cho mục đích học thuật của đồ án, có ghi nguồn |
+| Ô | chuong13.pdf | chuong7.pdf | who_healthy_diet.pdf |
+|---|---|---|---|
+| Tiêu đề | NASM Essentials of Personal Fitness Training, 6th edition, chương 13: Resistance Training Concepts (trích) | NASM Essentials of Personal Fitness Training, 6th edition, chương 7: Flexibility Training Concepts (trích) | Healthy diet (fact sheet), WHO, cập nhật 26/01/2026 |
+| Tác giả / tổ chức | National Academy of Sports Medicine (NASM); Brian G. Sutton (biên tập) | National Academy of Sports Medicine (NASM); Brian G. Sutton (biên tập) | World Health Organization (WHO) |
+| Năm | 2018 | 2018 | 2026 |
+| Ngôn ngữ | en | en | en |
+| Chủ đề | kỹ thuật tập sức mạnh, nguyên tắc tập tạ, tăng dần cường độ | khởi động, giãn cơ, các kỹ thuật giãn cơ | nguyên tắc ăn uống lành mạnh, chất béo, đường tự do, muối, chất xơ |
+| Giấy phép / quyền sử dụng | Giáo trình thương mại của NASM, © 2018 NASM (Jones & Bartlett Learning); chỉ dùng trích đoạn chương 13 cho mục đích học thuật của đồ án, có ghi nguồn | Giáo trình thương mại của NASM, © 2018 NASM (Jones & Bartlett Learning); chỉ dùng trích đoạn chương 7 cho mục đích học thuật của đồ án, có ghi nguồn | Trang công khai trên website WHO; dùng cho mục đích học thuật của đồ án, có ghi nguồn và ngày truy cập 10/11/2026 |
+| Đường dẫn nguồn | (để trống) | (để trống) | https://www.who.int/news-room/fact-sheets/detail/healthy-diet |
 
 Số trang chatbot trích dẫn cho NASM là số trang của file cắt: trang sách = trang + 160 (chương 7), trang + 302
 (chương 13).
@@ -217,6 +218,7 @@ Với free tier, chỉ nên chạy từng nhóm hoặc từng câu; dùng `--res
 | Bảng thành phần thực phẩm Việt Nam 2007 | Viện Dinh dưỡng (Bộ Y tế), NXB Y học; dùng cho mục đích học tập của đồ án, có ghi nguồn |
 | 70 món nhập thủ công (`data/foods/manual/`) | Số liệu ước tính từ nguồn thứ cấp (bảng dinh dưỡng chuỗi nhà hàng, ứng dụng đếm calo, blog), độ chính xác thấp; chi tiết trong `data/foods/manual/dishes_sources_all.md` |
 | Hai chương NASM (`data/knowledge/extra/`) | Giáo trình thương mại có bản quyền (© 2018 NASM, Jones & Bartlett Learning); chỉ dùng cho đồ án học thuật. **Repo phải để Private.** |
+| WHO "Healthy diet" fact sheet (`data/knowledge/extra/who_healthy_diet.pdf`) | Trang công khai trên website WHO (https://www.who.int/news-room/fact-sheets/detail/healthy-diet); dùng cho mục đích học thuật của đồ án, có ghi nguồn và ngày truy cập 10/11/2026 |
 | Video tập luyện | Chỉ lưu link YouTube; bản quyền video thuộc kênh đăng tải |
 
 ---
@@ -229,7 +231,7 @@ Với free tier, chỉ nên chạy từng nhóm hoặc từng câu; dùng `--res
 ├── frontend/           # Next.js: src/app, src/components, src/lib
 ├── data/
 │   ├── foods/          # README bảng thực phẩm, usda_selected.csv, external/ (USDA thô), manual/ (70 món)
-│   ├── knowledge/      # sources.csv, raw/ (ISSN, WHO, VN 2007), extra/ (NASM), uploads/ (ngoài git)
+│   ├── knowledge/      # sources.csv, raw/ (ISSN, WHO, VN 2007), extra/ (NASM, WHO Healthy diet), uploads/ (ngoài git)
 │   ├── training/       # programs.csv, schedule.csv của hai chương trình tập
 │   └── eval/           # eval_questions.csv, results/ (ngoài git)
 ├── docs/PROJECT_STATE.md
