@@ -408,13 +408,33 @@ def test_system_prompt_food_rules():
         "không có mục cánh gà",
         "chưa có số liệu về bia",
         "không dùng số của men bia",
-        "phở bò, cháo, canh",                      # 5d-2: cơm trắng đã có (USDA)
         "bảng thực phẩm tạm thời không truy cập được",
         "danh sách GỢI Ý",
         "KHÔNG nêu số liệu như thể đó là món đã hỏi",
         "PHẢI gọi lại lookup_food với đúng tên đầy đủ của mục đó trước khi nêu số liệu",
     ]:
         assert rule in prompt, rule
+
+
+def test_prompt_and_tool_no_longer_claim_no_prepared_dishes():
+    """Dữ liệu đã có món chế biến, đồ uống do quản trị viên nhập: prompt và mô tả công cụ không được
+    khẳng định là không có; câu hỏi calo của món phải gọi lookup_food trước."""
+    from services.ai_agents.fitness_advisor import AgentToolContext, build_tools
+
+    prompt = build_system_prompt(None)
+    tool = next(t for t in build_tools(AgentToolContext()) if t.name == "lookup_food")
+    description = " ".join(tool.description.split())      # docstring có xuống dòng giữa câu
+    for text in (prompt, description):
+        for banned in ("hoàn chỉnh", "Không có món ăn", "chỉ có nguyên liệu", "phở bò, cháo, canh"):
+            assert banned not in text, banned
+    assert "MÓN ĂN CHẾ BIẾN, ĐỒ UỐNG" in prompt
+    assert "PHẢI gọi lookup_food TRONG CHÍNH LƯỢT ĐÓ trước khi trả lời" in prompt
+    assert "mới nói chưa có số liệu cho món đó" in prompt
+    assert "chưa có số liệu về bia, rượu khi công cụ không trả kết quả" in prompt
+    # quy tắc nguồn quản trị viên nhập vẫn giữ, có thêm phần khẩu phần giả định
+    assert "NGUỒN QUẢN TRỊ VIÊN NHẬP" in prompt and "KHẨU PHẦN GIẢ ĐỊNH" in prompt
+    assert "SỐ ƯỚC TÍNH do quản trị viên nhập" in prompt
+    assert "các món chế biến, đồ uống do quản trị viên nhập" in description
 
 
 # ── get_daily_summary (FR9) ──────────────────────────────────────────────────
@@ -654,3 +674,17 @@ def test_system_prompt_progress_rules():
         "không nêu mục tiêu hay so sánh", PROGRESS_UNAVAILABLE_CODE, "NGUYÊN TẮC AN TOÀN Y TẾ:",
     ]:
         assert rule in prompt, rule
+
+
+def test_prompt_citations_only_from_this_turn_tools():
+    """Chống trích dẫn không có nguồn: chỉ được trích khi chính lượt này có kết quả công cụ."""
+    prompt = build_system_prompt(None)
+    rule = next(line for line in prompt.splitlines() if "KIẾN THỨC KHOA HỌC" in line)
+    for text in ("Phải gọi search_knowledge TRONG CHÍNH LƯỢT ĐÓ",
+                 "kể cả khi lượt trước đã trả lời cùng chủ đề",
+                 "CHỈ được ghi trích dẫn",
+                 "trong CHÍNH LƯỢT NÀY công cụ (search_knowledge hoặc lookup_food) đã trả về đúng đoạn hoặc dòng đó",
+                 "TUYỆT ĐỐI không chép lại trích dẫn từ câu trả lời trước trong lịch sử hội thoại",
+                 "không tự nhớ ra nguồn, số trang",
+                 "Nếu lượt này không gọi công cụ nào thì câu trả lời không được có trích dẫn"):
+        assert text in rule, text

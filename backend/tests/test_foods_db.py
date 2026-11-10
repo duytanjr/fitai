@@ -321,3 +321,117 @@ async def test_database_error_is_wrapped_and_session_stays_usable(foods_session,
     # SAVEPOINT: transaction ngoài vẫn dùng được (lượt chat vẫn lưu được tin nhắn)
     assert (await foods_session.execute(text("SELECT 1"))).scalar_one() == 1
     assert await count_foods(foods_session) == len(FIXTURE_FOODS)
+
+
+# ── Món do quản trị viên nhập có khẩu phần trong tên ("Bún bò Huế (1 tô ≈ 500 g)") ────────────
+from services.ai_agents.fitness_advisor import AgentToolContext, build_tools  # noqa: E402
+from services.foods.lookup import split_serving  # noqa: E402
+from services.foods.normalize import normalize_search  # noqa: E402
+from services.foods.sources import ADMIN_MANUAL_ID, VN2007_ID  # noqa: E402
+
+
+def admin_food(ref: str, name: str, kcal: float, protein: float, fat: float, carb: float,
+               group: str = "Món ăn chế biến") -> Food:
+    return Food(source_id=ADMIN_MANUAL_ID, source_ref=ref, name_vi=name, name_search=normalize_search(name),
+                group_name=group, energy_kcal=kcal, protein_g=protein, fat_g=fat, carb_g=carb,
+                source_note="Ước tính thử, khẩu phần giả định trong tên món.")
+
+
+@pytest.fixture
+async def dish_session(foods_session):
+    foods_session.add_all([
+        admin_food("ADM-T0001", "Bún bò Huế (1 tô ≈ 500 g)", 80.9, 4.12, 2.5, 10.45),
+        admin_food("ADM-T0002", "Trà sữa trân châu (1 ly 500 ml)", 84.9, 0.3, 3.16, 13.29, "Đồ uống"),
+        admin_food("ADM-T0003", "Thịt bò (Tu Farm)", 250, 26, 15, 0, "Thịt"),
+        admin_food("ADM-T0004", "Cháo trắng (1 tô ≈ 400 g)", 46, 1.1, 0.1, 10),
+        admin_food("ADM-T0005", "Xôi mặn (1 đĩa ≈ 250 g)", 190, 6, 5.5, 29),
+        Food(source_id=VN2007_ID, source_ref="99901", code=99901, stt=99901, name_vi="Sữa đậu nành (100g đậu/lít)",
+             name_search=normalize_search("Sữa đậu nành (100g đậu/lít)"), group_name="Sữa", source_page=1,
+             energy_kcal=28.0, protein_g=3.1, fat_g=1.6, carb_g=0.4),
+    ])
+    await foods_session.flush()
+    return foods_session
+
+
+def lookup_tool(session):
+    ctx = AgentToolContext(lookup_food=lambda q: search_foods(session, q))
+    return ctx, next(t for t in build_tools(ctx) if t.name == "lookup_food")
+
+
+async def test_admin_dish_full_name_is_exact_match_with_admin_label(dish_session):
+    matches = await search_foods(dish_session, "bún bò huế")
+    assert matches[0].food.name_vi == "Bún bò Huế (1 tô ≈ 500 g)" and matches[0].is_exact
+    assert matches[0].food.source.code == "ADMIN_MANUAL"
+    # không dấu vẫn khớp đúng tên
+    assert (await search_foods(dish_session, "bun bo hue"))[0].is_exact
+
+    ctx, tool = lookup_tool(dish_session)
+    out = await tool.ainvoke({"query": "bún bò huế"})
+    assert "Có mục trùng đúng tên truy vấn." in out
+    assert "khớp: đúng tên" in out and "Quản trị viên nhập" in out and "ADM-T0001" in out
+    assert "ghi chú nguồn số liệu" in out
+    # Số theo khẩu phần giả định do code tính (80,9 × 5 = 404,5 → làm tròn nửa lên 405)
+    assert ("KHẨU PHẦN GIẢ ĐỊNH theo tên món (1 tô ≈ 500 g)" in out and "năng lượng 405 kcal" in out
+            and "protein 20.6 g" in out and "lipid 12.5 g" in out and "glucid (không gồm xơ) 52.3 g" in out)
+    assert [s["ref"] for s in ctx.sources] == ["ADM-T0001"]
+
+
+async def test_admin_dish_partial_name_is_keyword_match_not_exact(dish_session):
+    matches = await search_foods(dish_session, "bún bò")
+    assert matches[0].food.name_vi == "Bún bò Huế (1 tô ≈ 500 g)"
+    assert matches[0].food.source.code == "ADMIN_MANUAL" and not matches[0].is_exact
+
+    ctx, tool = lookup_tool(dish_session)
+    out = await tool.ainvoke({"query": "bún bò"})
+    assert "Bún bò Huế (1 tô ≈ 500 g)" in out and "Quản trị viên nhập" in out
+    assert "khớp: chỉ chứa từ khoá" in out
+    assert "KHẨU PHẦN GIẢ ĐỊNH" not in out          # chưa khớp đúng tên: không đưa số theo khẩu phần
+    assert ctx.sources == []                          # không trích nguồn mục chỉ chứa từ khoá
+
+
+async def test_admin_dish_user_grams_override_serving(dish_session):
+    _, tool = lookup_tool(dish_session)
+    out = await tool.ainvoke({"query": "bún bò huế", "grams": 300})
+    assert "Theo 300 g (code đã tính): năng lượng 242.7 kcal" in out
+    assert "KHẨU PHẦN GIẢ ĐỊNH" not in out
+
+
+async def test_admin_drink_serving_in_ml(dish_session):
+    _, tool = lookup_tool(dish_session)
+    out = await tool.ainvoke({"query": "trà sữa trân châu"})
+    assert "khớp: đúng tên" in out
+    assert "KHẨU PHẦN GIẢ ĐỊNH theo tên món (1 ly 500 ml) (coi 1 ml ≈ 1 g" in out and "năng lượng 425 kcal" in out
+
+
+async def test_serving_suffix_only_stripped_for_admin_numeric_parentheses(dish_session):
+    # "(Tu Farm)" không phải khẩu phần: "thịt bò" không khớp đúng tên "Thịt bò (Tu Farm)"
+    tu_farm = [m for m in await search_foods(dish_session, "thịt bò") if m.food.source_ref == "ADM-T0003"]
+    assert tu_farm and not tu_farm[0].is_exact
+    # VN2007 có ngoặc bắt đầu bằng số: KHÔNG bóc (chỉ áp dụng cho ADMIN_MANUAL)
+    soy = [m for m in await search_foods(dish_session, "sữa đậu nành") if m.food.source_ref == "99901"]
+    assert soy and not soy[0].is_exact
+    names = {f.name_vi: split_serving(f) for f in (await dish_session.execute(select(Food))).scalars()}
+    assert names["Bún bò Huế (1 tô ≈ 500 g)"][0] == "Bún bò Huế"
+    assert names["Bún bò Huế (1 tô ≈ 500 g)"][1].amount == 500 and names["Bún bò Huế (1 tô ≈ 500 g)"][1].unit == "g"
+    assert names["Thịt bò (Tu Farm)"] == ("Thịt bò (Tu Farm)", None)
+    assert names["Sữa đậu nành (100g đậu/lít)"] == ("Sữa đậu nành (100g đậu/lít)", None)
+
+
+async def test_admin_dish_accent_conflict_not_exact(dish_session):
+    # gõ có dấu nhưng sai dấu ("bún bơ huế") không được coi là đúng tên
+    matches = await search_foods(dish_session, "bún bơ huế")
+    assert not any(m.is_exact for m in matches)
+
+
+@pytest.mark.parametrize("query,ref", [("cháo trắng", "ADM-T0004"), ("chao trang", "ADM-T0004"),
+                                       ("xôi mặn", "ADM-T0005")])
+async def test_admin_dish_exact_name_wins_over_raw_rice_rule(dish_session, query, ref):
+    matches = await search_foods(dish_session, query)
+    assert matches[0].food.source_ref == ref and matches[0].is_exact
+    assert all(m.food.source.code != "VN2007" or not m.is_exact for m in matches)   # không ra gạo sống
+
+
+@pytest.mark.parametrize("query", ["cháo", "xôi", "xôi trắng"])
+async def test_plain_porridge_or_sticky_rice_still_raw_only(dish_session, query):
+    with pytest.raises(lookup_module.RawOnlyFoodQuery):
+        await search_foods(dish_session, query)

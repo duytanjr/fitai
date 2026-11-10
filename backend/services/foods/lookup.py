@@ -139,14 +139,50 @@ def accent_conflict(name_vi: str, accented: list[str]) -> bool:
     return any(q != n and normalize_search(q) != q for q, n in zip(accented, name_words))
 
 
+# Phần ngoặc KHẨU PHẦN ở cuối tên món do quản trị viên nhập: bắt đầu bằng số, vd. "(1 tô ≈ 500 g)",
+# "(1 ly 500 ml)", "(5 cái ≈ 150 g)". Ngoặc khác ("(Tu Farm)") không phải khẩu phần, giữ nguyên.
+_SERVING_SUFFIX = re.compile(r"^(?P<base>.*?\S)\s*\((?P<serving>\s*\d[^()]*)\)\s*$")
+_SERVING_AMOUNT = re.compile(r"(\d+(?:[.,]\d+)?)\s*(g|ml)\s*$", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class Serving:
+    """Khẩu phần ghi trong tên món ADMIN (giả định của người nhập, không phải số đo)."""
+    label: str                 # nguyên văn trong ngoặc, vd. "1 tô ≈ 500 g"
+    amount: float | None       # 500 (None khi không đọc được khối lượng/thể tích)
+    unit: str | None           # "g" hoặc "ml"
+
+
+def split_serving(food: Food) -> tuple[str, Serving | None]:
+    """(tên bỏ phần ngoặc khẩu phần, khẩu phần) — CHỈ với nguồn ADMIN_MANUAL; nguồn khác giữ nguyên tên."""
+    if source_code(food) != ADMIN_MANUAL:
+        return food.name_vi, None
+    m = _SERVING_SUFFIX.match(food.name_vi.strip())
+    if not m:
+        return food.name_vi, None
+    label = re.sub(r"\s+", " ", m["serving"]).strip()
+    amount = _SERVING_AMOUNT.search(label)
+    value = float(amount[1].replace(",", ".")) if amount else None
+    if value is not None and not 0 < value <= MAX_GRAMS:
+        value = None
+    return m["base"].strip(), Serving(label, value, amount[2].lower() if amount and value else None)
+
+
 def rank(food: Food, tokens: list[str], accented: list[str] | None = None) -> tuple:
     """Cùng mức khớp: mục khớp đúng cả dấu nhiều từ hơn trước ("bò" → "Thịt bò" trước "Dưa bở"),
-    rồi từ khoá đứng sớm hơn trong tên ("Sữa bò tươi" trước "Vú sữa"), rồi tên ít từ thừa, tên ngắn."""
+    rồi từ khoá đứng sớm hơn trong tên ("Sữa bò tươi" trước "Vú sữa"), rồi tên ít từ thừa, tên ngắn.
+    Món ADMIN có ngoặc khẩu phần ("Bún bò Huế (1 tô ≈ 500 g)") được coi là đúng tên khi phần tên trước
+    ngoặc trùng truy vấn ("bún bò huế")."""
     words = food.name_search.split()
     query = " ".join(tokens)
-    if food.name_search == query and not (accented and accent_conflict(food.name_vi, accented)):
+    names = [(food.name_search, food.name_vi)]
+    base_vi, serving = split_serving(food)
+    if serving is not None:
+        names.append((normalize_search(base_vi), base_vi))
+    hit = next((vi for search, vi in names if search == query), None)
+    if hit is not None and not (accented and accent_conflict(hit, accented)):
         level = MATCH_EXACT
-    elif food.name_search == query:
+    elif hit is not None:
         level = MATCH_ALL_WORDS        # trùng khi bỏ dấu nhưng khác dấu: không coi là đúng tên
     elif all(t in words for t in tokens):
         level = MATCH_ALL_WORDS
@@ -201,10 +237,20 @@ async def _resolve_meanings(db: AsyncSession, meanings: tuple[Meaning, ...]) -> 
     return [ResolvedMeaning(m.label, [found[r] for r in m.refs if r in found], m.search) for m in meanings]
 
 
+async def _has_exact_admin_dish(db: AsyncSession, tokens: list[str], accented: list[str]) -> bool:
+    """Có món do quản trị viên nhập khớp ĐÚNG TÊN truy vấn (sau khi bỏ ngoặc khẩu phần)?"""
+    return any(
+        source_code(food) == ADMIN_MANUAL and rank(food, tokens, accented)[0] == MATCH_EXACT
+        for food in await _candidates(db, tokens)
+    )
+
+
 async def search_foods(db: AsyncSession, query: str, limit: int = 5) -> list[FoodMatch]:
     tokens = prepare_query(query)
     dish = find_cooked_dish(query)
-    if dish:
+    # Món đã nấu chỉ có gạo sống (xôi, cháo): nếu đã có món ADMIN đúng tên (vd. "Cháo trắng (1 tô ≈ 400 g)"
+    # khi hỏi "cháo trắng") thì dùng món đó; "cháo", "xôi" đơn thuần không có dòng đúng tên vẫn ra gạo sống.
+    if dish and not await _has_exact_admin_dish(db, tokens, accent_words(query)):
         found = await fetch_refs(db, list(dish.refs))
         raise RawOnlyFoodQuery(dish, [found[r] for r in dish.refs if r in found])
     ambiguous = find_ambiguous(query)
