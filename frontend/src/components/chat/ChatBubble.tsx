@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 import type { ChatSource } from "@/lib/chat";
 import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
+import { shouldWarnUnsourcedCitation } from "@/lib/citations";
+import { TriangleAlert } from "lucide-react";
 
 interface ChatBubbleProps {
   role: "user" | "assistant";
@@ -20,6 +22,7 @@ function formatSource(source: ChatSource): string {
 export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProps) {
   const isUser = role === "user";
   const showSources = !isUser && !!sources && sources.length > 0;
+  const warnUnsourced = shouldWarnUnsourcedCitation(role, content, sources);
 
   return (
     <div className={cn("flex w-full gap-3", isUser ? "justify-end" : "justify-start")}>
@@ -63,6 +66,16 @@ export function ChatBubble({ role, content, sources, createdAt }: ChatBubbleProp
             </div>
           )}
         </div>
+
+        {warnUnsourced && (
+          <p className="flex items-start gap-1.5 rounded-control bg-accent-50 px-3 py-2 text-xs text-accent-900 ring-1 ring-inset ring-accent-200">
+            <TriangleAlert aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Câu trả lời có nhắc tới nguồn nhưng lượt này không ghi nhận tài liệu tra cứu. Thông tin có thể là kiến
+              thức chung của mô hình, hãy kiểm tra lại hoặc hỏi lại.
+            </span>
+          </p>
+        )}
 
         {createdAt && (
           <span className="text-xs text-muted">
