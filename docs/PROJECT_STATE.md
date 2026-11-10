@@ -1,6 +1,6 @@
 # Trạng thái dự án FitAI (ghi chú bàn giao giữa các phiên)
 
-Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-08.
+Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-10.
 
 ## 1. Các lát đã xong (git log)
 | Lát | Commit | Nội dung chính |
@@ -24,11 +24,15 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | Dữ liệu tập luyện + ảnh xem trước | 5af1b21, 7f4def5, 76b89a7 | nội dung nguoi-moi-14 và toan-than-28 trong data/training/, ảnh xem trước YouTube trên trang ngày tập |
 | Nạp món ăn thủ công (FR19) | 2fab762, d5da112 | scripts/import_admin_foods.py, services/foods/admin_import.py, data/foods/manual/ |
 | 70 món ADMIN_MANUAL (chế biến, đồ uống, thực phẩm cơ bản) | 6d25841 | dishes.csv (đợt 1, 8 món) + dishes_all.csv (62 món mới, cập nhật 6 món đợt 1), nạp vào DB dev |
+| Khớp tên món nhập thủ công + chống trích dẫn không nguồn | chưa commit (nhánh fix/citation-consistency) | bóc ngoặc khẩu phần khi khớp tên món ADMIN, số theo khẩu phần giả định, bỏ lời dặn "không có món ăn hoàn chỉnh", "cháo trắng" ưu tiên món đúng tên, quy tắc trích dẫn trong chính lượt, cảnh báo frontend lib/citations.ts |
 
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
 
-- pytest hiện tại: 956 passed, 0 skipped (sau quy tắc kỹ thuật động tác: +1 test nội dung quy tắc; sau 955
+- pytest hiện tại: 970 passed, 0 skipped (sau sửa khớp tên món nhập thủ công và quy tắc trích dẫn: +14 test —
+  12 test tra cứu món ADMIN trên DB test, 2 test chuỗi prompt/mô tả công cụ, 1 assert cũ "phở bò, cháo, canh"
+  bị bỏ; trước đó 956 sau quy tắc kỹ thuật
+  động tác: +1 test nội dung quy tắc; sau 955
   là sau script nạp món ăn thủ công: +28 test import, test dữ liệu tập luyện
   trong repo 1 → 4; sau 9d là 924, sau 9b là 862, sau 9a là 822, sau 8b-2 là 689, sau 8b-1 là
   628, sau 8a là 580, sau lát 7 là 487). Lát 9d không có migration mới.
@@ -277,6 +281,21 @@ Quản trị (lát 8a, services/foods/admin.py, api/routers/admin_foods.py):
     data/foods/manual/dishes_sources_all.md; tóm tắt trong source_note.
   - 24 thực phẩm cơ bản đặt tên kèm hậu tố "(Tu Farm)" (vd. "Dưa chuột (Tu Farm)") để không trùng tên với dòng
     VN 2007 / USDA (unique index chỉ chặn trùng trong ADMIN_MANUAL; hậu tố giúp người dùng và LLM phân biệt).
+  - Tra cứu (services/foods/lookup.py, sửa 2026-11-10): trước đây 41/70 món có phần khẩu phần trong ngoặc ở cuối
+    tên ("Bún bò Huế (1 tô ≈ 500 g)") nên hỏi "bún bò huế" chỉ được tính "chỉ chứa từ khoá" — công cụ báo cho mô
+    hình đây là "thực phẩm KHÁC, không được dùng số" và không trích nguồn, cộng với lời dặn cũ "không có món ăn
+    hoàn chỉnh" trong prompt nên chatbot trả lời "chưa có số liệu". Nay `split_serving` bóc phần ngoặc BẮT ĐẦU
+    BẰNG SỐ ở cuối tên, CHỈ với nguồn ADMIN_MANUAL (không đụng VN 2007/USDA, không bóc "(Tu Farm)"), rồi so đúng
+    tên trên phần còn lại (vẫn kiểm dấu). Đã kiểm cả 70 món trên DB dev: 41 bóc đúng, 24 "(Tu Farm)" và 5 tên
+    không ngoặc giữ nguyên. Truy vấn thiếu chữ ("bún bò", "cơm tấm", "hủ tiếu", "trà sữa") vẫn là "chỉ chứa từ
+    khoá" có chủ đích: mô hình nêu các lựa chọn rồi hỏi lại; không thêm alias theo mã ADM (mã do sequence sinh,
+    khác giữa các DB).
+  - Khi khớp đúng tên món ADMIN có khẩu phần đọc được (g hoặc ml), lookup_food trả thêm dòng "KHẨU PHẦN GIẢ ĐỊNH
+    theo tên món (...)" với kcal, protein, lipid, glucid do code tính từ số trên 100 g (kcal làm tròn đơn vị,
+    chất 0,1 g, làm tròn nửa lên; ml coi ≈ g, có ghi chú). Người dùng nêu số gam thì dùng grams như cũ, không
+    hiện dòng khẩu phần.
+  - "cháo trắng": nếu truy vấn khớp đúng tên một món ADMIN thì dùng món đó trước quy tắc xôi/cháo → gạo sống
+    (COOKED_DISHES); "cháo", "xôi", "xôi trắng" vẫn ra gạo sống.
   - Cảnh báo số liệu: Bánh tét 408 kcal/100 g cao bất thường (cần kiểm lại). Lệch Atwater > 15% (có cờ
     atwater_lech_15pct, đúng 5 dòng): Bánh xèo (1 suất ≈ 200 g), Nem chua rán, Rau muống luộc (Tu Farm), Rau bina
     (Tu Farm), Dưa chuột (Tu Farm).
@@ -302,8 +321,9 @@ Nguồn dữ liệu thực phẩm (`food_sources`, id cố định):
   source_ref = mã số; trích theo trang PDF; xơ = celluloza.
 - 2 = USDA_SR_LEGACY_2018 (CC0): 20 mục đã duyệt (`USDA_SELECTION` trong services/foods/usda.py), nạp từ
   data/foods/usda_selected.csv; source_ref = fdc_id; xơ = xơ thực phẩm tổng số (TDF).
-- 3 = ADMIN_MANUAL: quản trị viên nhập qua /admin/foods; source_ref = ADM-xxxxx; nhãn "Quản trị viên nhập";
-  mỗi dòng có source_note. DB dev hiện không có dòng nào (dòng thử đầu-cuối đã xoá).
+- 3 = ADMIN_MANUAL: quản trị viên nhập qua /admin/foods hoặc scripts/import_admin_foods.py; source_ref =
+  ADM-xxxxx; nhãn "Quản trị viên nhập"; mỗi dòng có source_note. DB dev hiện có 70 dòng (xem mục món đã nạp ở
+  trên).
 
 RAG gồm (kiểm 2026-11-08, bảng knowledge_documents khớp Chroma, cả 4 đang bật) — tổng 198 đoạn:
 - builtin: ISSN 2017 "diets and body composition" (34 đoạn) và WHO 2020 "physical activity and sedentary
@@ -323,8 +343,24 @@ RAG gồm (kiểm 2026-11-08, bảng knowledge_documents khớp Chroma, cả 4 �
 PDF bảng 2007 dùng cho foods, không nạp vào RAG.
 
 Cấu hình tra cứu (services/foods/aliases.py, có test): SYNONYMS, AMBIGUOUS (bơ, bo, tôm, chuối, bắp, mè,
-thơm, mãng cầu, táo, hồng, dưa, com), COOKED_DISHES (xôi, cháo: chỉ có gạo sống), FOOD_ALIASES (ức gà, cơm,
+thơm, mãng cầu, táo, hồng, dưa, com), COOKED_DISHES (xôi, cháo: chỉ có gạo sống — trừ khi có món ADMIN đúng tên, vd. "cháo trắng"), FOOD_ALIASES (ức gà, cơm,
 cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRIDES trong preparation.py.
+
+Prompt và chống trích dẫn không nguồn (services/ai_agents/fitness_advisor.py, 2026-11-10):
+- Đã bỏ mọi câu khẳng định "không có món ăn hoàn chỉnh" (mô tả công cụ lookup_food và quy tắc cũ "MÓN ĂN HOÀN
+  CHỈNH VÀ ĐỒ UỐNG CÓ CỒN"). Quy tắc mới "MÓN ĂN CHẾ BIẾN, ĐỒ UỐNG": câu hỏi calo/dinh dưỡng của một món (kể cả
+  món chế biến, đồ uống) PHẢI gọi lookup_food trong chính lượt đó; chỉ khi công cụ không trả kết quả mới nói chưa
+  có số liệu (bia, rượu cũng vậy). Quy tắc "NGUỒN QUẢN TRỊ VIÊN NHẬP" giữ nguyên, thêm: nêu số trên 100 g và số
+  theo dòng KHẨU PHẦN GIẢ ĐỊNH, nói rõ là số ước tính và khẩu phần là giả định. Câu báo không tìm thấy của công cụ
+  nay ghi đủ ba nguồn (trước chỉ nhắc Bảng 2007).
+- Quy tắc "KIẾN THỨC KHOA HỌC" thêm: phải gọi search_knowledge trong chính lượt đó kể cả khi lượt trước đã trả
+  lời cùng chủ đề; chỉ ghi trích dẫn (tổ chức, năm, tr. PDF, NASM/ISSN/WHO, Bảng thành phần, fdc_id, ADM-…) khi
+  chính lượt này có kết quả công cụ tương ứng; không chép trích dẫn từ lịch sử hội thoại.
+- Frontend (frontend/src/lib/citations.ts, ChatBubble.tsx): tin của AI có chữ dạng trích dẫn ("tr. PDF n",
+  "(WHO/ISSN/NASM/USDA…, năm", "WHO (năm)", "fdc_id n", "ADM-nnn", "Bảng thành phần thực phẩm Việt Nam…năm") mà
+  sources rỗng thì hiện dòng cảnh báo "Câu trả lời có nhắc tới nguồn nhưng lượt này không ghi nhận tài liệu tra
+  cứu…". Không hiện cho tin người dùng, tin báo dịch vụ gián đoạn, hay khi chỉ nhắc tên ISSN/NASM/WHO đơn lẻ.
+  Không có cờ ở backend, không đổi API. Kiểm bằng script Node ngoài repo (15/15 ca), tsc và next build.
 
 ## 3. Quy ước làm việc đã chốt
 - Không tự commit; báo danh sách file đổi để người dùng commit. Kế hoạch file trước, chờ xác nhận.
@@ -384,6 +420,11 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   đoạn nào qua ngưỡng (0,6382); A10 không đổi (0,6710). D03 ("Hướng dẫn tôi tập squat đúng kỹ thuật.") nay truy
   xuất được đoạn squat NASM ch.13 tr. 45–47 (0,7006) nên trả lời được: bản v2 cần đổi kỳ vọng D03 (v1 mong đợi
   "nói chưa có tài liệu về kỹ thuật tập") và xem lại nguồn kỳ vọng A06.
+- Sau khi sửa khớp tên món ADMIN (2026-11-10): C05 của v1 mong đợi "chưa có số liệu cho món ăn hoàn chỉnh",
+  nay câu trả lời đúng là nêu số ước tính của "Phở bò (1 tô ≈ 500 g)" (số trên 100 g, số cho 1 tô, ghi rõ do
+  quản trị viên nhập). Bản v2 cần thêm nhóm câu hỏi món chế biến: phở bò, bún bò Huế, cơm tấm (hỏi lại vì có
+  hai món), trà sữa (hỏi lại / trà sữa trân châu), bánh tét (kèm cảnh báo số bất thường), cháo trắng (ra món
+  ADMIN, không ra gạo sống). Chưa đo tỷ lệ câu trả lời có khung nguồn đúng trước và sau khi sửa.
 - Kết quả đã chạy (data/eval/results/, ngoài git):
   - results_20261102-012741_retrieval.csv: retrieval nhóm A. A09 không đoạn nào vượt ngưỡng (cao nhất 0,638);
     A06 chỉ 1 đoạn (0,651).
@@ -406,6 +447,11 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   trình thương mại (có bản quyền; PDF nằm trong git ở data/knowledge/extra/, repo GitHub để Private). Quy tắc kỹ thuật động tác mới CHƯA thử với Gemini thật.
 - LLM đôi khi không làm đúng quy tắc (không nêu trạng thái, gọi lại bằng tên người dùng gõ) — chỉ kiểm được
   bằng thử thật.
+- Khớp tên món, quy tắc "MÓN ĂN CHẾ BIẾN, ĐỒ UỐNG" và quy tắc trích dẫn trong chính lượt (2026-11-10) mới kiểm
+  bằng test và gọi công cụ trên DB dev (không LLM), CHƯA thử với Gemini thật; chưa đo tỷ lệ câu có khung nguồn
+  đúng trước và sau khi sửa. Cảnh báo trích dẫn ở frontend là nhận diện bằng mẫu chữ: có thể sót trích dẫn viết
+  kiểu khác, và chưa thử trên trình duyệt. Số trang trích dẫn của hai chương NASM là trang của file cắt (trang
+  sách = trang_pdf + 160 cho chương 7, + 302 cho chương 13), người dùng đối chiếu sách sẽ thấy lệch.
 - ESLint frontend lỗi sẵn ("nextVitals is not iterable"); kiểm tra frontend bằng tsc và next build.
 - Bản quyền bảng 2007 (data/foods/README.md): ghi là dùng cho mục đích học tập của đồ án, có ghi nguồn Viện Dinh
   dưỡng (2007).
@@ -420,7 +466,8 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
   cộng blog Tu Farm (thứ cấp, chưa kiểm chứng) — độ chính xác thấp, không phải phân tích phòng thí nghiệm hay bảng
   thành phần chính thức; mỗi quán khác nhau (lượng bánh/cơm, thịt, nước dùng, đường, sữa đặc). Cơm tấm sườn chỉ
   có hai nguồn. Bánh tét 408 kcal/100 g và 5 dòng lệch Atwater chưa được kiểm lại. Khẩu phần chỉ nằm trong tên
-  món (giả định) nên số "1 tô / 1 ly" phải tự nhân từ số trên 100 g. lookup_food chỉ hiện nhãn
+  món (giả định); lookup_food tính sẵn số cho khẩu phần đó, nhưng chỉ khi khớp đúng tên và khi phần ngoặc bắt đầu
+  bằng số và kết thúc bằng g/ml (món ghi khác thì không có dòng khẩu phần). lookup_food chỉ hiện nhãn
   "Quản trị viên nhập" kèm ghi chú nguồn, không phân biệt món ước tính với số liệu nhãn. Chưa test hai lần nạp
   song song thật (dựa vào unique index như 8a). Module thực phẩm dùng read_csv của services/training/seed.py.
 - Tài liệu RAG (8b-1): chưa test hai kết nối lập chỉ mục song song thật (đã test unique index ở mức DB và đường
@@ -462,18 +509,22 @@ cá hồi, yến mạch...). Giá trị preparation gán tay: PREPARATION_OVERRI
    vài câu hỏi tập luyện với Gemini thật (recommend_program, get_training_summary).
 2. Dữ liệu tập luyện: kiểm chứng bằng mắt hai video dùng chung (toan-than-28 ngày 5 và ngày 13), điền
    duration_min (và kênh nếu muốn) cho 43 video rồi nạp lại; định kỳ kiểm link còn xem được.
-3. Món ăn thủ công: kiểm lại bánh tét và 5 dòng lệch Atwater (sửa bằng --update-existing nếu cần); tìm nguồn tốt hơn cho món Việt (ưu
-   tiên nguồn Việt Nam đã công bố) và thêm nguồn cho cơm tấm sườn; thử lookup_food với vài món (vd. "1 tô phở
-   bò", tên trùng giữa dòng "(Tu Farm)" và VN 2007) với Gemini thật.
+3. Món ăn thủ công: thử với Gemini thật các câu "bún bò huế / bún bò / phở bò / cơm tấm / trà sữa / cháo trắng
+   bao nhiêu calo" (có gọi lookup_food trong lượt, có khung nguồn, nêu số khẩu phần giả định, hỏi lại khi chỉ chứa
+   từ khoá) và một câu kiến thức hỏi lại lần hai (có gọi search_knowledge lại, không chép trích dẫn cũ; cảnh báo
+   frontend hiện đúng lúc). Kiểm lại bánh tét và 5 dòng lệch Atwater (sửa bằng --update-existing nếu cần); tìm
+   nguồn tốt hơn cho món Việt (ưu tiên nguồn Việt Nam đã công bố) và thêm nguồn cho cơm tấm sườn; xem tên trùng
+   giữa dòng "(Tu Farm)" và VN 2007.
    Quản trị bài tập của FR19 (hiện nạp bằng CSV) chưa xếp lát.
 4. Gợi ý cập nhật cân nặng trong hồ sơ từ lần đo mới nhất (chỉ dạng gợi ý, người dùng xác nhận; chưa chốt cách làm).
 5. Chính sách lưu trữ hội thoại (hiện giữ vô thời hạn).
 6. Chốt mô hình cho demo (hiện gemini-2.5-flash, giới hạn ~20 lượt/ngày/mô hình ở gói miễn phí).
-7. Đóng gói và README: hướng dẫn chạy từ đầu (docker compose, migration, các script nạp dữ liệu, tạo admin),
-   repo hiện chưa có README ở thư mục gốc.
+7. Đóng gói: README ở thư mục gốc đã có (commit e4dadd0); còn lại là thử chạy từ đầu trên máy khác theo README.
 8. Tạo bản v2 của bộ đánh giá: cập nhật hành vi mong đợi C04/C08/C09/C10, câu phở bò C05 (và D01) theo 70 món
-   ADMIN_MANUAL, giữ nguyên v1 ở eade8b0 làm mốc, rồi đo lần 2 và so với mốc eade8b0. Có thể thêm
-   câu đánh giá cho tiến độ, dòng quản trị viên nhập và tập luyện (gợi ý chương trình, tiến độ tập).
+   ADMIN_MANUAL và cách khớp tên mới, D03 (squat, nay có NASM), nguồn kỳ vọng A06; thêm nhóm câu hỏi món chế biến
+   (phở bò, bún bò Huế, cơm tấm, trà sữa, bánh tét, cháo trắng) và câu kiểm trích dẫn khi hỏi lại cùng chủ đề;
+   giữ nguyên v1 ở eade8b0 làm mốc, rồi đo lần 2 và so với mốc eade8b0, gồm tỷ lệ câu có khung nguồn đúng. Có
+   thể thêm câu đánh giá cho tiến độ, dòng quản trị viên nhập và tập luyện (gợi ý chương trình, tiến độ tập).
 9. Báo cáo đồ án (bảng "Trạng thái thực hiện" ở SPEC.md mục 4 là căn cứ phạm vi).
 Đã bỏ có chủ đích: gợi ý thực đơn / thay món (FR10–11 ngoài phạm vi) và bộ lọc câu hỏi y khoa riêng bằng code
 (FR7 đáp ứng bằng quy tắc prompt, dòng cảnh báo dưới ô nhập và nhóm câu hỏi E).
