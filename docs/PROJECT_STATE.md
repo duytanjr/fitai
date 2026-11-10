@@ -348,11 +348,19 @@ tổng 206 đoạn (198 trước đó + 8 đoạn WHO Healthy diet):
   bỏ trang nào). Lý do nạp: đề cương đồ án có mục "tài liệu và tiêu chuẩn liên quan đến dinh dưỡng", trong khi kho
   trước đó chỉ có ISSN (đối tượng người tập luyện) về dinh dưỡng. Chữ đọc tốt, không có đoạn rác; riêng đầu đoạn
   đầu tiên (tr. 1–2) dính khoảng 130 ký tự điều hướng trang web ("Donate Credits … Reading time … العربية 中文
-  Français Русский Español"). Truy xuất thử (vector câu hỏi nhúng một lần): "chế độ ăn lành mạnh gồm những gì",
-  "tối đa bao nhiêu muối" (đoạn có câu "less than 5 grams per day"), "giới hạn chất béo bão hòa" (đoạn có câu
-  "no more than 10% of total energy") đều có 2–3 đoạn qua ngưỡng 0,65 từ tài liệu này; "uống bao nhiêu nước" không
-  đoạn nào qua ngưỡng (tài liệu không nói về lượng nước). A06, A09, A10 của nhóm A không đổi so với sau NASM; 7
-  câu A còn lại CHƯA chạy lại (vector câu hỏi lưu trước đó đã mất khi container khởi động lại).
+  Français Русский Español").
+- rag_smoke sau khi nạp WHO Healthy diet (2026-11-10, k=5, ngưỡng 0,65, chạy scripts/rag_smoke.py bằng vector câu
+  hỏi đã lưu): 9/10 câu nhóm A giống hệt kết quả sau NASM. Chỉ A01 ("Giảm cân thì nên ăn bao nhiêu protein?") đổi:
+  đoạn Healthy diet tr. 3 (0,6916) vào hạng 3, đoạn ISSN tr. 11 (0,6831) ra khỏi top 5, điểm cao nhất vẫn là ISSN
+  tr. 8 (0,7130). A06, A09 (cao nhất 0,6382, vẫn không đoạn nào qua ngưỡng), A10 không đổi.
+  Truy vấn mới: "Mỗi ngày nên ăn tối đa bao nhiêu muối?" cao nhất 0,6939 (Healthy diet tr. 3, đoạn có câu "less
+  than 5 grams per day"); "Nên giới hạn chất béo bão hòa bao nhiêu?" cao nhất 0,7190 (Healthy diet tr. 2, đoạn có
+  câu "no more than 10% of total energy"); "Cần uống bao nhiêu nước mỗi ngày?" không đoạn nào qua ngưỡng (cao nhất
+  0,6319), nên D05 vẫn là hạn chế: kho không có tài liệu về lượng nước mỗi ngày.
+- Vận hành rag_smoke: vector câu hỏi phải lưu NGOÀI /tmp của container. Container bị tạo lại thì /tmp mất, phải
+  nhúng lại và tốn lượt embedding (vector ngày 04/11 và 08/11 đã mất như vậy). Bản lần này đã lưu ngoài repo
+  (thư mục scratchpad của phiên trên máy host): 7 vector A01–A05, A07, A08 và vector A06, A09, A10, muối, chất
+  béo, nước.
 PDF bảng 2007 dùng cho foods, không nạp vào RAG.
 
 Cấu hình tra cứu (services/foods/aliases.py, có test): SYNONYMS, AMBIGUOUS (bơ, bo, tôm, chuối, bắp, mè,
