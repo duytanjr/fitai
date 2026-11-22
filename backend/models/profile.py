@@ -25,36 +25,29 @@ class FitnessGoal(str, Enum):
 
 
 class MedicalCondition(str, Enum):
-    """Mã bệnh lý / tình trạng sức khỏe người dùng tự khai báo (dùng chung cho schema, metrics, gợi ý tập, agent).
+    """Mã bệnh lý / tình trạng sức khỏe người dùng tự khai báo (dùng chung cho schema, cảnh báo, gợi ý tập, agent).
 
-    Chỉ để cảnh báo an toàn và hạn chế gợi ý rủi ro, KHÔNG dùng để cá nhân hoá điều trị.
+    Chỉ để cảnh báo an toàn (services/health_rules.py), KHÔNG dùng để cá nhân hoá điều trị hay đổi mục tiêu.
+    Danh sách đổi ở migration e4c1a8f2d905: mọi mã cũ (diabetes, kidney, pregnancy_lactation...) đã bị bỏ.
     """
-    DIABETES = "diabetes"
-    HYPERTENSION = "hypertension"
-    DYSLIPIDEMIA = "dyslipidemia"
-    CARDIOVASCULAR = "cardiovascular"
-    KIDNEY = "kidney"
-    GOUT = "gout"
-    LIVER = "liver"
-    STOMACH = "stomach"
     MUSCULOSKELETAL = "musculoskeletal"
-    PREGNANCY_LACTATION = "pregnancy_lactation"
+    CARDIOVASCULAR = "cardiovascular"
+    HYPERTENSION = "hypertension"
+    METABOLIC = "metabolic"
+    RESPIRATORY = "respiratory"
+    STROKE = "stroke"
     OTHER = "other"
 
 
 # Thứ tự hiển thị chuẩn (theo thứ tự khai báo enum)
 MEDICAL_CONDITION_CODES: tuple[str, ...] = tuple(c.value for c in MedicalCondition)
 MEDICAL_CONDITION_LABELS: dict[str, str] = {
-    "diabetes": "Tiểu đường",
+    "musculoskeletal": "Viêm khớp, loãng xương, đau lưng",
+    "cardiovascular": "Tim mạch",
     "hypertension": "Tăng huyết áp",
-    "dyslipidemia": "Rối loạn mỡ máu",
-    "cardiovascular": "Bệnh tim mạch",
-    "kidney": "Bệnh thận",
-    "gout": "Gout",
-    "liver": "Bệnh gan",
-    "stomach": "Bệnh dạ dày",
-    "musculoskeletal": "Bệnh xương khớp hoặc chấn thương",
-    "pregnancy_lactation": "Đang mang thai hoặc cho con bú",
+    "metabolic": "Bệnh chuyển hóa (gồm tiểu đường)",
+    "respiratory": "Bệnh hô hấp",
+    "stroke": "Đột quỵ",
     "other": "Khác",
 }
 MEDICAL_NOTES_MAX_LENGTH = 500

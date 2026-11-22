@@ -2,6 +2,8 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.schemas.profile import HealthWarningOut
+
 
 class ProgramSummaryOut(BaseModel):
     slug: str
@@ -122,3 +124,4 @@ class RecommendationOut(BaseModel):
     notes: list[str]
     experience: Optional[str]
     needs_medical_clearance: bool = False  # hồ sơ có bệnh lý: chỉ gợi ý mức người mới, cần gặp bác sĩ trước khi tập
+    health_warnings: list[HealthWarningOut] = []  # cảnh báo tập luyện và chung theo bệnh (chỉ là chữ)

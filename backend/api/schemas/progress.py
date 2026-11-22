@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from api.schemas.meals import TargetValues
+from api.schemas.meals import MacroValues
 from api.schemas.profile import HealthWarningOut
 from models.body_metric import MAX_WAIST_CM, MAX_WEIGHT_KG, MIN_WAIST_CM, MIN_WEIGHT_KG
 
@@ -114,7 +114,7 @@ class ProgressOut(BaseModel):
     end_date: date
     is_complete: bool = Field(description="Hồ sơ đủ để so với mục tiêu")
     missing_fields: list[str]
-    target: Optional[TargetValues] = Field(None, description="Từng chất có thể None vì bệnh lý (xem health_warnings)")
+    target: Optional[MacroValues] = None
     series: list[ProgressDay]
     stats: ProgressStats
     health_warnings: list[HealthWarningOut] = []
@@ -130,7 +130,7 @@ class WeeklyReportOut(BaseModel):
     logged_days: int
     is_complete: bool
     missing_fields: list[str]
-    target: Optional[TargetValues] = Field(None, description="Từng chất có thể None vì bệnh lý (xem health_warnings)")
+    target: Optional[MacroValues] = None
     average: NullableMacros
     comparison: Optional[Comparison] = None
     weight_change: Optional[WeightChange] = None

@@ -1,6 +1,6 @@
 """Pydantic schemas cho UserProfile."""
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, StrictBool, field_validator, model_validator
 
@@ -10,8 +10,9 @@ from models.profile import (
     ActivityLevel,
     FitnessGoal,
 )
+from services.health_rules import health_warnings
 
-# Chặn danh sách quá dài trước khi loại trùng (11 mã hợp lệ; dư nhiều để không chặn nhầm khi gửi trùng)
+# Chặn danh sách quá dài trước khi loại trùng (7 mã hợp lệ; dư nhiều để không chặn nhầm khi gửi trùng)
 MEDICAL_CONDITIONS_MAX_ITEMS = 50
 
 
@@ -90,6 +91,17 @@ class ProfileUpdate(BaseModel):
         return v.lower() if v else v
 
 
+class HealthWarningOut(BaseModel):
+    """Cảnh báo theo bệnh lý tự khai báo (services/health_rules.py). Không đổi mục tiêu, chỉ là lưu ý chung."""
+    id: str
+    domain: Literal["nutrition", "training", "general"]
+    codes: list[str]                    # các bệnh đã khai báo kích hoạt cảnh báo
+    message: str
+    source: str                         # chuỗi nguồn, hoặc DESIGN_RULE nếu là quy tắc thiết kế
+    source_short: Optional[str] = None  # nhãn ngắn của nguồn; None = quy tắc thiết kế
+    source_url: Optional[str] = None
+
+
 class ProfileOut(BaseModel):
     """Schema trả về hồ sơ người dùng, kèm cờ is_complete."""
     age: Optional[int]
@@ -102,6 +114,7 @@ class ProfileOut(BaseModel):
     medical_conditions: list[str] = []
     medical_notes: Optional[str] = None
     medical_consent_at: Optional[datetime] = None
+    health_warnings: list[HealthWarningOut] = []
     is_complete: bool
 
     model_config = {"from_attributes": True}
@@ -122,16 +135,11 @@ class ProfileOut(BaseModel):
             medical_conditions=list(getattr(profile, "medical_conditions", None) or []),
             medical_notes=getattr(profile, "medical_notes", None),
             medical_consent_at=getattr(profile, "medical_consent_at", None),
+            health_warnings=health_warnings(getattr(profile, "medical_conditions", None)),
             is_complete=complete,
         )
 
 
-class HealthWarningOut(BaseModel):
-    """Cảnh báo theo bệnh lý tự khai báo (quy tắc thiết kế, chưa có nguồn lâm sàng)."""
-    code: str
-    label: str
-    message: str
-    withheld: list[str] = []  # các chỉ số mục tiêu bị để null vì bệnh này
 
 
 class ProfileMetricsOut(BaseModel):

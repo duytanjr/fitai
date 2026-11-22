@@ -30,6 +30,8 @@ DEFAULT_RANGE_DAYS = 90
 MAX_RANGE_DAYS = 366
 WEEK_DAYS = 7
 NUTRIENTS = tuple(TARGET_FIELDS)  # energy_kcal, protein_g, fat_g, carb_g
+# Báo cáo tuần là về ăn uống: chỉ kèm cảnh báo dinh dưỡng và chung
+NOTE_WARNING_DOMAINS = ("nutrition", "general")
 CALORIE_NOTE = ("Tính trên các ngày có ghi nhật ký; nếu ghi chưa đủ bữa thì số này thấp hơn thực tế.")
 NUTRIENT_LABELS = {"energy_kcal": ("Calo", "kcal"), "protein_g": ("Protein", "g"),
                    "fat_g": ("Chất béo", "g"), "carb_g": ("Carb", "g")}
@@ -190,10 +192,9 @@ def build_series(start: date, end: date, totals: dict[date, DayTotals], weights:
 
 
 def targets_from(metrics: dict) -> dict | None:
-    """Mục tiêu theo từng chất; một chất có thể None khi bệnh lý khiến chỉ số đó không được tính."""
     if not metrics.get("is_complete"):
         return None
-    return {k: metrics.get(src) for k, src in TARGET_FIELDS.items()}
+    return {k: metrics[src] for k, src in TARGET_FIELDS.items()}
 
 
 def averages(days: list[dict]) -> dict[str, float | None]:
@@ -372,15 +373,9 @@ def weekly_notes(report: dict) -> list[str]:
         notes.append("Chưa có dữ liệu nhật ký để tính trung bình.")
     else:
         if comparison is not None:
-            target = report["target"] or {}
             for f in NUTRIENTS:
                 if comparison[f] is not None:
                     notes.append(comparison_sentence(f, comparison[f]))
-                elif avg[f] is not None and target.get(f) is None:
-                    # Mục tiêu chất này không được tính vì bệnh lý (lý do ở health_warnings)
-                    label, unit = NUTRIENT_LABELS[f]
-                    notes.append(f"{label} trung bình {fmt(avg[f], 0 if unit == 'kcal' else 1)} {unit}/ngày "
-                                 f"(không đặt mục tiêu).")
         else:
             for f in NUTRIENTS:
                 if avg[f] is not None:
@@ -388,8 +383,10 @@ def weekly_notes(report: dict) -> list[str]:
                     notes.append(f"{label} trung bình {fmt(avg[f], 0 if unit == 'kcal' else 1)} {unit}/ngày.")
             notes.append("Hồ sơ chưa đủ thông tin nên chưa so với mục tiêu.")
         notes.append(CALORIE_NOTE)
-    for message in dict.fromkeys(w["message"] for w in report.get("health_warnings") or []):
-        notes.append(f"{message}.")
+    # Báo cáo ăn uống: chỉ cảnh báo dinh dưỡng và cảnh báo chung (cảnh báo tập ở trang Tập luyện)
+    for w in report.get("health_warnings") or []:
+        if w["domain"] in NOTE_WARNING_DOMAINS:
+            notes.append(f"{w['message']}.")
     if report["incomplete_days"]:
         days = ", ".join(fmt_day(d) for d in report["incomplete_days"])
         notes.append(f"Ngày có tổng chưa đầy đủ (có mục thiếu số liệu): {days}.")

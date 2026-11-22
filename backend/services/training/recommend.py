@@ -10,7 +10,8 @@ Thứ tự xét:
 0b) Hồ sơ có khai báo bệnh lý (bất kỳ mã nào, kể cả "other"; xét SAU chốt BMI thấp, TRƯỚC experience):
    chỉ gợi ý mức beginner (thay thế cũng chỉ là beginner), không lùi sang intermediate khi thiếu chương trình
    beginner, needs_medical_clearance=True kèm ghi chú gặp bác sĩ trước khi tập. Quy tắc thiết kế, chưa có
-   nguồn lâm sàng.
+   nguồn lâm sàng. Không lọc bài theo từng bệnh (kho bài chưa có nhãn cường độ/tác động); cảnh báo tập theo
+   bệnh chỉ là chữ (health_warnings, lĩnh vực training/general — services/health_rules.py).
 1) Thiếu mức vận động và experience None → mức beginner (ghi chú hồ sơ còn thiếu).
 3) experience "regular" → intermediate.   4) experience "new" → beginner.
 5) Vận động ít/nhẹ, hoặc BMI ≥ 30, hoặc tuổi ≥ 60 → beginner, thay thế intermediate.
@@ -26,9 +27,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.profile import UserProfile
 from models.training import TrainingProgram, TrainingStatus
+from services.health_rules import declared_conditions, health_warnings
 from services.metrics_service import calculate_bmi
 
 EXPERIENCES = ("regular", "new")
+TRAINING_WARNING_DOMAINS = ("training", "general")
 BEGINNER, INTERMEDIATE = "beginner", "intermediate"
 LOW_BMI, HIGH_BMI, SENIOR_AGE = 18.5, 30.0, 60
 LOW_ACTIVITY = ("sedentary", "light")
@@ -116,7 +119,7 @@ def recommend_program(profile: ProfileFacts | None, experience: str | None,
     goal = profile.fitness_goal
     goal_tag = GOAL_TO_TAG.get(goal) if goal else None
     bmi = _bmi(profile)
-    medical = bool(profile.medical_conditions)
+    medical = bool(declared_conditions(profile.medical_conditions))  # mã lạ/cũ không bật nhánh bệnh
     notes: list[str] = [NOTE_MEDICAL_CLEARANCE] if medical else []
     if bmi is None:
         notes.append(NOTE_NO_BMI)
@@ -214,4 +217,5 @@ async def recommendation_for_user(db: AsyncSession, user_id: uuid.UUID, experien
         "notes": rec.notes,
         "experience": experience,
         "needs_medical_clearance": rec.needs_medical_clearance,
+        "health_warnings": health_warnings(facts.medical_conditions, TRAINING_WARNING_DOMAINS),
     }

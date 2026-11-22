@@ -6,7 +6,7 @@ không gọi mô hình AI/LLM. Nhận số liệu vào và tính toán trả v�
 from dataclasses import dataclass
 from typing import Optional
 
-from models.profile import MEDICAL_CONDITION_CODES, MEDICAL_CONDITION_LABELS
+from services.health_rules import health_warnings
 
 
 # ── 1. Hệ số mức độ vận động (Activity Multipliers) ───────────────────────────
@@ -63,22 +63,8 @@ CALORIES_PER_GRAM_PROTEIN = 4  # 1g Protein = 4 kcal
 CALORIES_PER_GRAM_FAT = 9      # 1g Fat = 9 kcal
 CALORIES_PER_GRAM_CARB = 4     # 1g Carb = 4 kcal
 
-# ── 7. Cảnh báo theo bệnh lý tự khai báo ──────────────────────────────────────
-# QUY TẮC THIẾT KẾ, CHƯA CÓ NGUỒN LÂM SÀNG. Mục đích: cảnh báo an toàn và không đưa con số có thể gây hại;
-# KHÔNG cá nhân hoá điều trị và KHÔNG điều chỉnh BMI/BMR/TDEE theo bệnh.
-#  - kidney: không đưa mục tiêu protein; carb tính từ protein nên cũng null. Calo và chất béo giữ.
-#  - pregnancy_lactation: không tính mục tiêu calo/macro (tất cả null), kể cả cờ calo sàn.
-#  - mọi bệnh còn lại (kể cả "other"): giữ nguyên số, chỉ thêm cảnh báo tham khảo.
-HEALTH_MESSAGE_KIDNEY = "Mục tiêu protein không phù hợp khi có bệnh thận, hãy hỏi bác sĩ"
-HEALTH_MESSAGE_PREGNANCY = ("Chưa hỗ trợ tính mục tiêu khi mang thai hoặc cho con bú, "
-                            "hãy hỏi bác sĩ hoặc chuyên gia dinh dưỡng")
-HEALTH_MESSAGE_GENERAL = "Mục tiêu chỉ mang tính tham khảo, hãy hỏi bác sĩ"
-HEALTH_WITHHELD_FIELDS: dict[str, tuple[str, ...]] = {
-    "kidney": ("protein_g", "carb_g"),
-    "pregnancy_lactation": ("target_calories", "calorie_floor_applied", "protein_g", "fat_g", "carb_g"),
-}
-HEALTH_MESSAGES: dict[str, str] = {"kidney": HEALTH_MESSAGE_KIDNEY,
-                                   "pregnancy_lactation": HEALTH_MESSAGE_PREGNANCY}
+# ── 7. Bệnh lý tự khai báo ─────────────────────────────────────────────────────
+# Bệnh KHÔNG đổi bất kỳ con số nào ở trên: chỉ thêm cảnh báo (services/health_rules.py).
 
 
 @dataclass
@@ -262,30 +248,11 @@ REQUIRED_METRICS_FIELDS = [
 ]
 
 
-def declared_conditions(raw) -> list[str]:
-    """Mã bệnh hợp lệ theo thứ tự chuẩn, không trùng; mã lạ (không qua schema) bị bỏ qua."""
-    present = set(raw or [])
-    return [code for code in MEDICAL_CONDITION_CODES if code in present]
-
-
-def health_warnings(conditions) -> list[dict]:
-    """Một cảnh báo cho mỗi bệnh đã khai báo (quy tắc thiết kế, chưa có nguồn lâm sàng)."""
-    return [
-        {
-            "code": code,
-            "label": MEDICAL_CONDITION_LABELS[code],
-            "message": HEALTH_MESSAGES.get(code, HEALTH_MESSAGE_GENERAL),
-            "withheld": list(HEALTH_WITHHELD_FIELDS.get(code, ())),
-        }
-        for code in declared_conditions(conditions)
-    ]
-
-
 def profile_metrics_summary(profile) -> dict:
     """Tính chỉ số từ một đối tượng hồ sơ (có các thuộc tính như UserProfile) hoặc None.
 
     Hồ sơ chưa đủ trường bắt buộc → {"is_complete": False, "missing_fields": [...], "health_warnings": [...]}.
-    Có bệnh lý → các mục tiêu trong `withheld` của cảnh báo là None (xem mục 7 ở đầu file).
+    Bệnh lý chỉ thêm health_warnings (mọi lĩnh vực), không đổi con số nào.
     """
     if profile is None:
         return {"is_complete": False, "missing_fields": list(REQUIRED_METRICS_FIELDS), "health_warnings": []}
@@ -314,8 +281,5 @@ def profile_metrics_summary(profile) -> dict:
         "fat_g": m.fat_g,
         "carb_g": m.carb_g,
     }
-    for warning in warnings:
-        for field_name in warning["withheld"]:
-            summary[field_name] = None
     summary["health_warnings"] = warnings
     return summary

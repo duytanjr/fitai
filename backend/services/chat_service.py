@@ -11,7 +11,7 @@ from models.profile import MEDICAL_CONDITION_LABELS, UserProfile
 from services.ai_agents.fitness_advisor import AgentToolContext, ChatAgentException, fitness_agent
 from services.foods.lookup import search_foods
 from services.meals import daily_summary
-from services.metrics_service import declared_conditions
+from services.health_rules import declared_conditions
 from services.progress import progress_summary_for_agent
 from services.training.progress import training_summary_for_agent
 from services.training.recommend import recommendation_for_user

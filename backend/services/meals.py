@@ -180,12 +180,10 @@ def summarize(meals: list[MealLog], metrics: dict, day: date) -> dict:
         "health_warnings": list(metrics.get("health_warnings") or []),
     }
     if summary["is_complete"]:
-        # Mục tiêu có thể None khi bệnh lý khiến chỉ số đó không được tính (lý do ở health_warnings)
-        target = {k: metrics.get(src) for k, src in TARGET_FIELDS.items()}
+        target = {k: metrics[src] for k, src in TARGET_FIELDS.items()}
         summary["target"] = target
-        # Cho phép âm (đã vượt mục tiêu), không chặn; mục tiêu None → còn lại None
-        summary["remaining"] = {k: (None if target[k] is None else round(target[k] - eaten[k], 1))
-                                for k in TARGET_FIELDS}
+        # Cho phép âm (đã vượt mục tiêu), không chặn
+        summary["remaining"] = {k: round(target[k] - eaten[k], 1) for k in TARGET_FIELDS}
     return summary
 
 
