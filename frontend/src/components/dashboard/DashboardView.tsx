@@ -30,6 +30,8 @@ import { ProfileInvite, TodayStats } from "@/components/dashboard/TodayCard";
 import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
 import { TrainingWeekCard } from "@/components/dashboard/TrainingWeekCard";
 import { WeightChart } from "@/components/dashboard/WeightChart";
+import { HealthNotice, fromWarnings } from "@/components/health/HealthNotice";
+import { noTargetText } from "@/lib/medical";
 
 /** Cộng/trừ số ngày cho chuỗi YYYY-MM-DD (tính theo UTC để không lệch múi giờ máy). */
 function addDays(iso: string, days: number): string {
@@ -227,6 +229,8 @@ export function DashboardView() {
       <PageContainer className="space-y-6">
         <GreetingCard name={user?.full_name ?? user?.email ?? "bạn"} today={today} />
 
+        {progress && <HealthNotice {...fromWarnings(progress.health_warnings)} />}
+
         {error && (
           <div className="flex items-center justify-between rounded-control bg-red-50 px-4 py-3 text-sm text-red-700">
             <span>{error}</span>
@@ -283,6 +287,9 @@ export function DashboardView() {
                           `${formatNumber(Math.abs(kcalComparison.diff), 0)} kcal (${formatNumber(Math.abs(kcalComparison.diff_pct))}%)`)}
                     .
                   </p>
+                )}
+                {progress.is_complete && progress.target?.energy_kcal === null && (
+                  <p className="text-muted">{noTargetText(progress.health_warnings, "energy_kcal")}</p>
                 )}
                 {stats.average.energy_kcal !== null && <p className="text-muted">{stats.calorie_note}</p>}
               </div>

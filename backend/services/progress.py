@@ -380,7 +380,7 @@ def weekly_notes(report: dict) -> list[str]:
                     # Mục tiêu chất này không được tính vì bệnh lý (lý do ở health_warnings)
                     label, unit = NUTRIENT_LABELS[f]
                     notes.append(f"{label} trung bình {fmt(avg[f], 0 if unit == 'kcal' else 1)} {unit}/ngày "
-                                 f"(không có mục tiêu để so).")
+                                 f"(không đặt mục tiêu).")
         else:
             for f in NUTRIENTS:
                 if avg[f] is not None:

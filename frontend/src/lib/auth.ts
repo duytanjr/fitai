@@ -33,10 +33,20 @@ export interface ProfileData {
   activity_level: string | null;
   fitness_goal: string | null;
   dietary_restrictions: string | null;
+  /** Mã bệnh lý tự khai báo (xem lib/medical.ts); [] = không khai báo */
+  medical_conditions: string[];
+  medical_notes: string | null;
+  medical_consent_at: string | null;
   is_complete: boolean;
 }
 
-export type ProfileUpdateRequest = Partial<Omit<ProfileData, "is_complete">>;
+export type ProfileUpdateRequest = Partial<
+  Omit<ProfileData, "is_complete" | "medical_consent_at" | "medical_conditions">
+> & {
+  medical_conditions?: string[];
+  /** Bắt buộc true khi medical_conditions không rỗng; server không lưu giá trị này */
+  medical_consent?: boolean;
+};
 
 export const authApi = {
   login: async (data: LoginRequest): Promise<LoginResponse> => {

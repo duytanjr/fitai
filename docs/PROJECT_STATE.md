@@ -1,6 +1,6 @@
 # Trạng thái dự án FitAI (ghi chú bàn giao giữa các phiên)
 
-Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-10.
+Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-22.
 
 ## 1. Các lát đã xong (git log)
 | Lát | Commit | Nội dung chính |
@@ -24,18 +24,27 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | Dữ liệu tập luyện + ảnh xem trước | 5af1b21, 7f4def5, 76b89a7 | nội dung nguoi-moi-14 và toan-than-28 trong data/training/, ảnh xem trước YouTube trên trang ngày tập |
 | Nạp món ăn thủ công (FR19) | 2fab762, d5da112 | scripts/import_admin_foods.py, services/foods/admin_import.py, data/foods/manual/ |
 | 70 món ADMIN_MANUAL (chế biến, đồ uống, thực phẩm cơ bản) | 6d25841 | dishes.csv (đợt 1, 8 món) + dishes_all.csv (62 món mới, cập nhật 6 món đợt 1), nạp vào DB dev |
-| Khớp tên món nhập thủ công + chống trích dẫn không nguồn | chưa commit (nhánh fix/citation-consistency) | bóc ngoặc khẩu phần khi khớp tên món ADMIN, số theo khẩu phần giả định, bỏ lời dặn "không có món ăn hoàn chỉnh", "cháo trắng" ưu tiên món đúng tên, quy tắc trích dẫn trong chính lượt, cảnh báo frontend lib/citations.ts |
+| Khớp tên món nhập thủ công + chống trích dẫn không nguồn | 18ab066, ff8bd0b | bóc ngoặc khẩu phần khi khớp tên món ADMIN, số theo khẩu phần giả định, bỏ lời dặn "không có món ăn hoàn chỉnh", "cháo trắng" ưu tiên món đúng tên, quy tắc trích dẫn trong chính lượt, cảnh báo frontend lib/citations.ts |
+| Bệnh lý tự khai báo trong hồ sơ | chưa commit (nhánh nang-cap-ai) | migration b7d4e2a9c615 (medical_conditions, medical_notes, medical_consent_at), schema + đồng ý, health_warnings và mục tiêu null theo bệnh, gợi ý tập chỉ mức người mới + needs_medical_clearance, quy tắc 20 của prompt, bước "Sức khỏe" ở onboarding, banner HealthNotice |
 
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
 
-- pytest hiện tại: 970 passed, 0 skipped (sau sửa khớp tên món nhập thủ công và quy tắc trích dẫn: +14 test —
+- pytest hiện tại: 1031 passed, 0 failed (sau phần bệnh lý: +61 test — tests/test_medical_profile.py 59 test,
+  tests/test_medical_migration.py 2 test; 1 assert cũ ở test_fitness_agent.py thêm khoá health_warnings; trước đó
+  970 passed, 0 skipped sau sửa khớp tên món nhập thủ công và quy tắc trích dẫn: +14 test —
   12 test tra cứu món ADMIN trên DB test, 2 test chuỗi prompt/mô tả công cụ, 1 assert cũ "phở bò, cháo, canh"
   bị bỏ; trước đó 956 sau quy tắc kỹ thuật
   động tác: +1 test nội dung quy tắc; sau 955
   là sau script nạp món ăn thủ công: +28 test import, test dữ liệu tập luyện
   trong repo 1 → 4; sau 9d là 924, sau 9b là 862, sau 9a là 822, sau 8b-2 là 689, sau 8b-1 là
   628, sau 8a là 580, sau lát 7 là 487). Lát 9d không có migration mới.
+- Migration b7d4e2a9c615 (bệnh lý, 2026-11-22) có down_revision d2a6f9c3e8b1, đã `alembic upgrade head` trên DB
+  dev; KHÔNG chạy downgrade thật (test chạy downgrade()/upgrade() trong transaction rồi rollback). LƯU Ý khi gộp
+  nhánh: nhánh của bạn trong nhóm có migration telegram cũng dùng down_revision d2a6f9c3e8b1, gộp vào sẽ thành HAI
+  head (`alembic heads` ra 2 dòng, `alembic upgrade head` báo lỗi). Khi đó cần tạo migration gộp
+  (`alembic merge -m "merge medical and telegram" <rev1> <rev2>`) hoặc sửa down_revision của một bên cho nối tiếp,
+  rồi kiểm lại `alembic heads` chỉ còn một.
 - md5 trước/sau migration d2a6f9c3e8b1 (trùng nhau): foods, meal_logs, body_metrics, chat_sessions như dòng 9a bên
   dưới; users 80 dòng `45add6f9c99a77675bdb856963d98f93`; workout_videos 2 dòng `a8f9331b5237cf67edb66f7dad117fb5`;
   training_programs 1 dòng `8d94dc027929a48eec087fc37364fd21`. Sau thử đầu-cuối 9b chỉ users đổi (81 dòng
@@ -383,6 +392,28 @@ Prompt và chống trích dẫn không nguồn (services/ai_agents/fitness_advis
   cứu…". Không hiện cho tin người dùng, tin báo dịch vụ gián đoạn, hay khi chỉ nhắc tên ISSN/NASM/WHO đơn lẻ.
   Không có cờ ở backend, không đổi API. Kiểm bằng script Node ngoài repo (15/15 ca), tsc và next build.
 
+Bệnh lý tự khai báo (chỉ để cảnh báo an toàn, KHÔNG cá nhân hoá điều trị; quy tắc thiết kế, chưa có nguồn lâm
+sàng; chi tiết và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
+- user_profiles.medical_conditions (varchar(40)[], NOT NULL, mặc định '{}'), medical_notes (≤ 500, null),
+  medical_consent_at (timestamptz, null). Mã và nhãn dùng chung: models/profile.py (MedicalCondition,
+  MEDICAL_CONDITION_LABELS), frontend lib/medical.ts phải khớp.
+- PUT /profile: mã lạ / null / notes > 500 → 422; loại trùng; có bệnh thì medical_consent phải là true (bool thật),
+  không lưu bool; server đặt medical_consent_at = lúc lưu, xoá về [] thì null, không gửi thì giữ nguyên.
+- profile_metrics_summary trả health_warnings {code, label, message, withheld}: kidney → protein_g, carb_g null;
+  pregnancy_lactation → calo mục tiêu, cờ calo sàn và cả 3 macro null; bệnh khác chỉ cảnh báo. BMI/BMR/TDEE không
+  đổi. Nhật ký ngày, /progress, báo cáo tuần: mục tiêu/còn lại null theo từng chất, kèm health_warnings.
+- recommend.py luật 0b: có bất kỳ bệnh nào → chỉ mức người mới (kể cả khi nói đã tập đều), không lùi sang trung
+  bình, needs_medical_clearance=true. Chốt BMI thấp vẫn xét trước.
+- Agent: profile_data có tên bệnh + ghi chú; ghi chú nằm trong thẻ <ghi_chu_benh_ly> (đã thay < >), quy tắc 20.
+- Không ghi log dữ liệu bệnh lý (không handler/middleware đọc body, structlog không dùng, hide_parameters=True);
+  API admin xem hội thoại không trả trường bệnh lý. Phản hồi 422 mặc định của FastAPI vẫn lặp lại giá trị người
+  dùng gửi trong `input` (trả về chính người dùng, không ghi log).
+- Frontend: onboarding bước 3 "Sức khỏe" (10 bệnh, Khác + ghi chú có đếm ký tự, Không có, kiêng cữ chuyển sang
+  đây, ô đồng ý chỉ bắt buộc khi có bệnh; không thao tác thì không gửi medical_*); cảnh báo mềm tuổi < 18; banner
+  HealthNotice ở Tổng quan (lấy từ progress.health_warnings) và trang Tập luyện (lấy tên từ GET /profile, không
+  hiện ghi chú); "Không đặt mục tiêu: <lý do>" ở thẻ hôm nay, nhật ký ăn uống, tiến độ; cảnh báo gặp bác sĩ ở hộp
+  gợi ý chương trình. Mô tả "light" thống nhất "1–3 ngày/tuần".
+
 ## 3. Quy ước làm việc đã chốt
 - Không tự commit; báo danh sách file đổi để người dùng commit. Kế hoạch file trước, chờ xác nhận.
 - Test mock hoàn toàn Gemini và embedding; test DB dùng Postgres thật trong transaction rollback
@@ -501,6 +532,12 @@ Prompt và chống trích dẫn không nguồn (services/ai_agents/fitness_advis
   /admin (tab Thực phẩm, tab Tài liệu, xác nhận khi tắt tài liệu builtin, tải file lớn); mới kiểm bằng tsc/next
   build và gọi API trực tiếp.
 - Hội thoại (8b-2): hội thoại được giữ vô thời hạn (chưa có chính sách lưu trữ).
+- Bệnh lý (2026-11-22): quy tắc là thiết kế, CHƯA có nguồn lâm sàng và chưa được chuyên môn y tế duyệt. Chưa có
+  trang xem/sửa hồ sơ: form onboarding không nạp dữ liệu cũ, muốn đổi bệnh phải làm lại onboarding (không tick gì ở
+  phần bệnh thì giữ nguyên bệnh cũ). Tôn trọng bệnh lý và ghi chú trong chat phụ thuộc mô hình (quy tắc 20 CHƯA thử
+  với Gemini thật); code không lọc món theo bệnh. Ghi chú bệnh lý gửi tới Gemini mỗi lượt chat. Đồng ý chỉ lưu
+  thời điểm, không lưu nội dung câu đồng ý hay phiên bản. Giao diện mới kiểm bằng tsc/next build, CHƯA thử trên
+  trình duyệt; container frontend chưa build lại.
 - Tập luyện (9a): FR13 và FR14 được đơn giản hoá có chủ đích — chưa có nhóm cơ, lưu ý an toàn riêng từng bài,
   ghi từng hiệp/lần/mức tạ; mỗi mục chỉ là một video YouTube kèm label. Chưa có theo dõi hoàn thành ngày, ghi số
   phút, gợi ý chương trình, công cụ chatbot (đã làm ở 9b/9d). Không kiểm link còn xem được (checked_on do người
@@ -548,7 +585,10 @@ Prompt và chống trích dẫn không nguồn (services/ai_agents/fitness_advis
    (phở bò, bún bò Huế, cơm tấm, trà sữa, bánh tét, cháo trắng) và câu kiểm trích dẫn khi hỏi lại cùng chủ đề;
    giữ nguyên v1 ở eade8b0 làm mốc, rồi đo lần 2 và so với mốc eade8b0, gồm tỷ lệ câu có khung nguồn đúng. Có
    thể thêm câu đánh giá cho tiến độ, dòng quản trị viên nhập và tập luyện (gợi ý chương trình, tiến độ tập).
-9. Báo cáo đồ án (bảng "Trạng thái thực hiện" ở SPEC.md mục 4 là căn cứ phạm vi).
+9. Bệnh lý: thử trên trình duyệt (onboarding bước Sức khỏe, banner, "Không đặt mục tiêu"), thử quy tắc 20 với
+   Gemini thật (nhắc gặp bác sĩ, không theo yêu cầu trong ghi chú); cân nhắc trang xem/sửa hồ sơ; gộp migration
+   nếu gộp nhánh telegram (xem mục 1).
+10. Báo cáo đồ án (bảng "Trạng thái thực hiện" ở SPEC.md mục 4 là căn cứ phạm vi).
 Đã bỏ có chủ đích: gợi ý thực đơn / thay món (FR10–11 ngoài phạm vi) và bộ lọc câu hỏi y khoa riêng bằng code
 (FR7 đáp ứng bằng quy tắc prompt, dòng cảnh báo dưới ô nhập và nhóm câu hỏi E).
 Thứ tự trên là dự kiến của người dùng; chi tiết từng lát chưa chốt (chưa chắc).

@@ -7,19 +7,25 @@ import { authApi } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { HealthNotice } from "@/components/health/HealthNotice";
+import { conditionLabels } from "@/lib/medical";
 
-/** Tuổi từ hồ sơ; lỗi hay chưa có hồ sơ → null (chỉ bỏ dòng nhắc, không chặn trang). */
-function useProfileAge(enabled: boolean): number | null {
-  const [age, setAge] = useState<number | null>(null);
+/** Tuổi và tên bệnh từ hồ sơ; lỗi hay chưa có hồ sơ → bỏ dòng nhắc và banner, không chặn trang. */
+function useProfileFacts(enabled: boolean): { age: number | null; conditions: string[] } {
+  const [facts, setFacts] = useState<{ age: number | null; conditions: string[] }>({ age: null, conditions: [] });
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
-    authApi.getProfile().then((p) => alive && setAge(p.age ?? null)).catch(() => {});
+    authApi
+      .getProfile()
+      // Chỉ lấy tên bệnh; ghi chú tự do (medical_notes) không bao giờ hiển thị ở đây
+      .then((p) => alive && setFacts({ age: p.age ?? null, conditions: conditionLabels(p.medical_conditions) }))
+      .catch(() => {});
     return () => {
       alive = false;
     };
   }, [enabled]);
-  return age;
+  return facts;
 }
 
 export function TrainingSafetyNotice({ weightLoss = false, age }: { weightLoss?: boolean; age: number | null }) {
@@ -46,7 +52,7 @@ interface Props {
 export function TrainingShell({ weightLoss = false, narrow = false, children }: Props) {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
-  const age = useProfileAge(isAuthenticated);
+  const { age, conditions } = useProfileFacts(isAuthenticated);
 
   useEffect(() => {
     if (!isAuthenticated) router.replace("/login");
@@ -57,6 +63,7 @@ export function TrainingShell({ weightLoss = false, narrow = false, children }: 
       <AppHeader />
       <PageContainer>
         <div className={cn("space-y-5", narrow && "max-w-3xl")}>
+          <HealthNotice labels={conditions} />
           <TrainingSafetyNotice weightLoss={weightLoss} age={age} />
           {children}
         </div>

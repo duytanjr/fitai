@@ -172,6 +172,8 @@ export interface Recommendation {
   reason: string;
   notes: string[];
   experience: Experience | null;
+  /** Hồ sơ có bệnh lý: chỉ gợi ý mức người mới, cần gặp bác sĩ trước khi tập */
+  needs_medical_clearance: boolean;
 }
 
 export const recommendationApi = {

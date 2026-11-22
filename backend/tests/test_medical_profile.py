@@ -276,7 +276,7 @@ def test_progress_compare_skips_null_targets_and_weekly_notes_explain():
     assert stats["comparison"]["protein_g"] is None and stats["comparison"]["carb_g"] is None
     assert stats["comparison"]["energy_kcal"]["target"] == 2104
     r = p.build_weekly_report(start, date(2026, 11, 4), series, metrics)
-    assert "Protein trung bình 100 g/ngày (không có mục tiêu để so)." in r["notes"]
+    assert "Protein trung bình 100 g/ngày (không đặt mục tiêu)." in r["notes"]
     assert f"{HEALTH_MESSAGE_KIDNEY}." in r["notes"]
     assert r["health_warnings"][0]["code"] == "kidney"
 

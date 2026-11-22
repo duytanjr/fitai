@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { authApi, type ProfileUpdateRequest } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
+import { MEDICAL_CONDITIONS, MEDICAL_NOTES_MAX_LENGTH } from "@/lib/medical";
 
 // ── Enum options ──────────────────────────────────────────────────────────────
 const ACTIVITY_OPTIONS = [
   { value: "sedentary", label: "Ít vận động (ngồi nhiều)" },
-  { value: "light", label: "Nhẹ nhàng (tập 1–2 ngày/tuần)" },
+  { value: "light", label: "Nhẹ nhàng (tập 1–3 ngày/tuần)" },
   { value: "moderate", label: "Vừa phải (tập 3–5 ngày/tuần)" },
   { value: "active", label: "Tích cực (tập 6–7 ngày/tuần)" },
   { value: "very_active", label: "Rất tích cực (vận động cường độ cao)" },
@@ -38,6 +39,20 @@ interface FormData {
   fitness_goal: string;
   dietary_restrictions: string;
 }
+
+/** Phần bệnh lý của bước "Sức khỏe". touched=false → không gửi trường medical_* nào. */
+interface MedicalState {
+  touched: boolean;
+  none: boolean;
+  conditions: string[];
+  notes: string;
+  consent: boolean;
+}
+
+const DISEASES = MEDICAL_CONDITIONS.filter((c) => c.code !== "other");
+const MEDICAL_NOTICE =
+  "Thông tin này chỉ để cảnh báo an toàn, không thay thế tư vấn của bác sĩ, và sẽ được gửi tới mô hình AI khi bạn " +
+  "dùng chat. Nội dung hội thoại có thể được quản trị viên xem ở dạng ẩn danh.";
 
 interface FieldError {
   [key: string]: string;
@@ -87,6 +102,34 @@ export function OnboardingForm() {
     fitness_goal: "",
     dietary_restrictions: "",
   });
+  const [medical, setMedical] = useState<MedicalState>({
+    touched: false,
+    none: false,
+    conditions: [],
+    notes: "",
+    consent: false,
+  });
+
+  const toggleCondition = (code: string) => {
+    setMedical((m) => {
+      const conditions = m.conditions.includes(code) ? m.conditions.filter((c) => c !== code) : [...m.conditions, code];
+      // Bỏ hết bệnh thì bỏ luôn đồng ý (lần sau chọn lại phải tick lại)
+      return { ...m, touched: true, none: false, conditions, consent: conditions.length > 0 && m.consent };
+    });
+    setFieldErrors((prev) => ({ ...prev, medical_consent: "" }));
+  };
+
+  const toggleNone = () => {
+    setMedical((m) =>
+      m.none ? { ...m, touched: true, none: false } : { ...m, touched: true, none: true, conditions: [], consent: false }
+    );
+    setFieldErrors((prev) => ({ ...prev, medical_consent: "" }));
+  };
+
+  const hasConditions = medical.conditions.length > 0;
+  const otherChecked = medical.conditions.includes("other");
+  const ageNumber = Number(form.age);
+  const isMinor = form.age !== "" && Number.isFinite(ageNumber) && ageNumber >= 13 && ageNumber < 18;
 
   // Bảo vệ trang: yêu cầu đăng nhập
   useEffect(() => {
@@ -120,6 +163,12 @@ export function OnboardingForm() {
 
   const handleSubmit = async () => {
     const errors = validateStep(step, form);
+    if (hasConditions && !medical.consent) {
+      errors.medical_consent = "Vui lòng tick “Tôi hiểu và đồng ý” khi đã chọn bệnh lý, hoặc bỏ chọn các bệnh.";
+    }
+    if (otherChecked && medical.notes.length > MEDICAL_NOTES_MAX_LENGTH) {
+      errors.medical_notes = `Ghi chú tối đa ${MEDICAL_NOTES_MAX_LENGTH} ký tự`;
+    }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
@@ -135,6 +184,12 @@ export function OnboardingForm() {
       if (form.activity_level) payload.activity_level = form.activity_level;
       if (form.fitness_goal) payload.fitness_goal = form.fitness_goal;
       if (form.dietary_restrictions) payload.dietary_restrictions = form.dietary_restrictions;
+      // Chỉ gửi phần bệnh lý khi người dùng đã thao tác (form không nạp hồ sơ cũ, gửi [] sẽ xoá bệnh đã khai)
+      if (medical.touched) {
+        payload.medical_conditions = medical.conditions;
+        payload.medical_notes = otherChecked ? medical.notes.trim() || null : null;
+        if (hasConditions) payload.medical_consent = medical.consent;
+      }
 
       await authApi.updateProfile(payload);
       router.push("/dashboard");
@@ -226,6 +281,12 @@ export function OnboardingForm() {
                     className={inputCls("age")}
                   />
                   <FieldErr field="age" />
+                  {isMinor && (
+                    <p className="mt-1 text-xs text-amber-800">
+                      Bạn dưới 18 tuổi: nên hỏi ý kiến phụ huynh, bác sĩ hoặc huấn luyện viên trước khi áp dụng chế
+                      độ ăn hay tập luyện.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -313,21 +374,105 @@ export function OnboardingForm() {
             </div>
           )}
 
-          {/* ── Bước 2: Dị ứng / Kiêng cữ ──────────────────────────────── */}
+          {/* ── Bước 2: Sức khỏe (toàn bộ tùy chọn) ─────────────────────── */}
           {step === 2 && (
             <div className="space-y-5">
-              <h2 className="text-lg font-semibold text-gray-900">Dị ứng & Kiêng cữ</h2>
-              <p className="text-sm text-gray-500">
-                Để AI không gợi ý những thực phẩm bạn không thể ăn.
-                Bỏ trống nếu không có.
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Sức khỏe</h2>
+                <p className="mt-1 text-sm text-gray-500">Bước này không bắt buộc. Bỏ trống nếu bạn không muốn khai báo.</p>
+              </div>
+
+              <fieldset>
+                <legend className="mb-2 text-sm font-medium text-gray-700">Bệnh lý hoặc tình trạng sức khỏe</legend>
+                <div className="space-y-2">
+                  {DISEASES.map((c) => (
+                    <label key={c.code} className="flex cursor-pointer items-start gap-2.5 text-sm text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={medical.conditions.includes(c.code)}
+                        onChange={() => toggleCondition(c.code)}
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-brand-700"
+                      />
+                      {c.label}
+                    </label>
+                  ))}
+                  <label className="flex cursor-pointer items-start gap-2.5 text-sm text-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={otherChecked}
+                      onChange={() => toggleCondition("other")}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-brand-700"
+                    />
+                    Khác
+                  </label>
+                  {otherChecked && (
+                    <div className="pl-6">
+                      <label htmlFor="medical-notes" className="sr-only">Ghi chú bệnh lý khác</label>
+                      <textarea
+                        id="medical-notes"
+                        rows={3}
+                        maxLength={MEDICAL_NOTES_MAX_LENGTH}
+                        value={medical.notes}
+                        onChange={(e) => {
+                          const notes = e.target.value;
+                          setMedical((m) => ({ ...m, touched: true, notes }));
+                          setFieldErrors((prev) => ({ ...prev, medical_notes: "" }));
+                        }}
+                        placeholder="Mô tả ngắn tình trạng khác (không bắt buộc)"
+                        aria-describedby="medical-notes-count"
+                        className={`${inputCls("medical_notes")} resize-none`}
+                      />
+                      <p id="medical-notes-count" className="mt-1 text-right text-xs text-gray-500">
+                        {medical.notes.length}/{MEDICAL_NOTES_MAX_LENGTH}
+                      </p>
+                      <FieldErr field="medical_notes" />
+                    </div>
+                  )}
+                  <label className="flex cursor-pointer items-start gap-2.5 border-t border-gray-100 pt-2 text-sm text-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={medical.none}
+                      onChange={toggleNone}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-brand-700"
+                    />
+                    Không có
+                  </label>
+                </div>
+              </fieldset>
+
+              <p className="rounded-lg bg-amber-50 px-3 py-2.5 text-xs text-amber-900 ring-1 ring-amber-200">
+                {MEDICAL_NOTICE}
               </p>
+
+              {hasConditions && (
+                <div>
+                  <label className="flex cursor-pointer items-start gap-2.5 text-sm font-medium text-gray-900">
+                    <input
+                      type="checkbox"
+                      checked={medical.consent}
+                      onChange={(e) => {
+                        const consent = e.target.checked;
+                        setMedical((m) => ({ ...m, consent }));
+                        setFieldErrors((prev) => ({ ...prev, medical_consent: "" }));
+                      }}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-brand-700"
+                    />
+                    Tôi hiểu và đồng ý <span className="text-red-500">*</span>
+                  </label>
+                  <FieldErr field="medical_consent" />
+                </div>
+              )}
+
               <div>
                 <label htmlFor="dietary" className="block text-sm font-medium text-gray-700 mb-1.5">
                   Dị ứng hoặc món kiêng cữ
                 </label>
+                <p className="mb-1.5 text-xs text-gray-500">
+                  Để AI không gợi ý những thực phẩm bạn không thể ăn. Bỏ trống nếu không có.
+                </p>
                 <textarea
                   id="dietary"
-                  rows={4}
+                  rows={3}
                   value={form.dietary_restrictions}
                   onChange={set("dietary_restrictions")}
                   placeholder="Ví dụ: Không ăn hải sản, dị ứng đậu phộng, ăn chay..."

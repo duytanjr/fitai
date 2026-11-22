@@ -9,6 +9,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { AddMealForm, friendlyError } from "@/components/meals/AddMealForm";
 import { cn } from "@/lib/utils";
+import { noTargetText } from "@/lib/medical";
 import { Card } from "@/components/ui/Card";
 import { Beef, Cookie, Droplet, Flame, Moon, Plus, Sun, Sunrise, TriangleAlert, Wheat } from "lucide-react";
 import type { ReactNode } from "react";
@@ -82,6 +83,21 @@ function SummaryCard({ summary }: { summary: DailySummary }) {
               const eaten = summary.eaten[key];
               const target = summary.target![key];
               const remaining = summary.remaining![key];
+              // Mục tiêu null (bệnh lý): chỉ hiện số đã ăn và lý do, không thanh tiến độ, không chia
+              if (target === null || remaining === null) {
+                return (
+                  <div key={key} className="rounded-control border border-line bg-canvas p-3">
+                    <div className="flex items-center gap-2">
+                      <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-100 text-accent-800">
+                        {icon}
+                      </span>
+                      <span className="text-sm font-medium text-muted">{label}</span>
+                    </div>
+                    <p className="mt-2 text-xl font-bold tabular-nums text-ink">{formatValue(eaten, unit)}</p>
+                    <p className="mt-1.5 text-xs text-muted">{noTargetText(summary.health_warnings, key)}</p>
+                  </div>
+                );
+              }
               const pct = target > 0 ? Math.min(100, (eaten / target) * 100) : 0;
               const over = target > 0 && remaining < 0;
               return (

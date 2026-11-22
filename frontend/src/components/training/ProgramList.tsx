@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { TriangleAlert } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { TrainingShell, useTrainingUnauthorized } from "@/components/training/TrainingShell";
 import { cn } from "@/lib/utils";
@@ -71,7 +72,18 @@ export function ProgramList() {
           <h2 id="rec-title" className="text-base font-semibold text-ink">
             {rec.primary ? `Gợi ý cho bạn: ${rec.primary.title}` : "Gợi ý chương trình"}
           </h2>
+          {!rec.primary && (
+            <p className="mt-1 text-sm font-medium text-ink">Hiện chưa có chương trình phù hợp để gợi ý cho bạn.</p>
+          )}
           <p className="mt-1 text-sm text-ink">{rec.reason}</p>
+          {rec.needs_medical_clearance && (
+            <p role="note" className="mt-2 flex items-start gap-2 rounded-control border border-accent-200 bg-accent-50 px-3 py-2 text-sm text-accent-900">
+              <TriangleAlert aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-accent-700" />
+              <span>
+                Hồ sơ của bạn có khai báo bệnh lý nên chỉ gợi ý mức người mới. Hãy gặp bác sĩ trước khi bắt đầu tập.
+              </span>
+            </p>
+          )}
           {rec.alternative && (
             <p className="mt-1 text-sm text-muted">
               Thay thế:{" "}

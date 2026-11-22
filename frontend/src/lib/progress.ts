@@ -1,5 +1,6 @@
 import { apiClient } from "./api-client";
-import type { MacroValues } from "./meals";
+import type { MacroValues, TargetValues } from "./meals";
+import type { HealthWarning } from "./medical";
 
 export const PROGRESS_DAYS = [7, 30, 90] as const;
 export type ProgressDays = (typeof PROGRESS_DAYS)[number];
@@ -71,9 +72,10 @@ export interface Progress {
   end_date: string;
   is_complete: boolean;
   missing_fields: string[];
-  target: MacroValues | null;
+  target: TargetValues | null;
   series: ProgressDay[];
   stats: ProgressStats;
+  health_warnings: HealthWarning[];
   latest_weight: { measured_on: string; weight_kg: number; waist_cm: number | null } | null;
 }
 
@@ -87,7 +89,7 @@ export interface WeeklyReport {
   logged_days: number;
   is_complete: boolean;
   missing_fields: string[];
-  target: MacroValues | null;
+  target: TargetValues | null;
   average: NullableMacros;
   comparison: Comparison | null;
   weight_change: WeightChange | null;
@@ -97,6 +99,7 @@ export interface WeeklyReport {
   calorie_note: string;
   /** Nhận xét trung tính do server tạo */
   notes: string[];
+  health_warnings: HealthWarning[];
 }
 
 /** "2026-11-04" → "04/11" */
