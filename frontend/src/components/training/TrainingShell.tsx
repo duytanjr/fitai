@@ -8,18 +8,23 @@ import { cn } from "@/lib/utils";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { HealthNotice } from "@/components/health/HealthNotice";
-import { conditionLabels } from "@/lib/medical";
+import { TRAINING_DOMAINS, type HealthWarning } from "@/lib/medical";
 
-/** Tuổi và tên bệnh từ hồ sơ; lỗi hay chưa có hồ sơ → bỏ dòng nhắc và banner, không chặn trang. */
-function useProfileFacts(enabled: boolean): { age: number | null; conditions: string[] } {
-  const [facts, setFacts] = useState<{ age: number | null; conditions: string[] }>({ age: null, conditions: [] });
+interface ProfileFacts {
+  age: number | null;
+  warnings: HealthWarning[];
+}
+
+/** Tuổi và cảnh báo sức khỏe từ hồ sơ; lỗi hay chưa có hồ sơ → bỏ dòng nhắc và banner, không chặn trang. */
+function useProfileFacts(enabled: boolean): ProfileFacts {
+  const [facts, setFacts] = useState<ProfileFacts>({ age: null, warnings: [] });
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
     authApi
       .getProfile()
-      // Chỉ lấy tên bệnh; ghi chú tự do (medical_notes) không bao giờ hiển thị ở đây
-      .then((p) => alive && setFacts({ age: p.age ?? null, conditions: conditionLabels(p.medical_conditions) }))
+      // Chỉ lấy cảnh báo do server tính; ghi chú tự do (medical_notes) không bao giờ hiển thị ở đây
+      .then((p) => alive && setFacts({ age: p.age ?? null, warnings: p.health_warnings ?? [] }))
       .catch(() => {});
     return () => {
       alive = false;
@@ -52,7 +57,7 @@ interface Props {
 export function TrainingShell({ weightLoss = false, narrow = false, children }: Props) {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
-  const { age, conditions } = useProfileFacts(isAuthenticated);
+  const { age, warnings } = useProfileFacts(isAuthenticated);
 
   useEffect(() => {
     if (!isAuthenticated) router.replace("/login");
@@ -63,7 +68,8 @@ export function TrainingShell({ weightLoss = false, narrow = false, children }: 
       <AppHeader />
       <PageContainer>
         <div className={cn("space-y-5", narrow && "max-w-3xl")}>
-          <HealthNotice labels={conditions} />
+          {/* Trang tập luyện: chỉ cảnh báo tập và chung (cảnh báo dinh dưỡng ở trang Tổng quan) */}
+          <HealthNotice warnings={warnings} domains={TRAINING_DOMAINS} />
           <TrainingSafetyNotice weightLoss={weightLoss} age={age} />
           {children}
         </div>

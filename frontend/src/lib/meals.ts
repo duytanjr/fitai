@@ -113,14 +113,6 @@ export interface MacroValues {
   carb_g: number;
 }
 
-/** Mục tiêu (hoặc phần còn lại) theo từng chất; null = không đặt mục tiêu vì bệnh lý (xem health_warnings). */
-export interface TargetValues {
-  energy_kcal: number | null;
-  protein_g: number | null;
-  fat_g: number | null;
-  carb_g: number | null;
-}
-
 export interface DailySummary {
   date: string;
   entries_count: number;
@@ -130,8 +122,9 @@ export interface DailySummary {
   missing_by_nutrient: Partial<Record<keyof Nutrients, number>>;
   is_complete: boolean;
   missing_fields: string[];
-  target: TargetValues | null;
-  remaining: TargetValues | null;
+  /** null cả khối khi hồ sơ chưa đủ; bệnh lý không đổi mục tiêu */
+  target: MacroValues | null;
+  remaining: MacroValues | null;
   /** Carb đã ăn lấy từ cột glucid của nguồn, không gồm xơ */
   carb_note: string;
   health_warnings: HealthWarning[];

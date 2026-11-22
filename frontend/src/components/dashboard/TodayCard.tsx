@@ -4,7 +4,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Beef, Droplet, Flame, TriangleAlert, Wheat } from "lucide-react";
 import type { DailySummary, MacroValues } from "@/lib/meals";
-import { noTargetText } from "@/lib/medical";
 import { formatNumber } from "@/lib/progress";
 import { StatCard, isValidTarget } from "@/components/ui/StatCard";
 
@@ -37,8 +36,6 @@ export function TodayStats({ summary }: { summary: DailySummary }) {
           const eaten = summary.eaten[key];
           const rawTarget = summary.target?.[key];
           const target = isValidTarget(rawTarget) ? rawTarget : null;
-          // Hồ sơ đủ nhưng server không đặt mục tiêu chất này (bệnh lý): nêu lý do, không thanh tiến độ
-          const withheld = summary.is_complete && summary.target !== null && rawTarget === null;
           // "Vượt mục tiêu" chỉ khi có nhật ký và mục tiêu là số hợp lệ > 0.
           const over = hasLog && target !== null && eaten > target;
 
@@ -54,9 +51,7 @@ export function TodayStats({ summary }: { summary: DailySummary }) {
           );
 
           let hint: ReactNode = null;
-          if (withheld) {
-            hint = noTargetText(summary.health_warnings, key);
-          } else if (over) {
+          if (over) {
             hint = (
               <span className="inline-flex items-center gap-1 font-medium text-accent-800">
                 <TriangleAlert aria-hidden className="h-3.5 w-3.5" />

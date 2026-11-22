@@ -42,6 +42,7 @@ services:
       - ./data:/app/data:ro     # kho tri thức RAG (chỉ đọc)
       - ./data/eval/results:/app/eval_results   # kết quả đánh giá chatbot (ghi được, ngoài /app/data)
       - ./data/knowledge/uploads:/app/uploads  # tài liệu RAG do quản trị viên tải lên (ghi được, ngoài /app/data)
+      - ./docs:/app/docs:ro     # tài liệu dự án (chỉ đọc; test đồng bộ tests/test_health_rules.py)
     command: >
       uvicorn main:app
         --host 0.0.0.0

@@ -1,5 +1,5 @@
 import { apiClient } from "./api-client";
-import type { MacroValues, TargetValues } from "./meals";
+import type { MacroValues } from "./meals";
 import type { HealthWarning } from "./medical";
 
 export const PROGRESS_DAYS = [7, 30, 90] as const;
@@ -72,7 +72,7 @@ export interface Progress {
   end_date: string;
   is_complete: boolean;
   missing_fields: string[];
-  target: TargetValues | null;
+  target: MacroValues | null;
   series: ProgressDay[];
   stats: ProgressStats;
   health_warnings: HealthWarning[];
@@ -89,7 +89,7 @@ export interface WeeklyReport {
   logged_days: number;
   is_complete: boolean;
   missing_fields: string[];
-  target: TargetValues | null;
+  target: MacroValues | null;
   average: NullableMacros;
   comparison: Comparison | null;
   weight_change: WeightChange | null;

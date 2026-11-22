@@ -1,6 +1,6 @@
 # Trạng thái dự án FitAI (ghi chú bàn giao giữa các phiên)
 
-Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-22.
+Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-23.
 
 ## 1. Các lát đã xong (git log)
 | Lát | Commit | Nội dung chính |
@@ -25,12 +25,16 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | Nạp món ăn thủ công (FR19) | 2fab762, d5da112 | scripts/import_admin_foods.py, services/foods/admin_import.py, data/foods/manual/ |
 | 70 món ADMIN_MANUAL (chế biến, đồ uống, thực phẩm cơ bản) | 6d25841 | dishes.csv (đợt 1, 8 món) + dishes_all.csv (62 món mới, cập nhật 6 món đợt 1), nạp vào DB dev |
 | Khớp tên món nhập thủ công + chống trích dẫn không nguồn | 18ab066, ff8bd0b | bóc ngoặc khẩu phần khi khớp tên món ADMIN, số theo khẩu phần giả định, bỏ lời dặn "không có món ăn hoàn chỉnh", "cháo trắng" ưu tiên món đúng tên, quy tắc trích dẫn trong chính lượt, cảnh báo frontend lib/citations.ts |
-| Bệnh lý tự khai báo trong hồ sơ | chưa commit (nhánh nang-cap-ai) | migration b7d4e2a9c615 (medical_conditions, medical_notes, medical_consent_at), schema + đồng ý, health_warnings và mục tiêu null theo bệnh, gợi ý tập chỉ mức người mới + needs_medical_clearance, quy tắc 20 của prompt, bước "Sức khỏe" ở onboarding, banner HealthNotice |
+| Bệnh lý tự khai báo trong hồ sơ | db852fa, df5807e | migration b7d4e2a9c615 (medical_conditions, medical_notes, medical_consent_at), schema + đồng ý, health_warnings, gợi ý tập chỉ mức người mới + needs_medical_clearance, quy tắc 20 của prompt, bước "Sức khỏe" ở onboarding, banner HealthNotice |
+| Đổi sang 7 nhóm bệnh + cảnh báo theo bệnh | 644d0ea (backend); frontend và tài liệu chưa commit (nhánh nang-cap-ai) | 7 mã (musculoskeletal, cardiovascular, hypertension, metabolic, respiratory, stroke, other), bỏ quy tắc thận/mang thai và mục tiêu null theo từng chất, services/health_rules.py (10 cảnh báo, chỉ ý muối có nguồn WHO), migration e4c1a8f2d905 đưa khai báo cũ về rỗng, scripts/export_health_rules.py, HealthNotice lọc theo lĩnh vực kèm dòng nguồn, docker-compose mount ./docs chỉ đọc vào backend |
 
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
 
-- pytest hiện tại: 1031 passed, 0 failed (sau phần bệnh lý: +61 test — tests/test_medical_profile.py 59 test,
+- pytest hiện tại: 1073 passed, 0 failed, 0 skipped (sau đổi 7 nhóm bệnh: +42 test — tests/test_medical_profile.py
+  59 → 90 test (hồi quy đúng 2104 kcal / protein 156 / chất béo 58 / carb 240 cho người không bệnh và từng mã),
+  tests/test_health_rules.py 8 test (gồm test đồng bộ với docs/CHI_SO_CAN_CU.md, chạy được nhờ mount ./docs),
+  tests/test_medical_codes_migration.py 3 test; trước đó 1031 sau phần bệnh lý: +61 test — tests/test_medical_profile.py 59 test,
   tests/test_medical_migration.py 2 test; 1 assert cũ ở test_fitness_agent.py thêm khoá health_warnings; trước đó
   970 passed, 0 skipped sau sửa khớp tên món nhập thủ công và quy tắc trích dẫn: +14 test —
   12 test tra cứu món ADMIN trên DB test, 2 test chuỗi prompt/mô tả công cụ, 1 assert cũ "phở bò, cháo, canh"
@@ -39,12 +43,14 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
   là sau script nạp món ăn thủ công: +28 test import, test dữ liệu tập luyện
   trong repo 1 → 4; sau 9d là 924, sau 9b là 862, sau 9a là 822, sau 8b-2 là 689, sau 8b-1 là
   628, sau 8a là 580, sau lát 7 là 487). Lát 9d không có migration mới.
-- Migration b7d4e2a9c615 (bệnh lý, 2026-11-22) có down_revision d2a6f9c3e8b1, đã `alembic upgrade head` trên DB
-  dev; KHÔNG chạy downgrade thật (test chạy downgrade()/upgrade() trong transaction rồi rollback). LƯU Ý khi gộp
-  nhánh: nhánh của bạn trong nhóm có migration telegram cũng dùng down_revision d2a6f9c3e8b1, gộp vào sẽ thành HAI
-  head (`alembic heads` ra 2 dòng, `alembic upgrade head` báo lỗi). Khi đó cần tạo migration gộp
-  (`alembic merge -m "merge medical and telegram" <rev1> <rev2>`) hoặc sửa down_revision của một bên cho nối tiếp,
-  rồi kiểm lại `alembic heads` chỉ còn một.
+- Chuỗi migration bệnh lý: d2a6f9c3e8b1 → b7d4e2a9c615 (thêm 3 cột bệnh lý, 2026-11-22) → e4c1a8f2d905 (đưa mọi
+  khai báo bệnh theo danh sách cũ về rỗng, medical_notes và medical_consent_at null; downgrade() không làm gì,
+  2026-11-23). HEAD hiện tại: e4c1a8f2d905; cả hai đã `alembic upgrade head` trên DB dev; KHÔNG chạy downgrade thật
+  (test chạy trong transaction rồi rollback). LƯU Ý khi gộp nhánh: nhánh của bạn trong nhóm có migration telegram
+  dùng down_revision d2a6f9c3e8b1, cùng gốc với b7d4e2a9c615, gộp vào sẽ thành HAI head (e4c1a8f2d905 và head
+  telegram; `alembic heads` ra 2 dòng, `alembic upgrade head` báo lỗi). Khi đó cần tạo migration gộp
+  (`alembic merge -m "merge medical and telegram" e4c1a8f2d905 <rev_telegram>`) hoặc sửa down_revision của
+  migration telegram thành e4c1a8f2d905, rồi kiểm lại `alembic heads` chỉ còn một.
 - md5 trước/sau migration d2a6f9c3e8b1 (trùng nhau): foods, meal_logs, body_metrics, chat_sessions như dòng 9a bên
   dưới; users 80 dòng `45add6f9c99a77675bdb856963d98f93`; workout_videos 2 dòng `a8f9331b5237cf67edb66f7dad117fb5`;
   training_programs 1 dòng `8d94dc027929a48eec087fc37364fd21`. Sau thử đầu-cuối 9b chỉ users đổi (81 dòng
@@ -95,7 +101,7 @@ bệnh nền/đau → gặp bác sĩ, thống kê tính theo tuần lịch từ 
 Bảng chính: users (role), user_profiles, chat_sessions, chat_messages (sources JSON), foods, food_sources,
 meal_logs (FK RESTRICT tới foods), body_metrics, admin_audit_log, knowledge_documents, workout_videos,
 training_programs, program_days, program_day_items, program_enrollments, program_day_completions.
-Migration head: d2a6f9c3e8b1.
+Migration head: e4c1a8f2d905 (xem mục 1 về chuỗi migration bệnh lý).
 
 Tập luyện (lát 9a, models/training.py, services/training/{youtube,seed,catalog}.py, api/routers/training.py):
 - Bảng: `workout_videos` (youtube_id 11 ký tự UNIQUE, url chuẩn `https://www.youtube.com/watch?v=<id>`; title bắt
@@ -392,27 +398,40 @@ Prompt và chống trích dẫn không nguồn (services/ai_agents/fitness_advis
   cứu…". Không hiện cho tin người dùng, tin báo dịch vụ gián đoạn, hay khi chỉ nhắc tên ISSN/NASM/WHO đơn lẻ.
   Không có cờ ở backend, không đổi API. Kiểm bằng script Node ngoài repo (15/15 ca), tsc và next build.
 
-Bệnh lý tự khai báo (chỉ để cảnh báo an toàn, KHÔNG cá nhân hoá điều trị; quy tắc thiết kế, chưa có nguồn lâm
-sàng; chi tiết và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
+Bệnh lý tự khai báo (chỉ để cảnh báo an toàn, KHÔNG cá nhân hoá điều trị, KHÔNG đổi mục tiêu; chi tiết, bảng
+cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
+- 7 mã: musculoskeletal, cardiovascular, hypertension, metabolic, respiratory, stroke, other. Mã và nhãn dùng
+  chung: models/profile.py (MedicalCondition, MEDICAL_CONDITION_LABELS), frontend lib/medical.ts phải khớp. Mã cũ
+  (diabetes, kidney, pregnancy_lactation…) → 422; mã lạ còn sót trong DB bị bỏ qua (declared_conditions).
 - user_profiles.medical_conditions (varchar(40)[], NOT NULL, mặc định '{}'), medical_notes (≤ 500, null),
-  medical_consent_at (timestamptz, null). Mã và nhãn dùng chung: models/profile.py (MedicalCondition,
-  MEDICAL_CONDITION_LABELS), frontend lib/medical.ts phải khớp.
+  medical_consent_at (timestamptz, null).
 - PUT /profile: mã lạ / null / notes > 500 → 422; loại trùng; có bệnh thì medical_consent phải là true (bool thật),
   không lưu bool; server đặt medical_consent_at = lúc lưu, xoá về [] thì null, không gửi thì giữ nguyên.
-- profile_metrics_summary trả health_warnings {code, label, message, withheld}: kidney → protein_g, carb_g null;
-  pregnancy_lactation → calo mục tiêu, cờ calo sàn và cả 3 macro null; bệnh khác chỉ cảnh báo. BMI/BMR/TDEE không
-  đổi. Nhật ký ngày, /progress, báo cáo tuần: mục tiêu/còn lại null theo từng chất, kèm health_warnings.
+- Bệnh KHÔNG đổi số: mục tiêu calo/macro luôn có số khi hồ sơ đủ; target/remaining là MacroValues, chỉ null cả
+  khối khi hồ sơ thiếu trường. Đã gỡ TargetValues, withheld và quy tắc thận/mang thai.
+- services/health_rules.py là nguồn DUY NHẤT của cảnh báo: HEALTH_RULES (10 quy tắc, lĩnh vực nutrition /
+  training / general), mỗi quy tắc có RuleSource hoặc DESIGN_RULE ("Quy tắc thiết kế, chưa có nguồn lâm sàng").
+  Chỉ ý muối có nguồn (WHO Healthy diet, tr. 3, data/knowledge/extra/who_healthy_diet.pdf). Mỗi cảnh báo trả
+  {id, domain, codes, message, source, source_short, source_url}; chuỗi source và message không kèm năm.
+  Bảng cho tài liệu: `docker compose exec backend python scripts/export_health_rules.py` (`--csv`).
+- health_warnings đủ mọi lĩnh vực ở GET /profile, /profile/metrics, /meals/summary, /progress, weekly-report;
+  notes của báo cáo tuần chỉ thêm cảnh báo dinh dưỡng và chung; /training/recommendation chỉ trả cảnh báo tập và
+  chung. Không lọc bài tập theo bệnh (0/45 video published có intensity/impact).
 - recommend.py luật 0b: có bất kỳ bệnh nào → chỉ mức người mới (kể cả khi nói đã tập đều), không lùi sang trung
   bình, needs_medical_clearance=true. Chốt BMI thấp vẫn xét trước.
-- Agent: profile_data có tên bệnh + ghi chú; ghi chú nằm trong thẻ <ghi_chu_benh_ly> (đã thay < >), quy tắc 20.
+- Agent: profile_data có tên bệnh + ghi chú; ghi chú nằm trong thẻ <ghi_chu_benh_ly> (đã thay < >). Quy tắc 20:
+  nhắc hỏi bác sĩ, bệnh không đổi mục tiêu, nêu lại cảnh báo đúng lĩnh vực, chỉ nói "WHO khuyến nghị…" với cảnh
+  báo có nguồn, không kèm năm hay định dạng trích dẫn.
 - Không ghi log dữ liệu bệnh lý (không handler/middleware đọc body, structlog không dùng, hide_parameters=True);
   API admin xem hội thoại không trả trường bệnh lý. Phản hồi 422 mặc định của FastAPI vẫn lặp lại giá trị người
   dùng gửi trong `input` (trả về chính người dùng, không ghi log).
-- Frontend: onboarding bước 3 "Sức khỏe" (10 bệnh, Khác + ghi chú có đếm ký tự, Không có, kiêng cữ chuyển sang
-  đây, ô đồng ý chỉ bắt buộc khi có bệnh; không thao tác thì không gửi medical_*); cảnh báo mềm tuổi < 18; banner
-  HealthNotice ở Tổng quan (lấy từ progress.health_warnings) và trang Tập luyện (lấy tên từ GET /profile, không
-  hiện ghi chú); "Không đặt mục tiêu: <lý do>" ở thẻ hôm nay, nhật ký ăn uống, tiến độ; cảnh báo gặp bác sĩ ở hộp
-  gợi ý chương trình. Mô tả "light" thống nhất "1–3 ngày/tuần".
+- Frontend: onboarding bước 3 "Sức khỏe" (6 bệnh + Khác có ghi chú đếm ký tự + Không có, kiêng cữ ở bước này,
+  ô đồng ý chỉ bắt buộc khi có bệnh; không thao tác thì không gửi medical_*); cảnh báo mềm tuổi < 18;
+  HealthNotice lọc theo lĩnh vực: Tổng quan hiện cảnh báo dinh dưỡng + chung (progress.health_warnings), trang
+  Tập luyện hiện cảnh báo tập + chung (GET /profile); mỗi cảnh báo có dòng nguồn xám "WHO, Healthy diet" hoặc
+  "Lưu ý chung của ứng dụng"; không hiện ghi chú. Cảnh báo gặp bác sĩ ở hộp gợi ý chương trình. Mô tả "light"
+  thống nhất "1–3 ngày/tuần".
+- docker-compose.yml mount ./docs:/app/docs:ro vào backend để test đồng bộ tài liệu chạy trong container.
 
 ## 3. Quy ước làm việc đã chốt
 - Không tự commit; báo danh sách file đổi để người dùng commit. Kế hoạch file trước, chờ xác nhận.
@@ -532,10 +551,11 @@ sàng; chi tiết và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
   /admin (tab Thực phẩm, tab Tài liệu, xác nhận khi tắt tài liệu builtin, tải file lớn); mới kiểm bằng tsc/next
   build và gọi API trực tiếp.
 - Hội thoại (8b-2): hội thoại được giữ vô thời hạn (chưa có chính sách lưu trữ).
-- Bệnh lý (2026-11-22): quy tắc là thiết kế, CHƯA có nguồn lâm sàng và chưa được chuyên môn y tế duyệt. Chưa có
+- Bệnh lý (2026-11-23): cảnh báo là quy tắc thiết kế, CHƯA có nguồn lâm sàng và chưa được chuyên môn y tế duyệt
+  (trừ ý muối có nguồn WHO, câu gốc dành cho người lớn). Không lọc bài tập hay món ăn theo bệnh. Chưa có
   trang xem/sửa hồ sơ: form onboarding không nạp dữ liệu cũ, muốn đổi bệnh phải làm lại onboarding (không tick gì ở
   phần bệnh thì giữ nguyên bệnh cũ). Tôn trọng bệnh lý và ghi chú trong chat phụ thuộc mô hình (quy tắc 20 CHƯA thử
-  với Gemini thật); code không lọc món theo bệnh. Ghi chú bệnh lý gửi tới Gemini mỗi lượt chat. Đồng ý chỉ lưu
+  với Gemini thật). Ghi chú bệnh lý gửi tới Gemini mỗi lượt chat. Đồng ý chỉ lưu
   thời điểm, không lưu nội dung câu đồng ý hay phiên bản. Giao diện mới kiểm bằng tsc/next build, CHƯA thử trên
   trình duyệt; container frontend chưa build lại.
 - Tập luyện (9a): FR13 và FR14 được đơn giản hoá có chủ đích — chưa có nhóm cơ, lưu ý an toàn riêng từng bài,
@@ -585,7 +605,7 @@ sàng; chi tiết và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
    (phở bò, bún bò Huế, cơm tấm, trà sữa, bánh tét, cháo trắng) và câu kiểm trích dẫn khi hỏi lại cùng chủ đề;
    giữ nguyên v1 ở eade8b0 làm mốc, rồi đo lần 2 và so với mốc eade8b0, gồm tỷ lệ câu có khung nguồn đúng. Có
    thể thêm câu đánh giá cho tiến độ, dòng quản trị viên nhập và tập luyện (gợi ý chương trình, tiến độ tập).
-9. Bệnh lý: thử trên trình duyệt (onboarding bước Sức khỏe, banner, "Không đặt mục tiêu"), thử quy tắc 20 với
+9. Bệnh lý: thử trên trình duyệt (onboarding bước Sức khỏe với 7 mã, banner hai trang và dòng nguồn), thử quy tắc 20 với
    Gemini thật (nhắc gặp bác sĩ, không theo yêu cầu trong ghi chú); cân nhắc trang xem/sửa hồ sơ; gộp migration
    nếu gộp nhánh telegram (xem mục 1).
 10. Báo cáo đồ án (bảng "Trạng thái thực hiện" ở SPEC.md mục 4 là căn cứ phạm vi).

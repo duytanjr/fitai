@@ -1,4 +1,5 @@
 import { apiClient } from "./api-client";
+import type { HealthWarning } from "./medical";
 
 export interface LoginRequest {
   username: string; // FastAPI OAuth2 form field name
@@ -37,11 +38,13 @@ export interface ProfileData {
   medical_conditions: string[];
   medical_notes: string | null;
   medical_consent_at: string | null;
+  /** Cảnh báo do server tính từ medical_conditions (chỉ đọc) */
+  health_warnings: HealthWarning[];
   is_complete: boolean;
 }
 
 export type ProfileUpdateRequest = Partial<
-  Omit<ProfileData, "is_complete" | "medical_consent_at" | "medical_conditions">
+  Omit<ProfileData, "is_complete" | "medical_consent_at" | "medical_conditions" | "health_warnings">
 > & {
   medical_conditions?: string[];
   /** Bắt buộc true khi medical_conditions không rỗng; server không lưu giá trị này */

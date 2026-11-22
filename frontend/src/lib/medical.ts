@@ -1,18 +1,14 @@
 /**
  * Bệnh lý tự khai báo — mã và nhãn PHẢI khớp backend (backend/models/profile.py: MedicalCondition,
- * MEDICAL_CONDITION_LABELS). Chỉ để cảnh báo an toàn, không cá nhân hoá điều trị.
+ * MEDICAL_CONDITION_LABELS). Chỉ để cảnh báo an toàn, không cá nhân hoá điều trị và không đổi mục tiêu.
  */
 export const MEDICAL_CONDITIONS = [
-  { code: "diabetes", label: "Tiểu đường" },
+  { code: "musculoskeletal", label: "Viêm khớp, loãng xương, đau lưng" },
+  { code: "cardiovascular", label: "Tim mạch" },
   { code: "hypertension", label: "Tăng huyết áp" },
-  { code: "dyslipidemia", label: "Rối loạn mỡ máu" },
-  { code: "cardiovascular", label: "Bệnh tim mạch" },
-  { code: "kidney", label: "Bệnh thận" },
-  { code: "gout", label: "Gout" },
-  { code: "liver", label: "Bệnh gan" },
-  { code: "stomach", label: "Bệnh dạ dày" },
-  { code: "musculoskeletal", label: "Bệnh xương khớp hoặc chấn thương" },
-  { code: "pregnancy_lactation", label: "Đang mang thai hoặc cho con bú" },
+  { code: "metabolic", label: "Bệnh chuyển hóa (gồm tiểu đường)" },
+  { code: "respiratory", label: "Bệnh hô hấp" },
+  { code: "stroke", label: "Đột quỵ" },
   { code: "other", label: "Khác" },
 ] as const;
 
@@ -28,30 +24,29 @@ export function conditionLabels(codes: readonly string[] | null | undefined): st
   return MEDICAL_CONDITIONS.filter((c) => present.has(c.code)).map((c) => LABELS[c.code]);
 }
 
-/** Cảnh báo do server tính theo bệnh lý (quy tắc thiết kế, chưa có nguồn lâm sàng). */
+export type HealthDomain = "nutrition" | "training" | "general";
+
+/** Trang ăn uống (Tổng quan) và trang Tập luyện đều kèm cảnh báo chung. */
+export const NUTRITION_DOMAINS: readonly HealthDomain[] = ["nutrition", "general"];
+export const TRAINING_DOMAINS: readonly HealthDomain[] = ["training", "general"];
+
+/** Cảnh báo do server tính (backend/services/health_rules.py). */
 export interface HealthWarning {
-  code: string;
-  label: string;
+  id: string;
+  domain: HealthDomain;
+  /** Các bệnh đã khai báo kích hoạt cảnh báo */
+  codes: string[];
   message: string;
-  /** Các chỉ số mục tiêu bị để null vì bệnh này (vd. "protein_g", "carb_g", "target_calories") */
-  withheld: string[];
+  /** Chuỗi nguồn, hoặc "Quy tắc thiết kế, chưa có nguồn lâm sàng" (không hiển thị chuỗi này trên UI) */
+  source: string;
+  /** Nhãn ngắn của nguồn; null = quy tắc thiết kế của ứng dụng */
+  source_short: string | null;
+  source_url: string | null;
 }
 
-export const NO_TARGET_LABEL = "Không đặt mục tiêu";
+/** Dòng nguồn nhỏ dưới mỗi cảnh báo. */
+export const APP_RULE_SOURCE_LABEL = "Lưu ý chung của ứng dụng";
 
-/** Tên chất trong tổng ngày → tên chỉ số trong `withheld` (calo mục tiêu là target_calories). */
-function metricOf(nutrient: string): string {
-  return nutrient === "energy_kcal" ? "target_calories" : nutrient;
-}
-
-/** Lý do một chất không có mục tiêu: message của cảnh báo đã bỏ chỉ số đó (null nếu không có). */
-export function withheldReason(warnings: readonly HealthWarning[] | null | undefined, nutrient: string): string | null {
-  const metric = metricOf(nutrient);
-  return warnings?.find((w) => w.withheld.includes(metric))?.message ?? null;
-}
-
-/** "Không đặt mục tiêu (lý do)" cho một chất có mục tiêu null. */
-export function noTargetText(warnings: readonly HealthWarning[] | null | undefined, nutrient: string): string {
-  const reason = withheldReason(warnings, nutrient);
-  return reason ? `${NO_TARGET_LABEL}: ${reason}.` : `${NO_TARGET_LABEL}.`;
+export function sourceLabel(w: HealthWarning): string {
+  return w.source_short ?? APP_RULE_SOURCE_LABEL;
 }

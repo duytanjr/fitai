@@ -1,4 +1,5 @@
 import { apiClient } from "./api-client";
+import type { HealthWarning } from "./medical";
 
 export type GoalTag = "weight_loss" | "general" | "muscle_gain" | "endurance";
 export type Level = "beginner" | "intermediate";
@@ -174,6 +175,8 @@ export interface Recommendation {
   experience: Experience | null;
   /** Hồ sơ có bệnh lý: chỉ gợi ý mức người mới, cần gặp bác sĩ trước khi tập */
   needs_medical_clearance: boolean;
+  /** Cảnh báo tập luyện và chung theo bệnh (chữ, không lọc bài); banner ở TrainingShell đã hiện từ GET /profile */
+  health_warnings: HealthWarning[];
 }
 
 export const recommendationApi = {
