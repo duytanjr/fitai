@@ -5,6 +5,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from api.schemas.profile import HealthWarningOut
 from models.meal_log import MAX_MEAL_GRAMS, MealType
 from services.foods.preparation import FoodPreparation
 
@@ -135,6 +136,14 @@ class MacroValues(BaseModel):
     carb_g: float = Field(description="Glucid theo nguồn, KHÔNG gồm xơ (celluloza)")
 
 
+class TargetValues(BaseModel):
+    """Mục tiêu (hoặc phần còn lại) theo từng chất; None = không tính vì bệnh lý (xem health_warnings)."""
+    energy_kcal: Optional[float] = None
+    protein_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    carb_g: Optional[float] = Field(None, description="Glucid theo nguồn, KHÔNG gồm xơ (celluloza)")
+
+
 class EatenTotals(MacroValues):
     fiber_g: float
 
@@ -148,6 +157,7 @@ class DailySummaryOut(BaseModel):
     missing_by_nutrient: dict[str, int]
     is_complete: bool = Field(description="Hồ sơ đủ để so với mục tiêu")
     missing_fields: list[str]
-    target: Optional[MacroValues] = None
-    remaining: Optional[MacroValues] = Field(None, description="Mục tiêu − đã ăn (có thể âm)")
+    target: Optional[TargetValues] = None
+    remaining: Optional[TargetValues] = Field(None, description="Mục tiêu − đã ăn (có thể âm); None nếu không có mục tiêu")
     carb_note: str = Field(description="Carb đã ăn lấy từ cột glucid của nguồn, không gồm xơ")
+    health_warnings: list[HealthWarningOut] = []

@@ -7,10 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
 from models.chat import ChatSession, ChatMessage
-from models.profile import UserProfile
+from models.profile import MEDICAL_CONDITION_LABELS, UserProfile
 from services.ai_agents.fitness_advisor import AgentToolContext, ChatAgentException, fitness_agent
 from services.foods.lookup import search_foods
 from services.meals import daily_summary
+from services.metrics_service import declared_conditions
 from services.progress import progress_summary_for_agent
 from services.training.progress import training_summary_for_agent
 from services.training.recommend import recommendation_for_user
@@ -83,6 +84,10 @@ class ChatService:
                 "activity_level": profile.activity_level,
                 "fitness_goal": profile.fitness_goal,
                 "dietary_restrictions": profile.dietary_restrictions,
+                # Bệnh lý tự khai báo: TÊN tiếng Việt (không phải mã); ghi chú là dữ liệu người dùng nhập
+                "medical_conditions": [MEDICAL_CONDITION_LABELS[c]
+                                       for c in declared_conditions(profile.medical_conditions)],
+                "medical_notes": profile.medical_notes,
             }
 
         # ── Bước 4: Gọi FitnessAdvisorAgent ────────────────────────────────────

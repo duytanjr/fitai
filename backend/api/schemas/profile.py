@@ -1,7 +1,18 @@
 """Pydantic schemas cho UserProfile."""
+from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, field_validator
-from models.profile import ActivityLevel, FitnessGoal
+
+from pydantic import BaseModel, ConfigDict, StrictBool, field_validator, model_validator
+
+from models.profile import (
+    MEDICAL_CONDITION_CODES,
+    MEDICAL_NOTES_MAX_LENGTH,
+    ActivityLevel,
+    FitnessGoal,
+)
+
+# Chặn danh sách quá dài trước khi loại trùng (11 mã hợp lệ; dư nhiều để không chặn nhầm khi gửi trùng)
+MEDICAL_CONDITIONS_MAX_ITEMS = 50
 
 
 class ProfileUpdate(BaseModel):
@@ -15,6 +26,39 @@ class ProfileUpdate(BaseModel):
     activity_level: Optional[ActivityLevel] = None
     fitness_goal: Optional[FitnessGoal] = None
     dietary_restrictions: Optional[str] = None
+    # Bệnh lý tự khai báo. KHÔNG ghi ra log. Không gửi = giữ nguyên; [] = xoá về "không có".
+    medical_conditions: Optional[list[str]] = None
+    medical_notes: Optional[str] = None
+    # Chỉ dùng để kiểm, không lưu giá trị bool; server lưu medical_consent_at.
+    medical_consent: Optional[StrictBool] = None
+
+    @field_validator("medical_conditions")
+    @classmethod
+    def validate_medical_conditions(cls, v: Optional[list[str]]) -> list[str]:
+        if v is None:
+            raise ValueError("medical_conditions phải là danh sách (gửi [] nếu không có bệnh)")
+        if len(v) > MEDICAL_CONDITIONS_MAX_ITEMS:
+            raise ValueError("Danh sách bệnh lý quá dài")
+        # Thông báo lỗi không nhắc lại giá trị người dùng gửi
+        if any(code not in MEDICAL_CONDITION_CODES for code in v):
+            raise ValueError("Mã bệnh lý không hợp lệ")
+        return list(dict.fromkeys(v))  # loại trùng, giữ thứ tự
+
+    @field_validator("medical_notes")
+    @classmethod
+    def validate_medical_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = v.strip()
+        if len(v) > MEDICAL_NOTES_MAX_LENGTH:
+            raise ValueError(f"Ghi chú bệnh lý tối đa {MEDICAL_NOTES_MAX_LENGTH} ký tự")
+        return v or None
+
+    @model_validator(mode="after")
+    def require_consent_for_conditions(self) -> "ProfileUpdate":
+        if self.medical_conditions and self.medical_consent is not True:
+            raise ValueError("Cần đồng ý (medical_consent=true) khi khai báo bệnh lý")
+        return self
 
     @field_validator("age")
     @classmethod
@@ -55,6 +99,9 @@ class ProfileOut(BaseModel):
     activity_level: Optional[str]
     fitness_goal: Optional[str]
     dietary_restrictions: Optional[str]
+    medical_conditions: list[str] = []
+    medical_notes: Optional[str] = None
+    medical_consent_at: Optional[datetime] = None
     is_complete: bool
 
     model_config = {"from_attributes": True}
@@ -72,8 +119,19 @@ class ProfileOut(BaseModel):
             activity_level=profile.activity_level,
             fitness_goal=profile.fitness_goal,
             dietary_restrictions=profile.dietary_restrictions,
+            medical_conditions=list(getattr(profile, "medical_conditions", None) or []),
+            medical_notes=getattr(profile, "medical_notes", None),
+            medical_consent_at=getattr(profile, "medical_consent_at", None),
             is_complete=complete,
         )
+
+
+class HealthWarningOut(BaseModel):
+    """Cảnh báo theo bệnh lý tự khai báo (quy tắc thiết kế, chưa có nguồn lâm sàng)."""
+    code: str
+    label: str
+    message: str
+    withheld: list[str] = []  # các chỉ số mục tiêu bị để null vì bệnh này
 
 
 class ProfileMetricsOut(BaseModel):
@@ -93,3 +151,4 @@ class ProfileMetricsOut(BaseModel):
     protein_g: Optional[int] = None
     fat_g: Optional[int] = None
     carb_g: Optional[int] = None
+    health_warnings: list[HealthWarningOut] = []

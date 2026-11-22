@@ -101,7 +101,7 @@ async def test_calc_body_metrics_incomplete_profile_reports_missing_fields():
     ctx = AgentToolContext(load_profile=AsyncMock(return_value=partial))
     calc = {t.name: t for t in build_tools(ctx)}["calc_body_metrics"]
     result = json.loads(await calc.ainvoke({}))
-    assert result == {"is_complete": False, "missing_fields": ["gender", "weight_kg", "fitness_goal"]}
+    assert result == {"is_complete": False, "missing_fields": ["gender", "weight_kg", "fitness_goal"], "health_warnings": []}
 
     ctx_none = AgentToolContext(load_profile=AsyncMock(return_value=None))
     calc_none = {t.name: t for t in build_tools(ctx_none)}["calc_body_metrics"]

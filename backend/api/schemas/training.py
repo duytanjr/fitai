@@ -121,3 +121,4 @@ class RecommendationOut(BaseModel):
     reason: str
     notes: list[str]
     experience: Optional[str]
+    needs_medical_clearance: bool = False  # hồ sơ có bệnh lý: chỉ gợi ý mức người mới, cần gặp bác sĩ trước khi tập

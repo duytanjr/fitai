@@ -7,6 +7,10 @@ Thứ tự xét:
 0) Chốt chặn chỉ số cân nặng thấp (BMI < 18,5, xét TRƯỚC mọi luật, kể cả experience):
    - mục tiêu giảm cân → không gợi ý chương trình nào;
    - mục tiêu khác → loại các chương trình weight_loss; không còn chương trình nào → không gợi ý.
+0b) Hồ sơ có khai báo bệnh lý (bất kỳ mã nào, kể cả "other"; xét SAU chốt BMI thấp, TRƯỚC experience):
+   chỉ gợi ý mức beginner (thay thế cũng chỉ là beginner), không lùi sang intermediate khi thiếu chương trình
+   beginner, needs_medical_clearance=True kèm ghi chú gặp bác sĩ trước khi tập. Quy tắc thiết kế, chưa có
+   nguồn lâm sàng.
 1) Thiếu mức vận động và experience None → mức beginner (ghi chú hồ sơ còn thiếu).
 3) experience "regular" → intermediate.   4) experience "new" → beginner.
 5) Vận động ít/nhẹ, hoặc BMI ≥ 30, hoặc tuổi ≥ 60 → beginner, thay thế intermediate.
@@ -46,6 +50,11 @@ REASON_LOW_BMI_WEIGHT_LOSS = "chỉ số cân nặng hiện thấp; chưa gợi 
 REASON_ONLY_WEIGHT_LOSS = ("chỉ số cân nặng hiện thấp; hiện chỉ có chương trình giảm cân nên chưa gợi ý "
                            "chương trình nào")
 REASON_NO_PROGRAM = "hiện chưa có chương trình nào để gợi ý"
+NOTE_MEDICAL_CLEARANCE = "hồ sơ có khai báo bệnh lý, hãy gặp bác sĩ trước khi bắt đầu tập"
+REASON_MEDICAL = ("Nên bắt đầu ở mức người mới vì hồ sơ có khai báo bệnh lý hoặc tình trạng sức khỏe "
+                  "cần lưu ý.")
+REASON_MEDICAL_NO_BEGINNER = ("hồ sơ có khai báo bệnh lý nên chỉ gợi ý mức người mới, nhưng hiện chưa có "
+                              "chương trình mức người mới")
 
 
 @dataclass(frozen=True)
@@ -64,6 +73,7 @@ class ProfileFacts:
     weight_kg: float | None = None
     activity_level: str | None = None
     fitness_goal: str | None = None
+    medical_conditions: tuple[str, ...] = ()
 
 
 @dataclass
@@ -73,6 +83,7 @@ class Recommendation:
     reason_code: str
     reason: str
     notes: list[str] = field(default_factory=list)
+    needs_medical_clearance: bool = False
 
 
 def _bmi(p: ProfileFacts) -> float | None:
@@ -105,22 +116,35 @@ def recommend_program(profile: ProfileFacts | None, experience: str | None,
     goal = profile.fitness_goal
     goal_tag = GOAL_TO_TAG.get(goal) if goal else None
     bmi = _bmi(profile)
-    notes: list[str] = []
+    medical = bool(profile.medical_conditions)
+    notes: list[str] = [NOTE_MEDICAL_CLEARANCE] if medical else []
     if bmi is None:
         notes.append(NOTE_NO_BMI)
+
+    def done(primary: str | None, alternative: str | None, code: str, reason: str) -> Recommendation:
+        return Recommendation(primary, alternative, code, reason, notes, needs_medical_clearance=medical)
 
     # 0) Chốt chặn chỉ số cân nặng thấp — trước mọi luật, kể cả experience
     candidates = list(programs)
     if bmi is not None and bmi < LOW_BMI:
         if goal == "weight_loss":
-            return Recommendation(None, None, "bmi_thap_muc_tieu_giam_can", REASON_LOW_BMI_WEIGHT_LOSS, notes)
+            return done(None, None, "bmi_thap_muc_tieu_giam_can", REASON_LOW_BMI_WEIGHT_LOSS)
         candidates = [p for p in programs if p.goal_tag != "weight_loss"]
         if programs and not candidates:
-            return Recommendation(None, None, "chi_co_chuong_trinh_giam_can", REASON_ONLY_WEIGHT_LOSS, notes)
+            return done(None, None, "chi_co_chuong_trinh_giam_can", REASON_ONLY_WEIGHT_LOSS)
         if len(candidates) != len(programs):
             notes.append(NOTE_LOW_BMI_FILTER)
     if not candidates:
-        return Recommendation(None, None, "chua_co_chuong_trinh", REASON_NO_PROGRAM, notes)
+        return done(None, None, "chua_co_chuong_trinh", REASON_NO_PROGRAM)
+
+    if medical:                                                                   # 0b
+        primary = _pick(candidates, BEGINNER, goal_tag)
+        if primary is None:
+            return done(None, None, "benh_ly_chua_co_muc_nguoi_moi", REASON_MEDICAL_NO_BEGINNER)
+        alternative = _pick(candidates, BEGINNER, goal_tag, exclude=primary.slug)
+        if goal in GOAL_TO_TAG and goal != "weight_loss" and not any(p.goal_tag == goal_tag for p in candidates):
+            notes.append(NOTE_NO_GOAL_PROGRAM)
+        return done(primary.slug, alternative.slug if alternative else None, "benh_ly_khai_bao", REASON_MEDICAL)
 
     alt_level: str | None = None
     if activity is None and experience is None:                                   # 1
@@ -158,7 +182,7 @@ def recommend_program(profile: ProfileFacts | None, experience: str | None,
     if goal in GOAL_TO_TAG and goal != "weight_loss" and not any(p.goal_tag == goal_tag for p in candidates):
         notes.append(NOTE_NO_GOAL_PROGRAM)
     reason = f"Nên bắt đầu ở mức {LEVEL_LABELS[level]} {because}."
-    return Recommendation(primary.slug, alternative.slug if alternative else None, code, reason, notes)
+    return done(primary.slug, alternative.slug if alternative else None, code, reason)
 
 
 # ── Đọc DB ───────────────────────────────────────────────────────────────────
@@ -174,7 +198,8 @@ async def recommendation_for_user(db: AsyncSession, user_id: uuid.UUID, experien
     """Hồ sơ của chính user_id (không nhận hồ sơ từ client); không có hồ sơ → coi như thiếu thông tin."""
     row = await db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
     facts = ProfileFacts(age=row.age, height_cm=row.height_cm, weight_kg=row.weight_kg,
-                         activity_level=row.activity_level, fitness_goal=row.fitness_goal) if row else ProfileFacts()
+                         activity_level=row.activity_level, fitness_goal=row.fitness_goal,
+                         medical_conditions=tuple(row.medical_conditions or ())) if row else ProfileFacts()
     programs = [ProgramOption(slug=p.slug, level=p.level.value, goal_tag=p.goal_tag.value,
                               duration_days=p.duration_days, title=p.title)
                 for p in (await db.scalars(select(TrainingProgram).where(
@@ -188,4 +213,5 @@ async def recommendation_for_user(db: AsyncSession, user_id: uuid.UUID, experien
         "reason": rec.reason,
         "notes": rec.notes,
         "experience": experience,
+        "needs_medical_clearance": rec.needs_medical_clearance,
     }

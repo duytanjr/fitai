@@ -190,9 +190,10 @@ def build_series(start: date, end: date, totals: dict[date, DayTotals], weights:
 
 
 def targets_from(metrics: dict) -> dict | None:
+    """Mục tiêu theo từng chất; một chất có thể None khi bệnh lý khiến chỉ số đó không được tính."""
     if not metrics.get("is_complete"):
         return None
-    return {k: metrics[src] for k, src in TARGET_FIELDS.items()}
+    return {k: metrics.get(src) for k, src in TARGET_FIELDS.items()}
 
 
 def averages(days: list[dict]) -> dict[str, float | None]:
@@ -287,6 +288,7 @@ async def progress(db: AsyncSession, user_id: uuid.UUID, days: int) -> dict:
         "target": target,
         "series": series,
         "stats": build_stats(series, target),
+        "health_warnings": list(metrics.get("health_warnings") or []),
         "latest_weight": None if latest is None else {
             "measured_on": latest.measured_on.isoformat(), "weight_kg": latest.weight_kg,
             "waist_cm": latest.waist_cm,
@@ -307,6 +309,7 @@ async def progress_summary_for_agent(db: AsyncSession, user_id: uuid.UUID, days:
         "missing_fields": full["missing_fields"],
         "target": full["target"],
         "stats": full["stats"],
+        "health_warnings": full["health_warnings"],
         "days_without_log": [d["date"] for d in series if not d["has_log"]],
         "days_with_incomplete_totals": [d["date"] for d in series if d["incomplete_totals"]],
     }
@@ -369,9 +372,15 @@ def weekly_notes(report: dict) -> list[str]:
         notes.append("Chưa có dữ liệu nhật ký để tính trung bình.")
     else:
         if comparison is not None:
+            target = report["target"] or {}
             for f in NUTRIENTS:
                 if comparison[f] is not None:
                     notes.append(comparison_sentence(f, comparison[f]))
+                elif avg[f] is not None and target.get(f) is None:
+                    # Mục tiêu chất này không được tính vì bệnh lý (lý do ở health_warnings)
+                    label, unit = NUTRIENT_LABELS[f]
+                    notes.append(f"{label} trung bình {fmt(avg[f], 0 if unit == 'kcal' else 1)} {unit}/ngày "
+                                 f"(không có mục tiêu để so).")
         else:
             for f in NUTRIENTS:
                 if avg[f] is not None:
@@ -379,6 +388,8 @@ def weekly_notes(report: dict) -> list[str]:
                     notes.append(f"{label} trung bình {fmt(avg[f], 0 if unit == 'kcal' else 1)} {unit}/ngày.")
             notes.append("Hồ sơ chưa đủ thông tin nên chưa so với mục tiêu.")
         notes.append(CALORIE_NOTE)
+    for message in dict.fromkeys(w["message"] for w in report.get("health_warnings") or []):
+        notes.append(f"{message}.")
     if report["incomplete_days"]:
         days = ", ".join(fmt_day(d) for d in report["incomplete_days"])
         notes.append(f"Ngày có tổng chưa đầy đủ (có mục thiếu số liệu): {days}.")
@@ -419,6 +430,7 @@ def build_weekly_report(week_start: date, today: date, series: list[dict], metri
         "missing_days": [d["date"] for d in counted if not d["has_log"]],
         "incomplete_days": [d["date"] for d in counted if d["incomplete_totals"]],
         "calorie_note": CALORIE_NOTE,
+        "health_warnings": list(metrics.get("health_warnings") or []),
     }
     report["notes"] = weekly_notes(report)
     return report
