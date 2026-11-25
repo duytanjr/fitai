@@ -1,8 +1,7 @@
 /**
- * Màn tạm của lát 0: gọi GET /health để xác nhận điện thoại tới được backend.
- * Sẽ được thay bằng luồng đăng nhập ở lát 1.
+ * Kiểm tra kết nối: gọi GET /health để xác nhận điện thoại tới được backend (mở từ màn đăng nhập).
+ * Không cần đăng nhập, không gửi token.
  */
-import { Stack } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -37,7 +36,7 @@ async function checkHealth(url: string): Promise<HealthState> {
   }
 }
 
-export default function HealthScreen() {
+export default function ConnectionScreen() {
   const [state, setState] = useState<HealthState>({ kind: "loading" });
 
   const run = useCallback(async () => {
@@ -52,8 +51,6 @@ export default function HealthScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Stack.Screen options={{ title: "FitAI · Kiểm tra kết nối" }} />
-
       {!apiConfig.ok ? (
         <View style={[styles.card, styles.errorCard]}>
           <Text style={styles.title}>Lỗi cấu hình</Text>
