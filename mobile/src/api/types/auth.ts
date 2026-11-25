@@ -1,7 +1,8 @@
 /**
  * Đồng bộ tay từ frontend/src/lib/auth.ts (chỉ phần kiểu dữ liệu, không có hàm gọi API).
- * Lát 1 mới cần phần đăng nhập; ProfileData sẽ chép ở lát dùng tới nó.
+ * Chưa chép ProfileUpdateRequest và authApi (app chưa sửa hồ sơ).
  */
+import type { HealthWarning } from "./medical";
 
 export interface LoginRequest {
   username: string; // FastAPI OAuth2 form field name
@@ -30,3 +31,20 @@ export interface User {
 
 /** Cùng ngưỡng với backend (api/schemas/auth.py: UserCreate.password_min_length). */
 export const PASSWORD_MIN_LENGTH = 8;
+
+export interface ProfileData {
+  age: number | null;
+  gender: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  activity_level: string | null;
+  fitness_goal: string | null;
+  dietary_restrictions: string | null;
+  /** Mã bệnh lý tự khai báo (xem lib/medical.ts); [] = không khai báo */
+  medical_conditions: string[];
+  medical_notes: string | null;
+  medical_consent_at: string | null;
+  /** Cảnh báo do server tính từ medical_conditions (chỉ đọc) */
+  health_warnings: HealthWarning[];
+  is_complete: boolean;
+}

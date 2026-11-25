@@ -4,7 +4,7 @@ import { Text } from "react-native";
 import { useAuth } from "@/auth/AuthContext";
 import { colors } from "@/components/ui";
 
-/** Tab: Tổng quan (tạm), Ăn uống; Tập luyện thêm ở lát 5. Chưa dùng thư viện icon. */
+/** Tab: Tổng quan, Ăn uống, Tập luyện. Chưa dùng thư viện icon. */
 export default function TabsLayout() {
   const { signOut } = useAuth();
   return (
@@ -27,6 +27,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Tổng quan" }} />
       <Tabs.Screen name="meals" options={{ title: "Ăn uống" }} />
+      <Tabs.Screen name="training" options={{ title: "Tập luyện" }} />
     </Tabs>
   );
 }

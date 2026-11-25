@@ -112,6 +112,15 @@ export function Notice({ kind, children }: { kind: "error" | "info" | "warn"; ch
   );
 }
 
+/** Nhãn nhỏ bo tròn. */
+export function Badge({ text, bg, fg }: { text: string; bg: string; fg: string }) {
+  return (
+    <View style={{ borderRadius: 999, backgroundColor: bg, paddingHorizontal: 8, paddingVertical: 2 }}>
+      <Text style={{ color: fg, fontSize: 11 }}>{text}</Text>
+    </View>
+  );
+}
+
 /** Lỗi tải dữ liệu kèm nút Thử lại. */
 export function ErrorRetry({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (

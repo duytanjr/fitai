@@ -14,7 +14,8 @@ export interface Loader<T> {
   reload: () => Promise<void>;
 }
 
-export function useLoader<T>(fetcher: () => Promise<T>, errorText: string): Loader<T> {
+/** `key` đổi (vd. lựa chọn của người dùng) → tải lại với fetcher mới nhất. */
+export function useLoader<T>(fetcher: () => Promise<T>, errorText: string, key: string = ""): Loader<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -40,7 +41,7 @@ export function useLoader<T>(fetcher: () => Promise<T>, errorText: string): Load
 
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [reload, key]);
 
   return { data, error, loading, reload };
 }

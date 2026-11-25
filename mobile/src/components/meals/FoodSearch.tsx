@@ -19,7 +19,7 @@ import {
   type FoodSearchItem,
   type Preparation,
 } from "@/api/types/meals";
-import { colors, ErrorRetry, Notice, styles } from "@/components/ui";
+import { Badge, colors, ErrorRetry, Notice, styles } from "@/components/ui";
 
 const SEARCH_DELAY_MS = 300;
 const MIN_QUERY_LENGTH = 2;
@@ -31,14 +31,6 @@ const MATCH_LABELS: Record<FoodSearchItem["match"], { text: string; bg: string; 
   partial: { text: "chứa từ khoá", bg: "#f9fafb", fg: "#4b5563" },
   suggestion: { text: "gợi ý, không phải kết quả đúng tên", bg: "#fffbeb", fg: "#b45309" },
 };
-
-export function Badge({ text, bg, fg }: { text: string; bg: string; fg: string }) {
-  return (
-    <View style={{ borderRadius: 999, backgroundColor: bg, paddingHorizontal: 8, paddingVertical: 2 }}>
-      <Text style={{ color: fg, fontSize: 11 }}>{text}</Text>
-    </View>
-  );
-}
 
 export function PreparationBadge({ value }: { value: Preparation }) {
   return value === "unknown" ? (
