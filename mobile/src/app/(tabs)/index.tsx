@@ -41,7 +41,7 @@ export default function OverviewScreen() {
       {error ? <Notice kind="error">{error}</Notice> : null}
 
       <Notice kind="info">
-        Màn Tổng quan, Ăn uống và Tập luyện sẽ có ở các bản sau. Kéo xuống để tải lại thông tin tài khoản.
+        Màn Tổng quan và Tập luyện sẽ có ở các bản sau. Kéo xuống để tải lại thông tin tài khoản.
       </Notice>
 
       <Button title="Đăng xuất" variant="secondary" onPress={() => void signOut()} />
