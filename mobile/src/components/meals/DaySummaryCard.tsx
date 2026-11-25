@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 
 import { formatValue, type DailySummary, type MacroValues } from "@/api/types/meals";
 import { colors, Notice, styles } from "@/components/ui";
+import { missingFieldsText } from "@/lib/profileFields";
 
 const MACROS: { key: keyof MacroValues; label: string; unit: string }[] = [
   { key: "energy_kcal", label: "Calo", unit: "kcal" },
@@ -19,7 +20,7 @@ const NUTRIENT_NAMES: Record<string, string> = {
   fiber_g: "xơ",
 };
 
-export function DaySummaryCard({ summary }: { summary: DailySummary }) {
+export function DaySummaryCard({ summary, title = "Tóm tắt ngày" }: { summary: DailySummary; title?: string }) {
   const missing = Object.entries(summary.missing_by_nutrient)
     .map(([k, n]) => `${NUTRIENT_NAMES[k] ?? k}: ${n} mục`)
     .join(", ");
@@ -27,7 +28,7 @@ export function DaySummaryCard({ summary }: { summary: DailySummary }) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Tóm tắt ngày</Text>
+      <Text style={styles.title}>{title}</Text>
 
       {summary.incomplete_totals && (
         <Notice kind="warn">
@@ -80,8 +81,9 @@ export function DaySummaryCard({ summary }: { summary: DailySummary }) {
 
       {!withTarget && (
         <Notice kind="info">
-          Hoàn tất hồ sơ trên web (tuổi, giới tính, chiều cao, cân nặng, mức vận động, mục tiêu) để so với mục tiêu
-          calo và macro của bạn.
+          Hồ sơ chưa đủ thông tin
+          {summary.missing_fields.length > 0 ? ` (${missingFieldsText(summary.missing_fields)})` : ""} nên chưa so
+          được với mục tiêu. Hoàn tất hồ sơ trên web để so với mục tiêu calo và macro của bạn.
         </Notice>
       )}
       <Text style={styles.muted}>{summary.carb_note}</Text>
