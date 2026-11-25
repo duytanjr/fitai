@@ -2,23 +2,12 @@
 import { useState } from "react";
 import { Alert, Text, TextInput, View } from "react-native";
 
-import { ApiError } from "@/api/client";
+import { ApiError, friendlyError } from "@/api/client";
 import { mealsApi } from "@/api/meals";
 import { formatValue, MAX_GRAMS, type MealEntry } from "@/api/types/meals";
 import { colors, SmallButton, styles } from "@/components/ui";
+import { parseGrams } from "@/lib/grams";
 
-/** Giống friendlyError của web: hiện câu của server cho 404/422 (chuỗi), còn lại dùng câu chung. */
-function friendlyError(err: unknown, fallback: string): string {
-  if (err instanceof ApiError && (err.status === 0 || err.status === 404 || err.status === 422)) return err.message;
-  return fallback;
-}
-
-export function parseGrams(text: string): number | null {
-  const trimmed = text.trim().replace(",", ".");
-  if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
-  const grams = Number(trimmed);
-  return Number.isFinite(grams) && grams > 0 && grams <= MAX_GRAMS ? grams : null;
-}
 
 export function MealRow({ entry, onChanged }: { entry: MealEntry; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);

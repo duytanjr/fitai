@@ -1,13 +1,22 @@
 /**
- * Nhật ký ăn uống (lát 2: xem, sửa số gam, xoá). Thêm món ở lát 3.
+ * Nhật ký ăn uống: xem, thêm (màn add-meal), sửa số gam, xoá.
  * Dữ liệu: GET /meals?date= và GET /meals/summary?date= (tải song song, chỉ nhận kết quả của lần tải mới nhất).
+ * Quay lại tab (vd. sau khi thêm món) thì tải lại ngầm.
  */
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { ApiError } from "@/api/client";
 import { mealsApi } from "@/api/meals";
-import { MEAL_TYPES, todayVN, type DailySummary, type DayMeals, type MealEntry } from "@/api/types/meals";
+import {
+  MEAL_TYPES,
+  todayVN,
+  type DailySummary,
+  type DayMeals,
+  type MealEntry,
+  type MealType,
+} from "@/api/types/meals";
 import { DaySummaryCard } from "@/components/meals/DaySummaryCard";
 import { MealRow } from "@/components/meals/MealRow";
 import { Button, CenteredLoading, colors, ErrorRetry, SmallButton, styles } from "@/components/ui";
@@ -65,6 +74,23 @@ export default function MealsScreen() {
     void load(date, "initial");
   }, [date, load]);
 
+  // Lần focus đầu trùng lần tải đầu (useEffect ở trên); các lần sau (quay lại từ màn thêm món) tải lại ngầm
+  const dateRef = useRef(date);
+  dateRef.current = date;
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        return;
+      }
+      void load(dateRef.current, "silent");
+    }, [load]),
+  );
+
+  const openAdd = (meal?: MealType) =>
+    router.push({ pathname: "/add-meal", params: meal ? { date, meal } : { date } });
+
   const today = todayVN();
   const isToday = date === today;
   // Chỉ hiện dữ liệu đúng ngày đang chọn (khi đổi ngày, dữ liệu ngày cũ không lẫn vào)
@@ -105,6 +131,7 @@ export default function MealsScreen() {
           contentContainerStyle={{ padding: 16, gap: 12 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}
         >
+          <Button title="+ Thêm món" onPress={() => openAdd()} disabled={!shown} />
           {!isToday && <Button title="Về hôm nay" variant="secondary" onPress={() => setDate(today)} />}
 
           {error ? <ErrorRetry message={error} onRetry={reload} /> : null}
@@ -115,8 +142,8 @@ export default function MealsScreen() {
 
               {shown.summary.entries_count === 0 && (
                 <Text style={[styles.muted, styles.center]}>
-                  {isToday ? "Hôm nay chưa ghi món nào." : "Ngày này chưa ghi món nào."} Thêm món sẽ có ở bản sau
-                  (hiện thêm trên web).
+                  {isToday ? "Hôm nay chưa ghi món nào." : "Ngày này chưa ghi món nào."} Bấm “+ Thêm” ở từng bữa
+                  để ghi.
                 </Text>
               )}
 
@@ -125,14 +152,21 @@ export default function MealsScreen() {
                 const kcal = mealKcal(entries);
                 return (
                   <View key={value} style={styles.card} accessibilityLabel={label}>
-                    <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
-                      <Text style={styles.title}>{label}</Text>
-                      {entries.length > 0 && (
-                        <Text style={styles.muted}>
-                          {Math.round(kcal.total).toLocaleString("vi-VN")} kcal
-                          {kcal.incomplete ? " (chưa đủ số liệu)" : ""}
-                        </Text>
-                      )}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.title}>{label}</Text>
+                        {entries.length > 0 && (
+                          <Text style={styles.muted}>
+                            {Math.round(kcal.total).toLocaleString("vi-VN")} kcal
+                            {kcal.incomplete ? " (chưa đủ số liệu)" : ""}
+                          </Text>
+                        )}
+                      </View>
+                      <SmallButton
+                        title="+ Thêm"
+                        accessibilityLabel={`Thêm món vào ${label.toLowerCase()}`}
+                        onPress={() => openAdd(value)}
+                      />
                     </View>
                     {entries.length === 0 ? (
                       <Text style={styles.muted}>Chưa ghi món nào.</Text>

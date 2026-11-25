@@ -107,3 +107,17 @@ export const apiClient = {
 export function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
+
+/** Lỗi mạng/hết thời gian chờ/thiếu cấu hình (không phải lỗi do server trả). */
+export function isNetworkError(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 0;
+}
+
+/**
+ * Giống friendlyError của web (AddMealForm): câu của server cho 404/422 (chuỗi), câu lỗi mạng cho status 0,
+ * còn lại dùng câu chung.
+ */
+export function friendlyError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && (err.status === 0 || err.status === 404 || err.status === 422)) return err.message;
+  return fallback;
+}

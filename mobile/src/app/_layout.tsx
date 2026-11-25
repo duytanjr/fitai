@@ -26,6 +26,7 @@ function RootNavigator() {
     <Stack screenOptions={{ headerTitleAlign: "center" }}>
       <Stack.Protected guard={signedIn} redirectTo="/login">
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="add-meal" options={{ title: "Thêm món", presentation: "modal" }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn} redirectTo="/">
         <Stack.Screen name="login" options={{ title: "Đăng nhập", headerShown: false }} />
