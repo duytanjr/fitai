@@ -1,6 +1,6 @@
 # Trạng thái dự án FitAI (ghi chú bàn giao giữa các phiên)
 
-Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-23.
+Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-26.
 
 ## 1. Các lát đã xong (git log)
 | Lát | Commit | Nội dung chính |
@@ -26,7 +26,8 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | 70 món ADMIN_MANUAL (chế biến, đồ uống, thực phẩm cơ bản) | 6d25841 | dishes.csv (đợt 1, 8 món) + dishes_all.csv (62 món mới, cập nhật 6 món đợt 1), nạp vào DB dev |
 | Khớp tên món nhập thủ công + chống trích dẫn không nguồn | 18ab066, ff8bd0b | bóc ngoặc khẩu phần khi khớp tên món ADMIN, số theo khẩu phần giả định, bỏ lời dặn "không có món ăn hoàn chỉnh", "cháo trắng" ưu tiên món đúng tên, quy tắc trích dẫn trong chính lượt, cảnh báo frontend lib/citations.ts |
 | Bệnh lý tự khai báo trong hồ sơ | db852fa, df5807e | migration b7d4e2a9c615 (medical_conditions, medical_notes, medical_consent_at), schema + đồng ý, health_warnings, gợi ý tập chỉ mức người mới + needs_medical_clearance, quy tắc 20 của prompt, bước "Sức khỏe" ở onboarding, banner HealthNotice |
-| Đổi sang 7 nhóm bệnh + cảnh báo theo bệnh | 644d0ea (backend); frontend và tài liệu chưa commit (nhánh nang-cap-ai) | 7 mã (musculoskeletal, cardiovascular, hypertension, metabolic, respiratory, stroke, other), bỏ quy tắc thận/mang thai và mục tiêu null theo từng chất, services/health_rules.py (10 cảnh báo, chỉ ý muối có nguồn WHO), migration e4c1a8f2d905 đưa khai báo cũ về rỗng, scripts/export_health_rules.py, HealthNotice lọc theo lĩnh vực kèm dòng nguồn, docker-compose mount ./docs chỉ đọc vào backend |
+| Đổi sang 7 nhóm bệnh + cảnh báo theo bệnh | 644d0ea (backend); nhánh nang-cap-ai, đã merge vào main: commit 644d0ea (backend) và 6b56527 (frontend, tài liệu) | 7 mã (musculoskeletal, cardiovascular, hypertension, metabolic, respiratory, stroke, other), bỏ quy tắc thận/mang thai và mục tiêu null theo từng chất, services/health_rules.py (10 cảnh báo, chỉ ý muối có nguồn WHO), migration e4c1a8f2d905 đưa khai báo cũ về rỗng, scripts/export_health_rules.py, HealthNotice lọc theo lĩnh vực kèm dòng nguồn, docker-compose mount ./docs chỉ đọc vào backend |
+| App di động (mobile/, lát 0–5) | nhánh app-mobile, commit 24f4b38, 2e56992, 70add46, b1ac396, 6614022, a7c4f2e | Expo SDK 58 + TypeScript + expo-router + expo-secure-store; đăng nhập/đăng ký, Tổng quan, Ăn uống (xem/sửa/xoá/thêm), Tập luyện (chỉ xem); chỉ gọi API backend hiện có, không sửa backend/frontend |
 
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
@@ -433,6 +434,27 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
   thống nhất "1–3 ngày/tuần".
 - docker-compose.yml mount ./docs:/app/docs:ro vào backend để test đồng bộ tài liệu chạy trong container.
 
+### Ứng dụng di động (mobile/, nhánh app-mobile, 2026-11-26)
+- Expo SDK 58 (expo ~58.0.26, react-native 0.88.1, react 19.3.0, expo-router ~58.0.32, expo-secure-store ~58.0.3),
+  TypeScript; chạy bằng Expo Go. Không thêm thư viện UI, icon, biểu đồ hay quản lý trạng thái. Hướng dẫn chạy ở
+  mobile/README.md.
+- Gọi THẲNG backend theo `EXPO_PUBLIC_API_URL` (mobile/.env, phải kết thúc bằng /api/v1; không qua proxy Next.js).
+  Không cần sửa backend: login đã trả JWT trong body, API đọc header Bearer; CORS không áp dụng cho app native.
+  GET /health nằm ở gốc backend (app suy ra từ EXPO_PUBLIC_API_URL; màn "Kiểm tra kết nối" mở từ màn đăng nhập).
+- Token lưu bằng expo-secure-store (Keychain/Keystore), không AsyncStorage; 401 khi đã gửi token → tự đăng xuất
+  ("Phiên đăng nhập đã hết hạn"); 401 của form đăng nhập không bị coi là hết phiên. Không có console.* trong src/.
+- Màn hình: Tổng quan (HealthNotice dinh dưỡng + chung từ GET /meals/summary, thẻ hôm nay, tập luyện tuần này,
+  nhận xét tuần hiện tại — ẩn khi tuần không có nhật ký và không có lần đo cân), Ăn uống (chọn ngày lùi/tiến,
+  không đi quá hôm nay; sửa số gam; xoá có xác nhận; màn thêm món với đủ trạng thái tìm kiếm ok/ambiguous/raw_only/
+  gợi ý/rỗng), Tập luyện (HealthNotice tập + chung từ GET /profile, câu cần gặp bác sĩ khi needs_medical_clearance,
+  gợi ý theo kinh nghiệm, thẻ "Đang tập", danh sách chương trình; chỉ xem). Mỗi khối tải độc lập, có Thử lại,
+  kéo để làm mới, quay lại tab thì tải lại ngầm. GET /profile chỉ giữ tuổi và health_warnings (không đưa
+  medical_notes vào state, không hiển thị).
+- Kiểu dữ liệu và hàm thuần CHÉP TAY từ frontend/src/lib/{auth,medical,meals,progress,training}.ts sang
+  mobile/src/api/types/ (đầu mỗi file ghi "Đồng bộ tay từ …"); đổi kiểu ở web/backend thì phải chép lại.
+- Kiểm tra mỗi lát: `npx tsc --noEmit`, `npx expo-doctor` (20/20), `npx expo export` bundle thử; người dùng thử tay
+  trên điện thoại sau mỗi lát 0–5. Chưa có test tự động cho mobile.
+
 ## 3. Quy ước làm việc đã chốt
 - Không tự commit; báo danh sách file đổi để người dùng commit. Kế hoạch file trước, chờ xác nhận.
 - Test mock hoàn toàn Gemini và embedding; test DB dùng Postgres thật trong transaction rollback
@@ -580,6 +602,12 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
   thẳng từ i.ytimg.com (trình duyệt người dùng gửi IP tới Google, không gửi referrer); mới kiểm bằng tsc/next
   build, chưa thử trên trình duyệt.
 
+- App di động (mobile/): HTTP chữ thường trên LAN (mật khẩu và token đi dạng chữ) — chỉ để thử ở nhà, không dùng
+  Wi-Fi công cộng; token 30 phút, không có refresh token nên phải đăng nhập lại; kiểu dữ liệu chép tay từ
+  frontend/src/lib nên có thể lệch khi web/backend đổi; chưa có test tự động; chưa build bản phát hành (EAS).
+  Chưa có: hồ sơ (nhập trên web), chat, chi tiết chương trình/ngày tập/video/đánh dấu hoàn thành (lát 6), số đo
+  cơ thể, biểu đồ tiến độ, chọn ngày theo lịch, nút đổi tuần của nhận xét tuần, icon tab.
+
 ## 7. Việc còn lại (thứ tự dự kiến)
 1. Thử trên trình duyệt: dashboard, /admin tab Thực phẩm và tab Tài liệu (tải lên, lập chỉ mục, xem trước, bật/tắt,
    xoá); thử get_progress_summary, một dòng ADMIN_MANUAL qua lookup_food và search_knowledge có tài liệu tải lên
@@ -609,6 +637,13 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
    Gemini thật (nhắc gặp bác sĩ, không theo yêu cầu trong ghi chú); cân nhắc trang xem/sửa hồ sơ; gộp migration
    nếu gộp nhánh telegram (xem mục 1).
 10. Báo cáo đồ án (bảng "Trạng thái thực hiện" ở SPEC.md mục 4 là căn cứ phạm vi).
+11. App di động: lát 6 (chi tiết chương trình, ngày tập, mở video qua Linking chỉ khi qua isSafeYoutubeUrl, đánh
+    dấu hoàn thành) khi người dùng duyệt. Việc nhỏ ở web/backend phát hiện khi làm app (chưa sửa):
+    (1) web luôn ghi nguồn "Bảng thành phần thực phẩm Việt Nam 2007" ở form thêm món kể cả món USDA / quản trị viên
+    nhập (frontend/src/components/meals/AddMealForm.tsx; app dùng source.title do server trả);
+    (2) nhận xét tuần của server (services/progress.py: weekly_notes) chèn lại câu cảnh báo muối đã có trong
+    health_warnings, nên Tổng quan (web và app) hiện câu này hai lần, bản trong nhận xét không có dòng nguồn —
+    quyết định xử lý ở backend, app không lọc.
 Đã bỏ có chủ đích: gợi ý thực đơn / thay món (FR10–11 ngoài phạm vi) và bộ lọc câu hỏi y khoa riêng bằng code
 (FR7 đáp ứng bằng quy tắc prompt, dòng cảnh báo dưới ô nhập và nhóm câu hỏi E).
 Thứ tự trên là dự kiến của người dùng; chi tiết từng lát chưa chốt (chưa chắc).
