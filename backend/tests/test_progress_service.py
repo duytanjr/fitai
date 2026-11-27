@@ -152,6 +152,24 @@ def test_finished_week_uses_denominator_7():
     assert ("Cân nặng thay đổi −0,5 kg: từ 70 kg (26/10) đến 69,5 kg (01/11), 2 lần đo." in r["notes"])
 
 
+def test_weekly_notes_without_condition_unchanged():
+    """Người không khai bệnh: nhận xét tuần giữ đúng như trước (toàn bộ danh sách, đúng thứ tự)."""
+    series = week_series("2026-10-26", {"2026-10-26": totals(1700.0), "2026-10-28": totals(1900.0, incomplete=1)},
+                         {"2026-10-26": 70.0, "2026-11-01": 69.5})
+    r = p.build_weekly_report(D("2026-10-26"), D("2026-11-04"), series, COMPLETE_METRICS)
+    assert r["health_warnings"] == []
+    assert r["notes"] == [
+        "Có nhật ký ăn uống 2/7 ngày.",
+        "Calo trung bình 1.800 kcal/ngày, thấp hơn mục tiêu 200 kcal (10%).",
+        "Protein trung bình 10 g/ngày, thấp hơn mục tiêu 110 g (91,7%).",
+        "Chất béo trung bình 5 g/ngày, thấp hơn mục tiêu 55 g (91,7%).",
+        "Carb trung bình 20 g/ngày, thấp hơn mục tiêu 220 g (91,7%).",
+        CALORIE_NOTE,
+        "Ngày có tổng chưa đầy đủ (có mục thiếu số liệu): 28/10.",
+        "Cân nặng thay đổi −0,5 kg: từ 70 kg (26/10) đến 69,5 kg (01/11), 2 lần đo.",
+    ]
+
+
 def test_partial_week_counts_only_elapsed_days():
     series = week_series("2026-11-02", {"2026-11-03": totals(2100.0)})
     r = p.build_weekly_report(D("2026-11-02"), D("2026-11-04"), series, COMPLETE_METRICS)   # thứ Tư

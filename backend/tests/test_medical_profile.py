@@ -268,7 +268,7 @@ def totals(kcal, protein=100.0):
                      sums={"energy_kcal": kcal, "protein_g": protein, "fat_g": 50.0, "carb_g": 200.0})
 
 
-def test_weekly_notes_add_only_nutrition_and_general_warnings():
+def test_weekly_notes_exclude_health_warnings():
     metrics = profile_metrics_summary(profile(["hypertension", "metabolic", "other"]))
     start = date(2026, 10, 26)
     series = p.build_series(start, start + timedelta(days=6), {start: totals(1800.0)}, {})
@@ -277,11 +277,13 @@ def test_weekly_notes_add_only_nutrition_and_general_warnings():
     stats = p.build_stats(series, target)
     assert all(stats["comparison"][f] is not None for f in OLD_TARGET)
     r = p.build_weekly_report(start, date(2026, 11, 4), series, metrics)
-    for rid in ("salt", "metabolic_diet", "other_general"):
-        assert f"{MESSAGE[rid]}." in r["notes"], rid
-    for rid in ("htn_training", "metabolic_training"):
-        assert f"{MESSAGE[rid]}." not in r["notes"], rid
+    # Cảnh báo chỉ nằm trong health_warnings (giao diện hiện kèm nguồn), không lặp lại trong notes
+    for w in r["health_warnings"]:
+        assert not any(w["message"] in n for n in r["notes"]), w["id"]
     assert not any("không đặt mục tiêu" in n for n in r["notes"])
+    # Bệnh lý không đổi nhận xét: giống hệt cùng dữ liệu khi không khai bệnh
+    healthy = p.build_weekly_report(start, date(2026, 11, 4), series, profile_metrics_summary(profile()))
+    assert healthy["health_warnings"] == [] and r["notes"] == healthy["notes"]
     assert [w["id"] for w in r["health_warnings"]] == [w["id"] for w in metrics["health_warnings"]]
 
 
@@ -297,7 +299,8 @@ async def test_meals_and_progress_api_with_condition_keep_numbers(client):
     weekly = await client.get("/api/v1/progress/weekly-report", headers=h)
     assert weekly.status_code == 200 and weekly.json()["target"] == OLD_TARGET
     notes = weekly.json()["notes"]
-    assert f"{MESSAGE['salt']}." in notes and f"{MESSAGE['stroke_training']}." not in notes
+    assert not any(MESSAGE["salt"] in n or MESSAGE["stroke_training"] in n for n in notes)
+    assert [w["id"] for w in weekly.json()["health_warnings"]] == ["salt", "stroke_training"]
 
 
 # ── 6. Gợi ý chương trình tập ────────────────────────────────────────────────

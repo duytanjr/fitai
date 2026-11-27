@@ -30,8 +30,6 @@ DEFAULT_RANGE_DAYS = 90
 MAX_RANGE_DAYS = 366
 WEEK_DAYS = 7
 NUTRIENTS = tuple(TARGET_FIELDS)  # energy_kcal, protein_g, fat_g, carb_g
-# Báo cáo tuần là về ăn uống: chỉ kèm cảnh báo dinh dưỡng và chung
-NOTE_WARNING_DOMAINS = ("nutrition", "general")
 CALORIE_NOTE = ("Tính trên các ngày có ghi nhật ký; nếu ghi chưa đủ bữa thì số này thấp hơn thực tế.")
 NUTRIENT_LABELS = {"energy_kcal": ("Calo", "kcal"), "protein_g": ("Protein", "g"),
                    "fat_g": ("Chất béo", "g"), "carb_g": ("Carb", "g")}
@@ -361,7 +359,11 @@ def comparison_sentence(field: str, c: dict) -> str:
 
 
 def weekly_notes(report: dict) -> list[str]:
-    """Câu nhận xét TRUNG TÍNH chỉ nêu số liệu (không khuyên, không đánh giá)."""
+    """Câu nhận xét TRUNG TÍNH chỉ nêu số liệu (không khuyên, không đánh giá).
+
+    Không chèn cảnh báo bệnh lý: chúng đã nằm trong report["health_warnings"] (kèm nguồn) và được giao diện
+    hiện riêng; chèn vào đây sẽ làm câu cảnh báo hiện hai lần.
+    """
     notes = []
     denom = report["days_counted"]
     head = f"Có nhật ký ăn uống {report['logged_days']}/{denom} ngày"
@@ -383,10 +385,6 @@ def weekly_notes(report: dict) -> list[str]:
                     notes.append(f"{label} trung bình {fmt(avg[f], 0 if unit == 'kcal' else 1)} {unit}/ngày.")
             notes.append("Hồ sơ chưa đủ thông tin nên chưa so với mục tiêu.")
         notes.append(CALORIE_NOTE)
-    # Báo cáo ăn uống: chỉ cảnh báo dinh dưỡng và cảnh báo chung (cảnh báo tập ở trang Tập luyện)
-    for w in report.get("health_warnings") or []:
-        if w["domain"] in NOTE_WARNING_DOMAINS:
-            notes.append(f"{w['message']}.")
     if report["incomplete_days"]:
         days = ", ".join(fmt_day(d) for d in report["incomplete_days"])
         notes.append(f"Ngày có tổng chưa đầy đủ (có mục thiếu số liệu): {days}.")
