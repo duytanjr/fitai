@@ -1,31 +1,22 @@
 /**
- * Tập luyện (chỉ xem; chi tiết chương trình, ngày tập, video, đánh dấu hoàn thành để lát 6).
+ * Tập luyện: gợi ý, chương trình đang tập, danh sách (bấm thẻ → chi tiết chương trình; "Tập ngày n" → ngày tập).
  * Khối tải độc lập: hồ sơ (cảnh báo tập + chung, tuổi) · gợi ý (theo kinh nghiệm) · đang tập · danh sách chương trình.
  * Kéo để làm mới; quay lại tab thì tải lại ngầm.
  */
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { RefreshControl, ScrollView, Text, View } from "react-native";
 
-import { profileApi, trainingApi } from "@/api/training";
-import { TRAINING_DOMAINS, type HealthWarning } from "@/api/types/medical";
+import { trainingApi } from "@/api/training";
 import type { Experience } from "@/api/types/training";
-import { HealthNotice } from "@/components/health/HealthNotice";
 import { LoaderCard } from "@/components/overview/cards";
-import { EnrollmentBody, ProgramCard, RecommendationBody, TrainingSafetyNotice } from "@/components/training/blocks";
+import { EnrollmentBody, ProgramCard, RecommendationBody, TrainingNotices } from "@/components/training/blocks";
 import { colors, ErrorRetry, styles } from "@/components/ui";
+import { fetchProfileFacts, PROFILE_FACTS_ERROR } from "@/lib/trainingHealth";
 import { useLoader } from "@/lib/useLoader";
 
-interface ProfileFacts {
-  age: number | null;
-  warnings: HealthWarning[];
-}
-
-/** Chỉ giữ tuổi và cảnh báo do server tính; ghi chú tự do (medical_notes) không được lưu vào state. */
-async function fetchProfileFacts(): Promise<ProfileFacts> {
-  const p = await profileApi.get();
-  return { age: p.age ?? null, warnings: p.health_warnings ?? [] };
-}
+const openProgram = (slug: string) => router.push(`/program/${encodeURIComponent(slug)}`);
+const openDay = (slug: string, n: number) => router.push(`/program/${encodeURIComponent(slug)}/day/${n}`);
 
 export default function TrainingScreen() {
   // Câu trả lời kinh nghiệm chỉ giữ trong màn (không sửa hồ sơ)
@@ -33,7 +24,7 @@ export default function TrainingScreen() {
   const experienceRef = useRef(experience);
   experienceRef.current = experience;
 
-  const profile = useLoader(fetchProfileFacts, "Không tải được cảnh báo sức khỏe từ hồ sơ.");
+  const profile = useLoader(fetchProfileFacts, PROFILE_FACTS_ERROR);
   const fetchRec = useCallback(() => trainingApi.recommendation(experienceRef.current), []);
   const rec = useLoader(fetchRec, "Không tải được gợi ý chương trình.", experience ?? "none");
   const current = useLoader(trainingApi.current, "Không tải được chương trình đang tập.");
@@ -71,14 +62,19 @@ export default function TrainingScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
       {/* Cảnh báo bệnh lý: chỉ lĩnh vực tập và chung (dinh dưỡng ở Tổng quan) */}
-      {profile.data ? <HealthNotice warnings={profile.data.warnings} domains={TRAINING_DOMAINS} /> : null}
-      {profile.error ? <ErrorRetry message={profile.error} onRetry={() => void profile.reload()} /> : null}
-      <TrainingSafetyNotice age={profile.data?.age ?? null} />
+      <TrainingNotices profile={profile} />
 
       {/* Đang tập: ẩn nếu không có (lỗi vẫn hiện để có Thử lại) */}
       {current.data && !enrollment && !current.error ? null : (
         <LoaderCard title="Đang tập" loader={current}>
-          {(c) => (c.enrollment ? <EnrollmentBody enrollment={c.enrollment} /> : null)}
+          {(c) =>
+            c.enrollment ? (
+              <EnrollmentBody
+                enrollment={c.enrollment}
+                onOpenDay={(n) => openDay(c.enrollment!.program_slug, n)}
+              />
+            ) : null
+          }
         </LoaderCard>
       )}
 
@@ -108,6 +104,7 @@ export default function TrainingScreen() {
             program={p}
             recommended={p.slug === recommendedSlug}
             following={enrollment && enrollment.program_slug === p.slug && enrollment.status === "active" ? enrollment : null}
+            onPress={() => openProgram(p.slug)}
           />
         ))}
       </View>

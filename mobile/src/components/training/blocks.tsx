@@ -1,6 +1,8 @@
 /** Nội dung các khối của tab Tập luyện (giống TrainingShell/ProgramList của web, chỉ xem). */
 import { Pressable, Text, View } from "react-native";
 
+import { TRAINING_DOMAINS } from "@/api/types/medical";
+
 import {
   GOAL_LABELS,
   LEVEL_LABELS,
@@ -10,8 +12,11 @@ import {
   type ProgramSummary,
   type Recommendation,
 } from "@/api/types/training";
-import { Badge, colors, Notice, styles } from "@/components/ui";
+import { HealthNotice } from "@/components/health/HealthNotice";
+import { Badge, colors, ErrorRetry, Notice, SmallButton, styles } from "@/components/ui";
 import { fullDate } from "@/lib/dates";
+import type { ProfileFacts } from "@/lib/trainingHealth";
+import type { Loader } from "@/lib/useLoader";
 
 const EXPERIENCE_CHOICES: { value: Experience; label: string }[] = [
   { value: "regular", label: "Đã tập đều" },
@@ -23,13 +28,39 @@ const NEUTRAL_BADGE = { bg: "#f3f4f6", fg: "#374151" };
 const ACCENT_BADGE = { bg: "#fffbeb", fg: "#92400e" };
 
 /** Hộp lưu ý an toàn cố định (TrainingSafetyNotice của web). */
-export function TrainingSafetyNotice({ age }: { age: number | null }) {
+export function TrainingSafetyNotice({ weightLoss = false, age }: { weightLoss?: boolean; age: number | null }) {
   return (
     <Notice kind="warn">
       Chương trình do nhóm đồ án soạn từ video công khai, không thay thế huấn luyện viên. Dừng tập nếu đau, chóng mặt
       hay khó thở; hỏi bác sĩ nếu bạn có bệnh nền.
+      {weightLoss ? "\nMô tả không hứa kết quả giảm cân; hiệu quả phụ thuộc chế độ ăn." : ""}
       {age !== null && age < 18 ? "\nBạn nên tập cùng người lớn hoặc hỏi huấn luyện viên." : ""}
     </Notice>
+  );
+}
+
+/**
+ * Đầu mọi màn tập luyện (như TrainingShell của web): banner bệnh lý (chỉ lĩnh vực tập và chung) + hộp lưu ý an
+ * toàn. Không chặn người có bệnh. Hồ sơ tải lỗi thì chỉ khối này báo lỗi; hộp lưu ý vẫn hiện.
+ */
+export function TrainingNotices({ profile, weightLoss = false }: { profile: Loader<ProfileFacts>; weightLoss?: boolean }) {
+  return (
+    <>
+      {profile.data ? <HealthNotice warnings={profile.data.warnings} domains={TRAINING_DOMAINS} /> : null}
+      {profile.error ? <ErrorRetry message={profile.error} onRetry={() => void profile.reload()} /> : null}
+      <TrainingSafetyNotice weightLoss={weightLoss} age={profile.data?.age ?? null} />
+    </>
+  );
+}
+
+/** Nhãn mục tiêu · mức · cường độ của một chương trình. */
+export function ProgramBadges({ program }: { program: ProgramSummary }) {
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+      <Badge text={GOAL_LABELS[program.goal_tag] ?? program.goal_tag} {...BRAND_BADGE} />
+      <Badge text={LEVEL_LABELS[program.level] ?? program.level} {...NEUTRAL_BADGE} />
+      {program.intensity_label ? <Badge text={program.intensity_label} {...ACCENT_BADGE} /> : null}
+    </View>
   );
 }
 
@@ -48,7 +79,13 @@ function Progress({ done, total, label }: { done: number; total: number; label: 
 }
 
 /** Thẻ "Đang tập": chương trình đang theo, tiến độ, ngày tiếp theo, thông báo của server. */
-export function EnrollmentBody({ enrollment }: { enrollment: Enrollment }) {
+export function EnrollmentBody({
+  enrollment,
+  onOpenDay,
+}: {
+  enrollment: Enrollment;
+  onOpenDay: (dayNumber: number) => void;
+}) {
   const total = enrollment.training_days_total;
   const done = enrollment.training_days_done;
   return (
@@ -64,12 +101,17 @@ export function EnrollmentBody({ enrollment }: { enrollment: Enrollment }) {
         </>
       )}
       {enrollment.next_day !== null ? (
-        <Text style={styles.text}>Ngày tiếp theo: ngày {enrollment.next_day}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <Text style={styles.text}>Ngày tiếp theo: ngày {enrollment.next_day}</Text>
+          {enrollment.available ? (
+            <SmallButton title={`Tập ngày ${enrollment.next_day} ›`} onPress={() => onOpenDay(enrollment.next_day!)} />
+          ) : null}
+        </View>
       ) : enrollment.available && total > 0 && done >= total ? (
         <Text style={styles.text}>Đã xong mọi ngày tập của chương trình.</Text>
       ) : null}
       {enrollment.message ? <Notice kind="warn">{enrollment.message}</Notice> : null}
-      <Text style={styles.muted}>Mở ngày tập, xem video và đánh dấu hoàn thành trên web (bản app sau sẽ có).</Text>
+      <Text style={styles.muted}>Đánh dấu hoàn thành ngày tập trên web (bản app sau sẽ có).</Text>
     </View>
   );
 }
@@ -144,17 +186,24 @@ export function ProgramCard({
   program,
   recommended,
   following,
+  onPress,
 }: {
   program: ProgramSummary;
   recommended: boolean;
   following: Enrollment | null;
+  onPress: () => void;
 }) {
   const p = program;
   const minutes = p.total_minutes !== null ? minutesText(p.total_minutes, p.required_minutes, p.items_without_duration) : "";
   const total = following?.training_days_total ?? 0;
   const done = following?.training_days_done ?? 0;
   return (
-    <View style={[styles.card, recommended && { borderColor: "#86efac" }]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityHint="Mở chi tiết chương trình"
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, recommended && { borderColor: "#86efac" }, pressed && { opacity: 0.7 }]}
+    >
       {(recommended || following) && (
         <View style={{ flexDirection: "row", gap: 6 }}>
           {recommended && <Badge text="Gợi ý cho bạn" {...BRAND_BADGE} />}
@@ -162,11 +211,7 @@ export function ProgramCard({
         </View>
       )}
       <Text style={[styles.title, { fontSize: 17 }]}>{p.title}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-        <Badge text={GOAL_LABELS[p.goal_tag] ?? p.goal_tag} {...BRAND_BADGE} />
-        <Badge text={LEVEL_LABELS[p.level] ?? p.level} {...NEUTRAL_BADGE} />
-        {p.intensity_label ? <Badge text={p.intensity_label} {...ACCENT_BADGE} /> : null}
-      </View>
+      <ProgramBadges program={p} />
       {p.description ? (
         <Text style={styles.text} numberOfLines={3}>
           {p.description}
@@ -183,6 +228,7 @@ export function ProgramCard({
           <Progress done={done} total={total} label={`Tiến độ ${p.title}`} />
         </View>
       )}
-    </View>
+      <Text style={[styles.link, { marginTop: 2 }]}>Xem chương trình ›</Text>
+    </Pressable>
   );
 }
