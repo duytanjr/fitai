@@ -17,8 +17,16 @@ export interface Loader<T> {
   reload: () => Promise<boolean>;
 }
 
-/** `key` đổi (vd. lựa chọn của người dùng) → tải lại với fetcher mới nhất. */
-export function useLoader<T>(fetcher: () => Promise<T>, errorText: string, key: string = ""): Loader<T> {
+/**
+ * `key` đổi (vd. lựa chọn của người dùng) → tải lại với fetcher mới nhất.
+ * `serverMessage`: true → lỗi 404/422 hiện câu của server (vd. tuần chưa bắt đầu) thay cho errorText.
+ */
+export function useLoader<T>(
+  fetcher: () => Promise<T>,
+  errorText: string,
+  key: string = "",
+  serverMessage: boolean = false,
+): Loader<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -38,12 +46,13 @@ export function useLoader<T>(fetcher: () => Promise<T>, errorText: string, key: 
     } catch (err) {
       if (mine !== seq.current) return false;
       if (err instanceof ApiError && err.status === 401) return false;
-      setError(isNetworkError(err) ? (err as ApiError).message : errorText);
+      const showServer = serverMessage && err instanceof ApiError && (err.status === 404 || err.status === 422);
+      setError(isNetworkError(err) || showServer ? (err as ApiError).message : errorText);
       return false;
     } finally {
       if (mine === seq.current) setLoading(false);
     }
-  }, [errorText]);
+  }, [errorText, serverMessage]);
 
   useEffect(() => {
     void reload();

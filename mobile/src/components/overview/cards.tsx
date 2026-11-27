@@ -2,10 +2,13 @@
 import type { ReactNode } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
-import { formatNumber, type BodyMetricList, type WeeklyReport } from "@/api/types/progress";
+import type { DailySummary } from "@/api/types/meals";
+import { PROGRESS_DAYS, formatNumber, type Progress, type ProgressDays, type WeeklyReport } from "@/api/types/progress";
 import type { TrainingWeekSummary } from "@/api/types/training";
+import { CalorieChart, WeightChart } from "@/components/overview/charts";
 import { colors, ErrorRetry, LinkText, Notice, SmallButton, styles } from "@/components/ui";
-import { fullDate } from "@/lib/dates";
+import { averageKcalText, loggedDaysText, weightChangeText } from "@/lib/charts";
+import { fullDate, weekdayVN } from "@/lib/dates";
 import { openOnboarding } from "@/lib/navigation";
 import { missingFieldsText } from "@/lib/profileFields";
 import type { Loader } from "@/lib/useLoader";
@@ -14,18 +17,24 @@ import type { Loader } from "@/lib/useLoader";
 export function LoaderCard<T>({
   title,
   loader,
+  right,
   children,
 }: {
   title: string;
   loader: Loader<T>;
+  /** Nút cạnh tiêu đề (vd. 7/30/90 ngày, đổi tuần) — luôn hiện, kể cả khi đang tải hay lỗi */
+  right?: ReactNode;
   children: (data: T) => ReactNode;
 }) {
   const { data, error, loading, reload } = loader;
   return (
     <View style={styles.card}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Text style={styles.title}>{title}</Text>
-        {loading && data !== null ? <ActivityIndicator size="small" color={colors.muted} /> : null}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+          <Text style={[styles.title, { flexShrink: 1 }]}>{title}</Text>
+          {loading && data !== null ? <ActivityIndicator size="small" color={colors.muted} /> : null}
+        </View>
+        {right}
       </View>
       {data === null && loading && !error ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 }}>
@@ -79,14 +88,11 @@ export function weeklyReportHasData(r: WeeklyReport): boolean {
   return r.logged_days > 0 || r.weight_measurements > 0;
 }
 
-/** Nhận xét tuần hiện tại (giống WeeklyReportCard của web, không có nút đổi tuần). Câu do server tạo. */
+/** Báo cáo tuần (giống WeeklyReportCard của web; tuần và nút đổi tuần ở tiêu đề thẻ). Câu do server tạo. */
 export function WeeklyReportBody({ report }: { report: WeeklyReport }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.muted}>
-        {fullDate(report.week_start)} – {fullDate(report.week_end)}
-        {report.is_partial_week ? " (tuần chưa kết thúc)" : ""}
-      </Text>
+      {report.is_partial_week ? <Text style={styles.muted}>Tuần chưa kết thúc</Text> : null}
       <Text style={styles.text}>
         Ngày có nhật ký:{" "}
         <Text style={{ fontWeight: "700" }}>
@@ -103,33 +109,142 @@ export function WeeklyReportBody({ report }: { report: WeeklyReport }) {
       {report.missing_days.length > 0 && (
         <Text style={styles.muted}>Ngày chưa có nhật ký: {report.missing_days.map(fullDate).join(", ")}</Text>
       )}
-      {!report.is_complete && (
-        <Notice kind="info">
-          Hồ sơ chưa đủ thông tin
-          {report.missing_fields.length > 0 ? ` (${missingFieldsText(report.missing_fields)})` : ""} nên chưa so được
-          với mục tiêu. <LinkText onPress={openOnboarding}>Hoàn tất hồ sơ</LinkText>.
-        </Notice>
-      )}
+      {!report.is_complete ? <ProfileNotice missing={report.missing_fields} /> : null}
     </View>
   );
 }
 
-/** Thẻ "Cân nặng": lần đo gần nhất trong 90 ngày (GET /body-metrics) + mở màn ghi số đo. */
-export function WeightBody({ list, onOpen }: { list: BodyMetricList; onOpen: () => void }) {
-  const latest = list.items.length > 0 ? list.items[list.items.length - 1] : null;
+function ProfileNotice({ missing }: { missing: string[] }) {
   return (
-    <View style={{ gap: 6 }}>
-      {latest ? (
-        <Text style={styles.text}>
-          Lần đo gần nhất: <Text style={{ fontWeight: "700" }}>{formatNumber(latest.weight_kg)} kg</Text>
-          {latest.waist_cm !== null ? `, vòng eo ${formatNumber(latest.waist_cm)} cm` : ""} ({fullDate(latest.measured_on)})
-        </Text>
-      ) : (
-        <Text style={styles.muted}>Chưa có lần đo nào trong 90 ngày gần nhất.</Text>
-      )}
+    <Notice kind="info">
+      Hồ sơ chưa đủ thông tin{missing.length > 0 ? ` (${missingFieldsText(missing)})` : ""} nên chưa so được với mục
+      tiêu. <LinkText onPress={openOnboarding}>Hoàn tất hồ sơ</LinkText>.
+    </Notice>
+  );
+}
+
+/** Nút chọn khoảng 7/30/90 ngày (đặt cạnh tiêu đề thẻ calo). */
+export function DaysPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: ProgressDays;
+  onChange: (d: ProgressDays) => void;
+  disabled: boolean;
+}) {
+  return (
+    <View accessibilityRole="radiogroup" style={{ flexDirection: "row", gap: 4 }}>
+      {PROGRESS_DAYS.map((d) => {
+        const on = d === value;
+        return (
+          <Text
+            key={d}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on, checked: on, disabled }}
+            onPress={disabled || on ? undefined : () => onChange(d)}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 8,
+              overflow: "hidden",
+              fontSize: 13,
+              fontWeight: "600",
+              color: on ? colors.white : "#374151",
+              backgroundColor: on ? colors.brand : "#f3f4f6",
+              opacity: disabled && !on ? 0.6 : 1,
+            }}
+          >
+            {d} ngày
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Thẻ "Calo theo ngày": biểu đồ cột + số liệu chữ (GET /progress). */
+export function CalorieBody({ progress }: { progress: Progress }) {
+  const avg = averageKcalText(progress.stats);
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={styles.muted}>{progress.period_label}</Text>
+      <CalorieChart
+        key={`${progress.start_date}-${progress.days}`}
+        series={progress.series}
+        target={progress.target?.energy_kcal ?? null}
+      />
+      <Text style={styles.text}>{loggedDaysText(progress.stats)}</Text>
+      {avg ? <Text style={styles.text}>{avg}</Text> : null}
+      {!progress.is_complete ? <ProfileNotice missing={progress.missing_fields} /> : null}
+    </View>
+  );
+}
+
+/** Thẻ "Cân nặng": lần đo gần nhất (không giới hạn khoảng), biểu đồ đường, thay đổi trong khoảng. */
+export function WeightBody({ progress, onOpen }: { progress: Progress; onOpen: () => void }) {
+  const latest = progress.latest_weight;
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={styles.muted}>{progress.period_label}</Text>
+      <Text style={styles.text}>
+        Cân nặng gần nhất:{" "}
+        {latest ? (
+          <Text style={{ fontWeight: "700" }}>
+            {formatNumber(latest.weight_kg)} kg ({fullDate(latest.measured_on)})
+          </Text>
+        ) : (
+          "chưa có lần đo"
+        )}
+      </Text>
+      <WeightChart key={`${progress.start_date}-${progress.days}`} series={progress.series} />
+      <Text style={styles.text}>{weightChangeText(progress.stats.weight_change)}</Text>
       <View style={{ alignItems: "flex-start" }}>
         <SmallButton title="Ghi cân nặng ›" onPress={onOpen} />
       </View>
+    </View>
+  );
+}
+
+/** Thẻ chào đầu Tổng quan (GreetingCard của web): tên, thứ, ngày, calo hôm nay hoặc nút ghi bữa ăn. */
+export function GreetingCard({
+  name,
+  today,
+  onLogMeal,
+}: {
+  name: string;
+  today: DailySummary | null;
+  onLogMeal: () => void;
+}) {
+  const hasLog = !!today && today.entries_count > 0;
+  const target = today?.target?.energy_kcal;
+  const validTarget = typeof target === "number" && Number.isFinite(target) && target > 0;
+  return (
+    <View style={[styles.card, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
+      <Text style={{ fontSize: 12, fontWeight: "700", color: colors.brandDark, letterSpacing: 0.5 }}>TIẾN ĐỘ</Text>
+      <Text style={[styles.title, { fontSize: 22 }]}>Xin chào, {name}.</Text>
+      {today ? (
+        <>
+          <Text style={styles.muted}>
+            {weekdayVN(today.date)}, {fullDate(today.date)}
+          </Text>
+          {hasLog ? (
+            <Text style={styles.text}>
+              Hôm nay bạn đã ghi{" "}
+              <Text style={{ fontWeight: "700" }}>
+                {formatNumber(today.eaten.energy_kcal, 0)}
+                {validTarget ? `/${formatNumber(target, 0)}` : ""} kcal
+              </Text>
+              .
+            </Text>
+          ) : (
+            <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+              <Text style={styles.text}>Bạn chưa ghi bữa ăn nào hôm nay.</Text>
+              <SmallButton title="Ghi bữa ăn" onPress={onLogMeal} />
+            </View>
+          )}
+        </>
+      ) : null}
     </View>
   );
 }

@@ -5,7 +5,8 @@
  */
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshControl, ScrollView, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { ApiError } from "@/api/client";
 import { mealsApi } from "@/api/meals";
@@ -17,6 +18,7 @@ import {
   type MealEntry,
   type MealType,
 } from "@/api/types/meals";
+import { DatePicker } from "@/components/meals/DatePicker";
 import { DaySummaryCard } from "@/components/meals/DaySummaryCard";
 import { MealRow } from "@/components/meals/MealRow";
 import { Button, CenteredLoading, colors, ErrorRetry, SmallButton, styles } from "@/components/ui";
@@ -43,6 +45,7 @@ interface DayData {
 
 export default function MealsScreen() {
   const [date, setDate] = useState(() => todayVN());
+  const [picking, setPicking] = useState(false);
   const [data, setData] = useState<DayData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,7 +102,7 @@ export default function MealsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      {/* Chọn ngày: lùi/tiến một ngày, không đi quá hôm nay (giờ Việt Nam) */}
+      {/* Chọn ngày: lùi/tiến một ngày hoặc chạm vào ngày để mở lịch; không đi quá hôm nay (giờ Việt Nam) */}
       <View
         style={{
           flexDirection: "row",
@@ -113,16 +116,28 @@ export default function MealsScreen() {
         }}
       >
         <SmallButton title="‹ Trước" accessibilityLabel="Ngày trước" onPress={() => setDate(addDays(date, -1))} />
-        <View style={{ flex: 1, alignItems: "center" }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Chọn ngày, đang xem ${fullDate(date)}`}
+          onPress={() => setPicking(true)}
+          style={({ pressed }) => [{ flex: 1, alignItems: "center" }, pressed && { opacity: 0.6 }]}
+        >
           <Text style={styles.title}>{isToday ? "Hôm nay" : weekdayVN(date)}</Text>
-          <Text style={styles.muted}>{fullDate(date)}</Text>
-        </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Ionicons name="calendar-outline" size={14} color={colors.brand} />
+            <Text style={[styles.muted, { color: colors.brand }]}>{fullDate(date)}</Text>
+          </View>
+        </Pressable>
         {isToday ? (
           <SmallButton title="Sau ›" accessibilityLabel="Ngày sau" disabled onPress={() => {}} />
         ) : (
           <SmallButton title="Sau ›" accessibilityLabel="Ngày sau" onPress={() => setDate(addDays(date, 1))} />
         )}
       </View>
+
+      {picking ? (
+        <DatePicker valueIso={date} maxIso={today} onPick={setDate} onClose={() => setPicking(false)} />
+      ) : null}
 
       {loading && !shown ? (
         <CenteredLoading label="Đang tải nhật ký…" />

@@ -1,9 +1,12 @@
 /**
- * Đồng bộ tay từ frontend/src/lib/progress.ts — WeeklyReport và các kiểu con, BodyMetric và giới hạn số đo,
- * formatNumber. (Progress chưa chép: lát 7c.) fullDate nằm ở src/lib/dates.ts; hàm gọi API ở src/api/progress.ts.
+ * Đồng bộ tay từ frontend/src/lib/progress.ts — Progress, WeeklyReport và các kiểu con, BodyMetric và giới hạn
+ * số đo, PROGRESS_DAYS, shortDate, formatNumber. fullDate nằm ở src/lib/dates.ts; hàm gọi API ở src/api/progress.ts.
  */
 import type { MacroValues } from "./meals";
 import type { HealthWarning } from "./medical";
+
+export const PROGRESS_DAYS = [7, 30, 90] as const;
+export type ProgressDays = (typeof PROGRESS_DAYS)[number];
 
 export const MIN_WEIGHT_KG = 20;
 export const MAX_WEIGHT_KG = 300;
@@ -32,6 +35,12 @@ export interface BodyMetricUpsert {
   waist_cm?: number | null;
 }
 
+/** "2026-11-04" → "04/11" */
+export function shortDate(iso: string): string {
+  const [, m, d] = iso.split("-");
+  return `${d}/${m}`;
+}
+
 export function formatNumber(value: number, digits = 1): string {
   return value.toLocaleString("vi-VN", { maximumFractionDigits: digits });
 }
@@ -42,6 +51,15 @@ export interface NullableMacros {
   protein_g: number | null;
   fat_g: number | null;
   carb_g: number | null;
+}
+
+export interface ProgressDay extends NullableMacros {
+  date: string;
+  has_log: boolean;
+  entries_count: number;
+  incomplete_totals: boolean;
+  incomplete_entries: number;
+  weight_kg: number | null;
 }
 
 export interface ComparisonItem {
@@ -61,6 +79,31 @@ export interface WeightChange {
   last_kg: number;
   change_kg: number;
   measurements_count: number;
+}
+
+export interface ProgressStats {
+  days_count: number;
+  logged_days: number;
+  incomplete_days: number;
+  average: NullableMacros;
+  comparison: Comparison | null;
+  weight_measurements: number;
+  weight_change: WeightChange | null;
+  calorie_note: string;
+}
+
+export interface Progress {
+  days: number;
+  period_label: string;
+  start_date: string;
+  end_date: string;
+  is_complete: boolean;
+  missing_fields: string[];
+  target: MacroValues | null;
+  series: ProgressDay[];
+  stats: ProgressStats;
+  health_warnings: HealthWarning[];
+  latest_weight: { measured_on: string; weight_kg: number; waist_cm: number | null } | null;
 }
 
 export interface WeeklyReport {

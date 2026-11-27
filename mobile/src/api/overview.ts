@@ -1,9 +1,12 @@
 import { apiClient } from "./client";
-import type { WeeklyReport } from "./types/progress";
+import type { Progress, ProgressDays, WeeklyReport } from "./types/progress";
 import type { TrainingWeekSummary } from "./types/training";
 
-/** Tương đương progressApi.weeklyReport và trainingApi.summary của frontend (chỉ tuần hiện tại). */
+/** Tương đương progressApi.get/weeklyReport và trainingApi.summary của frontend. */
 export const overviewApi = {
-  weeklyReport: () => apiClient.get<WeeklyReport>("/progress/weekly-report"),
+  progress: (days: ProgressDays) => apiClient.get<Progress>(`/progress?days=${days}`),
+  /** weekStart: thứ Hai YYYY-MM-DD; bỏ trống = tuần hiện tại. 422 khi không phải thứ Hai hoặc tuần chưa bắt đầu. */
+  weeklyReport: (weekStart?: string) =>
+    apiClient.get<WeeklyReport>(`/progress/weekly-report${weekStart ? `?week_start=${weekStart}` : ""}`),
   trainingSummary: () => apiClient.get<TrainingWeekSummary>("/training/summary"),
 };
