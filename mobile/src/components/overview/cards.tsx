@@ -2,9 +2,9 @@
 import type { ReactNode } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
-import type { WeeklyReport } from "@/api/types/progress";
+import { formatNumber, type BodyMetricList, type WeeklyReport } from "@/api/types/progress";
 import type { TrainingWeekSummary } from "@/api/types/training";
-import { colors, ErrorRetry, LinkText, Notice, styles } from "@/components/ui";
+import { colors, ErrorRetry, LinkText, Notice, SmallButton, styles } from "@/components/ui";
 import { fullDate } from "@/lib/dates";
 import { openOnboarding } from "@/lib/navigation";
 import { missingFieldsText } from "@/lib/profileFields";
@@ -110,6 +110,26 @@ export function WeeklyReportBody({ report }: { report: WeeklyReport }) {
           với mục tiêu. <LinkText onPress={openOnboarding}>Hoàn tất hồ sơ</LinkText>.
         </Notice>
       )}
+    </View>
+  );
+}
+
+/** Thẻ "Cân nặng": lần đo gần nhất trong 90 ngày (GET /body-metrics) + mở màn ghi số đo. */
+export function WeightBody({ list, onOpen }: { list: BodyMetricList; onOpen: () => void }) {
+  const latest = list.items.length > 0 ? list.items[list.items.length - 1] : null;
+  return (
+    <View style={{ gap: 6 }}>
+      {latest ? (
+        <Text style={styles.text}>
+          Lần đo gần nhất: <Text style={{ fontWeight: "700" }}>{formatNumber(latest.weight_kg)} kg</Text>
+          {latest.waist_cm !== null ? `, vòng eo ${formatNumber(latest.waist_cm)} cm` : ""} ({fullDate(latest.measured_on)})
+        </Text>
+      ) : (
+        <Text style={styles.muted}>Chưa có lần đo nào trong 90 ngày gần nhất.</Text>
+      )}
+      <View style={{ alignItems: "flex-start" }}>
+        <SmallButton title="Ghi cân nặng ›" onPress={onOpen} />
+      </View>
     </View>
   );
 }

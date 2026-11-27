@@ -1,9 +1,40 @@
 /**
- * Đồng bộ tay từ frontend/src/lib/progress.ts — chỉ phần Tổng quan dùng: WeeklyReport và các kiểu con.
- * (Progress, BodyMetric, progressApi... chưa chép vì app chưa dùng.) fullDate nằm ở src/lib/dates.ts.
+ * Đồng bộ tay từ frontend/src/lib/progress.ts — WeeklyReport và các kiểu con, BodyMetric và giới hạn số đo,
+ * formatNumber. (Progress chưa chép: lát 7c.) fullDate nằm ở src/lib/dates.ts; hàm gọi API ở src/api/progress.ts.
  */
 import type { MacroValues } from "./meals";
 import type { HealthWarning } from "./medical";
+
+export const MIN_WEIGHT_KG = 20;
+export const MAX_WEIGHT_KG = 300;
+export const MIN_WAIST_CM = 30;
+export const MAX_WAIST_CM = 250;
+
+export interface BodyMetric {
+  id: string;
+  measured_on: string;
+  weight_kg: number;
+  waist_cm: number | null;
+  created_at: string;
+}
+
+/** GET /body-metrics: mặc định 90 ngày tới hôm nay (giờ VN), xếp theo ngày tăng dần. */
+export interface BodyMetricList {
+  start_date: string;
+  end_date: string;
+  items: BodyMetric[];
+}
+
+/** Trường không gửi giữ giá trị cũ; waist_cm: null thì xoá vòng eo. */
+export interface BodyMetricUpsert {
+  measured_on: string;
+  weight_kg?: number;
+  waist_cm?: number | null;
+}
+
+export function formatNumber(value: number, digits = 1): string {
+  return value.toLocaleString("vi-VN", { maximumFractionDigits: digits });
+}
 
 /** null = không có số liệu (KHÔNG phải 0). */
 export interface NullableMacros {

@@ -1,5 +1,5 @@
 /**
- * Thao tác ghi của màn tập luyện (bắt đầu / chuyển / đánh dấu / bỏ đánh dấu).
+ * Thao tác ghi (tập luyện: bắt đầu / chuyển / đánh dấu; số đo cơ thể: ghi / sửa / xoá).
  * - Không cập nhật trước: chỉ hiện trạng thái mới sau khi server trả lời và đã tải lại.
  * - Khoá trong lúc chờ (ref chặn cả hai lần chạm liên tiếp trước khi state kịp đổi).
  * - Sau MỌI lần ghi (thành công hay lỗi, kể cả lỗi mạng) đều tải lại trạng thái thật trước khi mở khoá; nếu tải lại
@@ -17,27 +17,37 @@ export function trainingWriteError(err: unknown, fallback: string): string {
   return friendlyTrainingError(err, fallback);
 }
 
-export function useWriteAction(sync: () => Promise<boolean>) {
+/** `toMessage`: đổi lỗi ghi thành câu hiện cho người dùng (mặc định như màn tập luyện). */
+export function useWriteAction(
+  sync: () => Promise<boolean>,
+  toMessage: (err: unknown, fallback: string) => string = trainingWriteError,
+) {
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [needsSync, setNeedsSync] = useState(false);
   const syncRef = useRef(sync);
   syncRef.current = sync;
+  const toMessageRef = useRef(toMessage);
+  toMessageRef.current = toMessage;
 
-  const run = useCallback(async (write: () => Promise<unknown>, fallback: string) => {
-    if (busyRef.current) return;
+  /** Trả true khi server nhận lần ghi (kể cả khi tải lại sau đó lỗi). */
+  const run = useCallback(async (write: () => Promise<unknown>, fallback: string): Promise<boolean> => {
+    if (busyRef.current) return false;
     busyRef.current = true;
     setBusy(true);
     setError("");
+    let ok = false;
     try {
       try {
         await write();
+        ok = true;
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) return; // client đã đăng xuất
-        setError(trainingWriteError(err, fallback));
+        if (err instanceof ApiError && err.status === 401) return false; // client đã đăng xuất
+        setError(toMessageRef.current(err, fallback));
       }
       setNeedsSync(!(await syncRef.current()));
+      return ok;
     } finally {
       busyRef.current = false;
       setBusy(false);

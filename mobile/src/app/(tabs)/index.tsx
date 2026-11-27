@@ -1,6 +1,6 @@
 /**
  * Tổng quan: cảnh báo sức khỏe (dinh dưỡng + chung), hôm nay, tập luyện tuần này, nhận xét tuần, tài khoản.
- * Mỗi thẻ tải độc lập (GET /meals/summary, /training/summary, /progress/weekly-report); kéo để làm mới cả màn;
+ * Mỗi thẻ tải độc lập (GET /meals/summary, /training/summary, /body-metrics, /progress/weekly-report); kéo để làm mới cả màn;
  * quay lại tab thì tải lại ngầm.
  */
 import { router, useFocusEffect } from "expo-router";
@@ -9,6 +9,7 @@ import { RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { mealsApi } from "@/api/meals";
 import { overviewApi } from "@/api/overview";
+import { bodyMetricsApi } from "@/api/progress";
 import { todayVN } from "@/api/types/meals";
 import { NUTRITION_DOMAINS } from "@/api/types/medical";
 import { useAuth } from "@/auth/AuthContext";
@@ -18,6 +19,7 @@ import {
   LoaderCard,
   TrainingWeekBody,
   WeeklyReportBody,
+  WeightBody,
   weeklyReportHasData,
 } from "@/components/overview/cards";
 import { Button, colors, ErrorRetry, SmallButton, styles } from "@/components/ui";
@@ -37,11 +39,12 @@ export default function OverviewScreen() {
   const today = useLoader(fetchToday, "Không tải được số liệu hôm nay.");
   const training = useLoader(overviewApi.trainingSummary, "Không tải được số liệu tập luyện.");
   const weekly = useLoader(overviewApi.weeklyReport, "Không tải được nhận xét tuần.");
+  const weight = useLoader(() => bodyMetricsApi.list(), "Không tải được cân nặng.");
 
   const [refreshing, setRefreshing] = useState(false);
   const reloadAll = useCallback(
-    () => Promise.all([today.reload(), training.reload(), weekly.reload()]),
-    [today.reload, training.reload, weekly.reload],
+    () => Promise.all([today.reload(), training.reload(), weekly.reload(), weight.reload()]),
+    [today.reload, training.reload, weekly.reload, weight.reload],
   );
   const onRefresh = async () => {
     setRefreshing(true);
@@ -89,6 +92,10 @@ export default function OverviewScreen() {
           {() => null}
         </LoaderCard>
       )}
+
+      <LoaderCard title="Cân nặng" loader={weight}>
+        {(list) => <WeightBody list={list} onOpen={() => router.push("/body-metrics")} />}
+      </LoaderCard>
 
       <LoaderCard title="Tập luyện tuần này" loader={training}>
         {(week) => <TrainingWeekBody week={week} />}
