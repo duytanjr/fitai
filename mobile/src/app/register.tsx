@@ -30,7 +30,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register({ email, password, full_name: fullName.trim() || undefined });
-      // Thành công: đã đăng nhập, Stack.Protected tự chuyển sang (tabs)
+      // Thành công: đã đăng nhập, Stack.Protected chuyển sang (tabs), rồi (tabs) mở thiết lập hồ sơ
     } catch (err) {
       setError(errorMessage(err, "Đăng ký thất bại"));
       setLoading(false);
@@ -39,7 +39,7 @@ export default function RegisterScreen() {
 
   return (
     <FormScreen>
-      <Text style={styles.subheading}>Tạo tài khoản FitAI. Hồ sơ sức khỏe nhập trên web sau khi đăng ký.</Text>
+      <Text style={styles.subheading}>Tạo tài khoản FitAI. Sau khi đăng ký, bạn thiết lập hồ sơ để có mục tiêu calo.</Text>
 
       <Field
         label="Họ và tên (không bắt buộc)"

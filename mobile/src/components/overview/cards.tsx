@@ -4,8 +4,9 @@ import { ActivityIndicator, Text, View } from "react-native";
 
 import type { WeeklyReport } from "@/api/types/progress";
 import type { TrainingWeekSummary } from "@/api/types/training";
-import { colors, ErrorRetry, Notice, styles } from "@/components/ui";
+import { colors, ErrorRetry, LinkText, Notice, styles } from "@/components/ui";
 import { fullDate } from "@/lib/dates";
+import { openOnboarding } from "@/lib/navigation";
 import { missingFieldsText } from "@/lib/profileFields";
 import type { Loader } from "@/lib/useLoader";
 
@@ -106,7 +107,7 @@ export function WeeklyReportBody({ report }: { report: WeeklyReport }) {
         <Notice kind="info">
           Hồ sơ chưa đủ thông tin
           {report.missing_fields.length > 0 ? ` (${missingFieldsText(report.missing_fields)})` : ""} nên chưa so được
-          với mục tiêu. Hoàn tất hồ sơ trên web.
+          với mục tiêu. <LinkText onPress={openOnboarding}>Hoàn tất hồ sơ</LinkText>.
         </Notice>
       )}
     </View>

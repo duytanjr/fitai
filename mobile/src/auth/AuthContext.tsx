@@ -3,7 +3,7 @@
  *   loading   – đang đọc token đã lưu và kiểm với server
  *   signedOut – chưa đăng nhập (notice: lý do, vd. phiên hết hạn)
  *   offline   – có token đã lưu nhưng chưa kiểm được (lỗi mạng/máy chủ): giữ token, cho thử lại hoặc đăng xuất
- *   signedIn  – đã đăng nhập
+ *   signedIn  – đã đăng nhập (freshSignup: vừa đăng ký trên app → mở màn thiết lập hồ sơ một lần)
  * Token hết hạn (30 phút, không có refresh) → API trả 401 → tự đăng xuất về màn đăng nhập.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -17,7 +17,7 @@ export type AuthState =
   | { status: "loading" }
   | { status: "signedOut"; notice: string | null }
   | { status: "offline"; message: string }
-  | { status: "signedIn"; user: User };
+  | { status: "signedIn"; user: User; freshSignup: boolean };
 
 interface AuthContextValue {
   state: AuthState;
@@ -27,6 +27,8 @@ interface AuthContextValue {
   signOut: (notice?: string | null) => Promise<void>;
   /** Thử kiểm lại token đã lưu (trạng thái offline). */
   retry: () => Promise<void>;
+  /** Màn thiết lập hồ sơ đã mở: không tự mở lại nữa. */
+  clearFreshSignup: () => void;
 }
 
 export const SESSION_EXPIRED = "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.";
@@ -54,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(token);
     try {
       const user = await authApi.me();
-      setState({ status: "signedIn", user });
+      setState({ status: "signedIn", user, freshSignup: false });
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         // Handler 401 đã đăng xuất (xoá token); hiện lý do
@@ -80,34 +82,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [restore, signOut]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const logIn = useCallback(async (email: string, password: string, freshSignup: boolean) => {
     const { access_token } = await authApi.login({ username: email.trim(), password });
     setAccessToken(access_token);
     try {
       const user = await authApi.me();
       await saveToken(access_token);
-      setState({ status: "signedIn", user });
+      setState({ status: "signedIn", user, freshSignup });
     } catch (err) {
       setAccessToken(null);
       throw err;
     }
   }, []);
 
+  const signIn = useCallback((email: string, password: string) => logIn(email, password, false), [logIn]);
+
+  const clearFreshSignup = useCallback(() => {
+    setState((s) => (s.status === "signedIn" && s.freshSignup ? { ...s, freshSignup: false } : s));
+  }, []);
+
   const register = useCallback(
     async (data: RegisterRequest) => {
       await authApi.register({ ...data, email: data.email.trim() });
       try {
-        await signIn(data.email, data.password);
+        await logIn(data.email, data.password, true);
       } catch {
         throw new ApiError(0, "Đã tạo tài khoản nhưng chưa đăng nhập được. Vui lòng đăng nhập.");
       }
     },
-    [signIn],
+    [logIn],
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ state, signIn, register, signOut, retry: restore }),
-    [state, signIn, register, signOut, restore],
+    () => ({ state, signIn, register, signOut, retry: restore, clearFreshSignup }),
+    [state, signIn, register, signOut, restore, clearFreshSignup],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

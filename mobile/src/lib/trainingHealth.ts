@@ -1,5 +1,5 @@
 /** Dữ liệu hồ sơ dùng cho các màn tập luyện: chỉ tuổi và cảnh báo do server tính. */
-import { profileApi } from "@/api/training";
+import { profileApi } from "@/api/profile";
 import type { HealthWarning } from "@/api/types/medical";
 
 export interface ProfileFacts {

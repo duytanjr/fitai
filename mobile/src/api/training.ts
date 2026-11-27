@@ -1,5 +1,4 @@
 import { apiClient } from "./client";
-import type { ProfileData } from "./types/auth";
 import type {
   Enrollment,
   Experience,
@@ -27,9 +26,4 @@ export const trainingApi = {
     apiClient.delete<Enrollment>(`/training/enrollments/${encodeURIComponent(enrollmentId)}/days/${n}`),
   recommendation: (experience: Experience | null) =>
     apiClient.get<Recommendation>(`/training/recommendation${experience ? `?experience=${experience}` : ""}`),
-};
-
-/** GET /profile: tab Tập luyện chỉ dùng health_warnings và age (KHÔNG hiển thị medical_notes). */
-export const profileApi = {
-  get: () => apiClient.get<ProfileData>("/profile"),
 };

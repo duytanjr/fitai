@@ -2,7 +2,8 @@
 import { Text, View } from "react-native";
 
 import { formatValue, type DailySummary, type MacroValues } from "@/api/types/meals";
-import { colors, Notice, styles } from "@/components/ui";
+import { colors, LinkText, Notice, styles } from "@/components/ui";
+import { openOnboarding } from "@/lib/navigation";
 import { missingFieldsText } from "@/lib/profileFields";
 
 const MACROS: { key: keyof MacroValues; label: string; unit: string }[] = [
@@ -83,7 +84,8 @@ export function DaySummaryCard({ summary, title = "Tóm tắt ngày" }: { summar
         <Notice kind="info">
           Hồ sơ chưa đủ thông tin
           {summary.missing_fields.length > 0 ? ` (${missingFieldsText(summary.missing_fields)})` : ""} nên chưa so
-          được với mục tiêu. Hoàn tất hồ sơ trên web để so với mục tiêu calo và macro của bạn.
+          được với mục tiêu. <LinkText onPress={openOnboarding}>Hoàn tất hồ sơ</LinkText> để so với mục tiêu calo
+          và macro của bạn.
         </Notice>
       )}
       <Text style={styles.muted}>{summary.carb_note}</Text>

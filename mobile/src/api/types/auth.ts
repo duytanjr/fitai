@@ -1,6 +1,6 @@
 /**
- * Đồng bộ tay từ frontend/src/lib/auth.ts (chỉ phần kiểu dữ liệu, không có hàm gọi API).
- * Chưa chép ProfileUpdateRequest và authApi (app chưa sửa hồ sơ).
+ * Đồng bộ tay từ frontend/src/lib/auth.ts (chỉ phần kiểu dữ liệu, không có hàm gọi API: authApi ở api/auth.ts,
+ * getProfile/updateProfile ở api/profile.ts).
  */
 import type { HealthWarning } from "./medical";
 
@@ -48,3 +48,11 @@ export interface ProfileData {
   health_warnings: HealthWarning[];
   is_complete: boolean;
 }
+
+export type ProfileUpdateRequest = Partial<
+  Omit<ProfileData, "is_complete" | "medical_consent_at" | "medical_conditions" | "health_warnings">
+> & {
+  medical_conditions?: string[];
+  /** Bắt buộc true khi medical_conditions không rỗng; server không lưu giá trị này */
+  medical_consent?: boolean;
+};

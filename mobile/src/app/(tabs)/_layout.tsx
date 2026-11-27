@@ -1,4 +1,4 @@
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import { Text } from "react-native";
 
 import { useAuth } from "@/auth/AuthContext";
@@ -6,7 +6,9 @@ import { colors } from "@/components/ui";
 
 /** Tab: Tổng quan, Ăn uống, Tập luyện. Chưa dùng thư viện icon. */
 export default function TabsLayout() {
-  const { signOut } = useAuth();
+  const { state, signOut } = useAuth();
+  // Vừa đăng ký trên app: mở thiết lập hồ sơ một lần (như web chuyển sang /onboarding); màn đó tự tắt cờ
+  if (state.status === "signedIn" && state.freshSignup) return <Redirect href="/onboarding" />;
   return (
     <Tabs
       screenOptions={{
