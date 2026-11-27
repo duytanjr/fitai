@@ -27,7 +27,7 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | Khớp tên món nhập thủ công + chống trích dẫn không nguồn | 18ab066, ff8bd0b | bóc ngoặc khẩu phần khi khớp tên món ADMIN, số theo khẩu phần giả định, bỏ lời dặn "không có món ăn hoàn chỉnh", "cháo trắng" ưu tiên món đúng tên, quy tắc trích dẫn trong chính lượt, cảnh báo frontend lib/citations.ts |
 | Bệnh lý tự khai báo trong hồ sơ | db852fa, df5807e | migration b7d4e2a9c615 (medical_conditions, medical_notes, medical_consent_at), schema + đồng ý, health_warnings, gợi ý tập chỉ mức người mới + needs_medical_clearance, quy tắc 20 của prompt, bước "Sức khỏe" ở onboarding, banner HealthNotice |
 | Đổi sang 7 nhóm bệnh + cảnh báo theo bệnh | 644d0ea (backend); nhánh nang-cap-ai, đã merge vào main: commit 644d0ea (backend) và 6b56527 (frontend, tài liệu) | 7 mã (musculoskeletal, cardiovascular, hypertension, metabolic, respiratory, stroke, other), bỏ quy tắc thận/mang thai và mục tiêu null theo từng chất, services/health_rules.py (10 cảnh báo, chỉ ý muối có nguồn WHO), migration e4c1a8f2d905 đưa khai báo cũ về rỗng, scripts/export_health_rules.py, HealthNotice lọc theo lĩnh vực kèm dòng nguồn, docker-compose mount ./docs chỉ đọc vào backend |
-| App di động (mobile/, lát 0–6b) | lát 0–5: nhánh app-mobile, commit 24f4b38, 2e56992, 70add46, b1ac396, 6614022, a7c4f2e; lát 6a: nhánh app-mobile-lat6, commit 49478cf; lát 6b: chưa commit (nhánh app-mobile-lat6) | Expo SDK 58 + TypeScript + expo-router + expo-secure-store; đăng nhập/đăng ký, Tổng quan, Ăn uống (xem/sửa/xoá/thêm), Tập luyện (gợi ý, chi tiết chương trình, ngày tập kèm video, bắt đầu/chuyển/tập lại, đánh dấu ngày); chỉ gọi API backend hiện có, không sửa backend/frontend |
+| App di động (mobile/, lát 0–7g + chat) | lát 0–6b đã có trên main (0–5: 24f4b38, 2e56992, 70add46, b1ac396, 6614022, a7c4f2e; 6a: 49478cf; 6b: e5b1d3e); lát 7a–chat: nhánh app-dong-bo-web, commit 03a967f (onboarding), 608ea2c (số đo), 60c1066 (tiến độ, báo cáo tuần, lịch, icon), 46a8e29 (chat) | Expo SDK 58 + TypeScript + expo-router; ĐỦ chức năng người dùng của web: đăng nhập/đăng ký, thiết lập hồ sơ, Tổng quan (biểu đồ calo/cân nặng, báo cáo tuần), số đo cơ thể, Ăn uống, Tập luyện, Chat; trừ trang quản trị (chủ ý không làm). Chỉ gọi API backend hiện có, không sửa backend/frontend |
 
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
@@ -437,10 +437,18 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
   thống nhất "1–3 ngày/tuần".
 - docker-compose.yml mount ./docs:/app/docs:ro vào backend để test đồng bộ tài liệu chạy trong container.
 
-### Ứng dụng di động (mobile/, nhánh app-mobile và app-mobile-lat6, cập nhật 2026-11-27)
+### Ứng dụng di động (mobile/, lát 0–6b trên main, lát 7a–chat trên nhánh app-dong-bo-web, cập nhật 2026-11-27)
 - Expo SDK 58 (expo ~58.0.26, react-native 0.88.1, react 19.3.0, expo-router ~58.0.32, expo-secure-store ~58.0.3),
-  TypeScript; chạy bằng Expo Go. Không thêm thư viện UI, icon, biểu đồ hay quản lý trạng thái. Hướng dẫn chạy ở
+  TypeScript; chạy bằng Expo Go. Không thêm thư viện UI, quản lý trạng thái hay Markdown. Hướng dẫn chạy ở
   mobile/README.md.
+- Gói thêm ở đợt đồng bộ với web (đều có sẵn trong Expo Go SDK 58): react-native-svg 15.16.0 (biểu đồ),
+  @react-native-community/datetimepicker 9.2.1 (lịch chọn ngày), @expo/vector-icons ^15.0.2 (icon tab), expo-font
+  ~58.0.12 (phụ thuộc bắt buộc của vector-icons); datetimepicker và expo-font có plugin trong app.json.
+- PHẢI cài bằng `npm install --legacy-peer-deps` và `npx expo install <gói> -- --legacy-peer-deps`: react-dom@19.3.1
+  (phụ thuộc tuỳ chọn của expo-router qua radix) đòi react ^19.3.1, SDK 58 ghim react 19.3.0, không có cờ thì npm
+  lỗi ERESOLVE. Cờ này làm lockfile bỏ các phụ thuộc ngang hàng tuỳ chọn npm từng tự cài (reanimated,
+  gesture-handler, worklets, react-dom, vài gói babel/metro); app không import gói nào trong số đó và
+  `npx expo export` iOS/Android vẫn chạy.
 - Gọi THẲNG backend theo `EXPO_PUBLIC_API_URL` (mobile/.env, phải kết thúc bằng /api/v1; không qua proxy Next.js).
   Không cần sửa backend: login đã trả JWT trong body, API đọc header Bearer; CORS không áp dụng cho app native.
   GET /health nằm ở gốc backend (app suy ra từ EXPO_PUBLIC_API_URL; màn "Kiểm tra kết nối" mở từ màn đăng nhập).
@@ -469,12 +477,36 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
     tải lại không được thì giữ khoá kèm nút "Tải lại" (tránh tạo enrollment trùng khi bấm Chuyển lặp lại).
   - Không có nút Dừng chương trình: backend không có endpoint dừng riêng (chỉ abandoned khi start replace=true)
     và web cũng không có.
-- Kiểu dữ liệu và hàm thuần CHÉP TAY từ frontend/src/lib/{auth,medical,meals,progress,training}.ts sang
-  mobile/src/api/types/ (đầu mỗi file ghi "Đồng bộ tay từ …"); đổi kiểu ở web/backend thì phải chép lại.
-- Kiểm tra mỗi lát: `npx tsc --noEmit`, `npx expo-doctor`, `npx expo export` bundle thử (iOS và Android); người
-  dùng thử tay trên điện thoại sau mỗi lát 0–6b. Chưa có test tự động cho mobile.
+- Lát 7a–7g và chat (đồng bộ với web, xong 2026-11-27, đã thử tay trên điện thoại từng đợt):
+  - 7a Thiết lập hồ sơ 3 bước (app/onboarding.tsx, quy tắc ở lib/onboarding.ts chép theo OnboardingForm): tự mở
+    một lần sau khi đăng ký trên app (cờ freshSignup), mở từ các link "Hoàn tất hồ sơ". Giữ đúng quy tắc bệnh lý
+    của web: không chạm phần bệnh thì không gửi medical_*; "Không có" bỏ hết bệnh và bỏ đồng ý; ghi chú chỉ khi
+    chọn "Khác" (≤ 500, có bộ đếm); đồng ý chỉ bắt buộc và medical_consent chỉ gửi khi có bệnh; không nạp và không
+    hiện medical_notes cũ; tuổi 13–17 có câu nhắc. Khác web: tuổi phải là số nguyên (backend nhận int).
+  - 7b Số đo cơ thể (app/body-metrics.tsx): ghi/sửa/xoá cân nặng và vòng eo, cùng ngày là cập nhật, xoá có Alert;
+    sau mọi lần ghi tải lại danh sách trước khi mở khoá (useWriteAction dùng chung với tập luyện).
+  - 7c Tiến độ: thẻ "Calo theo ngày" (7/30/90, biểu đồ cột + đường mục tiêu, ngày không ghi để trống) và "Cân nặng"
+    (biểu đồ đường, thay đổi trong khoảng) từ GET /progress, vẽ bằng react-native-svg, chạm để xem số, luôn có số
+    liệu dạng chữ. Toạ độ và câu chữ là hàm thuần ở lib/charts.ts.
+  - 7d Báo cáo tuần mặc định tuần trước, ‹ › đổi tuần (không qua tuần hiện tại, 422 hiện câu của server); thẻ chào.
+  - 7g Lịch chọn ngày ở Ăn uống (không chọn sau hôm nay — giới hạn của app; ô ngày của web không chặn); icon tab.
+  - Chat (tab Chat + thẻ "Hỏi AI về tiến độ"): lịch sử phiên dạng modal, xoá có Alert, Markdown TỰ VIẾT
+    (lib/markdown.ts; link chỉ mở qua safeHttpUrl + Linking, javascript:/data:/mailto:… hiện thành chữ, không HTML/
+    ảnh, bảng hiện thành chữ), nguồn và cảnh báo trích dẫn (citations.ts chép nguyên văn), hai dòng lưu ý như web.
+    POST /chat chờ 60 giây (client có thời gian chờ riêng từng request; còn lại 10 giây); không streaming; sau lỗi
+    gửi tải lại phiên trước khi cho gửi tiếp (tránh gửi trùng). Nội dung chat không lưu vào máy, không log.
+  - Không làm trang quản trị và không có link Quản trị (chủ ý: công cụ dùng trên máy tính). Ngoài trang này, app
+    đã có đủ những gì web có.
+- Kiểu dữ liệu và hàm thuần CHÉP TAY từ frontend/src/lib/{auth,medical,meals,progress,training,chat,citations}.ts
+  sang mobile/src/api/types/ (đầu mỗi file ghi "Đồng bộ tay từ …"), cộng các quy tắc chép theo component của web
+  ở mobile/src/lib/ (onboarding, bodyMetrics, charts). Số file chép tay tăng nhiều sau đợt đồng bộ nên rủi ro lệch
+  với web tăng; đổi kiểu hoặc quy tắc ở web/backend thì phải chép lại.
+- Kiểm tra mỗi lát: `npx tsc --noEmit`, `npx expo-doctor`, `npx expo export` bundle thử (iOS và Android); từ 7a
+  thêm kiểm hàm thuần bằng Node (biên dịch vào thư mục tạm, không gọi API, không gọi Gemini); người dùng thử tay
+  trên điện thoại sau mỗi lát. Chưa có test tự động nằm trong repo cho mobile.
 - expo-doctor hiện 19/20 (từ lát 6a): Expo ra bản vá mới (expo cần ~58.1.0, đang 58.0.26; expo-router cần
-  ~58.0.33, đang 58.0.32); chưa nâng, nâng bằng `npx expo install --check` khi rảnh rồi chạy lại các kiểm tra.
+  ~58.0.33, đang 58.0.32); chưa nâng, nâng bằng `npx expo install --check -- --legacy-peer-deps` khi rảnh rồi chạy
+  lại các kiểm tra.
 
 ## 3. Quy ước làm việc đã chốt
 - Không tự commit; báo danh sách file đổi để người dùng commit. Kế hoạch file trước, chờ xác nhận.
@@ -625,10 +657,12 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
 
 - App di động (mobile/): HTTP chữ thường trên LAN (mật khẩu và token đi dạng chữ) — chỉ để thử ở nhà, không dùng
   Wi-Fi công cộng; token 30 phút, không có refresh token nên phải đăng nhập lại; kiểu dữ liệu chép tay từ
-  frontend/src/lib nên có thể lệch khi web/backend đổi; chưa có test tự động; chưa build bản phát hành (EAS).
-  thumbnail tải trực tiếp từ i.ytimg.com (IP người dùng gửi tới Google khi mở màn ngày tập).
-  Chưa có: hồ sơ (nhập trên web), chat, nút Dừng chương trình (backend và web chưa có), số đo cơ thể, biểu đồ
-  tiến độ, chọn ngày theo lịch, nút đổi tuần của nhận xét tuần, icon tab.
+  frontend/src/lib nên có thể lệch khi web/backend đổi; chưa có test tự động trong repo; chưa build bản phát hành
+  (EAS); thumbnail tải trực tiếp từ i.ytimg.com (IP người dùng gửi tới Google khi mở màn ngày tập); phải cài gói
+  bằng --legacy-peer-deps. Chat: không streaming, chờ tới 60 giây, rời màn trong lúc chờ thì mất câu trả lời đang
+  chờ (như web); Markdown chỉ phần hay gặp (bảng/HTML hiện thành chữ); hết lượt Gemini hiện câu 503.
+  Chưa có: trang quản trị (chủ ý không làm), nút Dừng chương trình (backend và web chưa có), trang sửa hồ sơ đã đủ
+  (web cũng chưa có).
 
 ## 7. Việc còn lại (thứ tự dự kiến)
 1. Thử trên trình duyệt: dashboard, /admin tab Thực phẩm và tab Tài liệu (tải lên, lập chỉ mục, xem trước, bật/tắt,
@@ -659,10 +693,12 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
    Gemini thật (nhắc gặp bác sĩ, không theo yêu cầu trong ghi chú); cân nhắc trang xem/sửa hồ sơ; gộp migration
    nếu gộp nhánh telegram (xem mục 1).
 10. Báo cáo đồ án (bảng "Trạng thái thực hiện" ở SPEC.md mục 4 là căn cứ phạm vi).
-11. App di động: lát 6a/6b ĐÃ XONG (2026-11-27, xem mục 2). Còn lại: commit lát 6b; nâng expo/expo-router bằng
-    `npx expo install --check` (expo-doctor 19/20) rồi chạy lại tsc/expo-doctor/export; nếu muốn nút Dừng thì
-    phải thêm endpoint ở backend trước (vd. POST /training/enrollments/{id}/abandon, kèm test) rồi mới làm ở web
-    và app. Việc nhỏ ở web/backend phát hiện khi làm app — ĐÃ XONG (2026-11-27,
+11. App di động: lát 0–7g và chat ĐÃ XONG (2026-11-27, xem mục 2); app đã đồng bộ với web trừ trang quản trị
+    (chủ ý không làm). Còn lại: gộp nhánh app-dong-bo-web vào main; nâng expo/expo-router bằng
+    `npx expo install --check -- --legacy-peer-deps` (expo-doctor 19/20) rồi chạy lại tsc/expo-doctor/export và thử
+    lại trên điện thoại; cân nhắc đưa các phép kiểm hàm thuần bằng Node (markdown, safeHttpUrl, onboarding, biểu
+    đồ) vào repo làm test tự động cho mobile; nếu muốn nút Dừng thì phải thêm endpoint ở backend trước (vd. POST
+    /training/enrollments/{id}/abandon, kèm test) rồi mới làm ở web và app. Việc nhỏ ở web/backend phát hiện khi làm app — ĐÃ XONG (2026-11-27,
     nhánh sua-loi-nho, đã thử tay):
     (1) nhận xét tuần (services/progress.py: weekly_notes) không chèn lại cảnh báo đã có trong health_warnings,
     chỉ còn nhận xét số liệu; schema/API không đổi, web và app không phải sửa;

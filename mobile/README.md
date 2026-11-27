@@ -84,6 +84,14 @@ Gói đã thêm sau bộ khung ban đầu (đều cài bằng lệnh trên):
   - Cân nặng: biểu đồ đường, thay đổi trong khoảng, nút "Ghi cân nặng".
   - Báo cáo tuần: mặc định tuần trước, đổi tuần bằng ‹ ›.
   - Thẻ tập luyện tuần này.
+- **Chat với AI (tab Chat):**
+  - Mở màn thì nạp danh sách phiên và tin của phiên mới nhất. Nút "Lịch sử" mở danh sách phiên: chọn phiên, "Cuộc trò chuyện mới", xoá phiên (có hỏi xác nhận).
+  - Tin AI hiện Markdown an toàn (tự viết, không thêm gói): liên kết chỉ mở khi là http/https, giao thức khác hiện thành chữ thường; không hiện HTML hay ảnh.
+  - "Tài liệu tham khảo" kèm tin khi AI có tra cứu; cảnh báo khi câu trả lời nhắc tới nguồn mà lượt đó không ghi nhận tài liệu (như web).
+  - Gửi tin: 4 câu gợi ý (chỉ điền vào ô nhập), ô nhập đếm tới 2000 ký tự, "FitAI đang suy nghĩ..." trong lúc chờ. Lỗi thì giữ chữ trong ô nhập và tải lại phiên trước khi cho gửi tiếp (tránh gửi trùng).
+  - Hai dòng lưu ý dưới ô nhập như web: FitAI có thể mắc lỗi; hội thoại có thể được quản trị viên xem ở dạng ẩn danh.
+  - Nội dung chat chỉ nằm trong bộ nhớ của màn, không lưu vào máy.
+- **Thẻ "Hỏi AI về tiến độ"** ở cuối Tổng quan, mở tab Chat.
 - **Cân nặng:** ghi cân nặng (vòng eo tuỳ chọn) theo ngày, ghi lại cùng ngày là cập nhật; sửa, xoá có hỏi xác nhận.
 - **Ăn uống:**
   - Xem theo ngày: ‹ ›, "Về hôm nay", hoặc chạm vào ngày để mở lịch. **Lịch không cho chọn sau hôm nay** (giờ Việt Nam), giống nút ›.
@@ -105,7 +113,6 @@ Mỗi khối dữ liệu tải riêng và có nút Thử lại. Kéo xuống đ�
 ## Chưa có
 
 - Trang xem và sửa hồ sơ đã đủ (web cũng chưa có): khi hồ sơ đã đủ thông tin, link "Hoàn tất hồ sơ" không hiện.
-- Chat (đợt sau).
 - Nút Dừng chương trình (dừng mà không chuyển sang chương trình khác), vì backend và web chưa có. Hiện chỉ đổi được bằng cách chuyển chương trình hoặc tập lại.
 - Refresh token.
 - Trang quản trị: chủ ý không làm trên app (công cụ dùng trên máy tính).
@@ -117,18 +124,23 @@ Mỗi khối dữ liệu tải riêng và có nút Thử lại. Kéo xuống đ�
 - **Phải đăng nhập lại sau 30 phút.** Token chỉ có hạn 30 phút và không có refresh token.
 - **Ảnh xem trước gửi IP tới Google.** App tải ảnh xem trước video trực tiếp từ `i.ytimg.com` (giống web), nên khi mở màn ngày tập, IP của điện thoại được gửi tới Google. Ảnh chỉ được tải khi link video hợp lệ.
 - **expo-doctor báo 19/20.** Check lỗi là phiên bản gói: Expo đã ra bản vá mới (`expo` 58.1.x, `expo-router` 58.0.33), app chưa nâng. Khi rảnh, nâng bằng `npx expo install --check -- --legacy-peer-deps`, rồi chạy lại các lệnh kiểm tra.
-- **Kiểu dữ liệu có thể lệch với web và backend.** Các kiểu trong `src/api/types/` được chép tay từ `frontend/src/lib/` (đầu mỗi file ghi rõ nguồn). Khi web hoặc backend đổi kiểu dữ liệu, phải chép lại bằng tay.
+- **Chat không có dòng chảy (streaming), giống web.** Câu trả lời chỉ hiện khi AI trả lời xong; app chờ tối đa 60 giây cho `POST /chat` (các request khác 10 giây). Rời màn Chat trong lúc chờ thì mất câu trả lời đang chờ (web cũng vậy); server vẫn lưu nếu AI trả lời xong, mở lại phiên là thấy.
+- **Markdown chỉ hỗ trợ phần hay gặp:** đoạn văn, xuống dòng, đậm, nghiêng, danh sách, tiêu đề, trích dẫn, code, liên kết. Bảng và Markdown lạ hiện thành chữ thường; HTML và ảnh bị bỏ.
+- **Hết lượt Gemini** (gói miễn phí khoảng 20 lượt mỗi ngày, một câu hỏi có thể tốn nhiều lượt khi AI gọi công cụ): server trả 503, app hiện câu "Dịch vụ AI tạm thời không khả dụng…". Lượt dùng chung với web.
+- **Kiểu dữ liệu có thể lệch với web và backend.** Các kiểu và hàm thuần trong `src/api/types/` (auth, medical, meals, progress, training, chat, citations) và các quy tắc chép theo component của web (onboarding, số đo, biểu đồ trong `src/lib/`) đều được chép tay, đầu mỗi file ghi rõ nguồn. Khi web hoặc backend đổi, phải chép lại bằng tay.
 
 ## Cấu trúc
 
 ```
 src/
   app/              # màn hình (expo-router): login, register, connection, onboarding, add-meal, body-metrics,
-                    #   (tabs)/{index,meals,training}, program/[slug], program/[slug]/day/[n]
-  api/              # client.ts (fetch + Bearer + ApiError + 401), các hàm gọi API
-  api/types/        # kiểu và hàm thuần chép tay từ frontend/src/lib/
+                    #   (tabs)/{index,meals,chat,training}, program/[slug], program/[slug]/day/[n]
+  api/              # client.ts (fetch + Bearer + ApiError + 401, thời gian chờ riêng từng request), các hàm gọi API
+  api/types/        # kiểu và hàm thuần chép tay từ frontend/src/lib/ (kể cả chat, citations)
   auth/             # AuthContext, lưu token
-  components/       # giao diện dùng chung, ăn uống (kèm lịch chọn ngày), tổng quan (kèm biểu đồ), tập luyện, hồ sơ
-  lib/              # hàm thuần (ngày, số gam, onboarding, số đo, biểu đồ), useLoader, useWriteAction, useScreenReload
-  config.ts         # đọc EXPO_PUBLIC_API_URL
+  components/       # dùng chung (ui), ăn uống (kèm lịch chọn ngày), tổng quan (kèm biểu đồ), tập luyện, hồ sơ,
+                    #   chat (ChatBubble, ChatMarkdown, SessionsModal), HealthNotice
+  lib/              # hàm thuần (ngày, số gam, onboarding, số đo, biểu đồ, markdown, chat), useLoader,
+                    #   useWriteAction, useScreenReload
+  config.ts         # đọc EXPO_PUBLIC_API_URL, thời gian chờ (10 giây; /chat 60 giây)
 ```
