@@ -29,3 +29,6 @@ export const apiConfig: ApiConfig = parseApiUrl(process.env.EXPO_PUBLIC_API_URL)
 
 /** Thời gian chờ tối đa cho mỗi request (ms); quá hạn thì báo lỗi mạng thay vì treo. */
 export const REQUEST_TIMEOUT_MS = 10_000;
+
+/** Riêng POST /chat: backend chờ AI tối đa 30 giây (AGENT_TIMEOUT_SECONDS) rồi còn lưu tin, nên chờ 60 giây. */
+export const CHAT_TIMEOUT_MS = 60_000;

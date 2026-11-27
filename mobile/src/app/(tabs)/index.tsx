@@ -4,6 +4,7 @@
  * đổi tuần bằng ‹ ›), tập luyện tuần này, tài khoản.
  * Mỗi khối tải độc lập: /meals/summary · /progress?days= (calo + cân nặng; đổi 7/30/90 chỉ tải lại khối này) ·
  * /progress/weekly-report?week_start= · /training/summary. Kéo để làm mới cả màn; quay lại tab thì tải lại ngầm.
+ * Cuối màn có thẻ "Hỏi AI về tiến độ" mở tab Chat.
  */
 import { router } from "expo-router";
 import { useCallback, useRef, useState } from "react";
@@ -19,6 +20,7 @@ import { HealthNotice } from "@/components/health/HealthNotice";
 import { DaySummaryCard } from "@/components/meals/DaySummaryCard";
 import {
   CalorieBody,
+  ChatLinkCard,
   DaysPicker,
   GreetingCard,
   LoaderCard,
@@ -136,6 +138,8 @@ export default function OverviewScreen() {
       <LoaderCard title="Tập luyện tuần này" loader={training}>
         {(week) => <TrainingWeekBody week={week} />}
       </LoaderCard>
+
+      <ChatLinkCard onOpen={() => router.navigate("/chat")} />
 
       <View style={styles.card}>
         <Text style={styles.muted}>Đang đăng nhập bằng</Text>

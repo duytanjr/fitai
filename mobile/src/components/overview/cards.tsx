@@ -206,6 +206,33 @@ export function WeightBody({ progress, onOpen }: { progress: Progress; onOpen: (
   );
 }
 
+/** Thẻ "Hỏi AI về tiến độ" (thẻ link chat cuối Dashboard web). */
+export function ChatLinkCard({ onOpen }: { onOpen: () => void }) {
+  return (
+    <View style={[styles.card, { backgroundColor: colors.brandDark, borderColor: colors.brandDark, gap: 8 }]}>
+      <Text style={{ fontSize: 17, fontWeight: "700", color: colors.white }}>Hỏi AI về tiến độ</Text>
+      <Text style={{ fontSize: 14, color: "#dcfce7" }}>Ví dụ: "7 ngày gần nhất tôi ăn trung bình bao nhiêu calo?"</Text>
+      <View style={{ alignItems: "flex-start" }}>
+        <Text
+          accessibilityRole="button"
+          onPress={onOpen}
+          style={{
+            overflow: "hidden",
+            borderRadius: 10,
+            paddingHorizontal: 14,
+            paddingVertical: 9,
+            backgroundColor: colors.white,
+            color: colors.brandDark,
+            fontWeight: "700",
+          }}
+        >
+          Bắt đầu chat →
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 /** Thẻ chào đầu Tổng quan (GreetingCard của web): tên, thứ, ngày, calo hôm nay hoặc nút ghi bữa ăn. */
 export function GreetingCard({
   name,

@@ -45,12 +45,14 @@ interface RequestOptions {
   /** Đối tượng JSON, hoặc URLSearchParams cho form-urlencoded (đăng nhập) */
   body?: unknown;
   signal?: AbortSignal;
+  /** Thời gian chờ riêng (ms); mặc định REQUEST_TIMEOUT_MS. Chỉ /chat dùng lâu hơn (AI có thể mất tới ~30 giây). */
+  timeoutMs?: number;
 }
 
 export async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   if (!apiConfig.ok) throw new ApiError(0, apiConfig.error);
 
-  const { method = "GET", body, signal } = options;
+  const { method = "GET", body, signal, timeoutMs = REQUEST_TIMEOUT_MS } = options;
   const isForm = body instanceof URLSearchParams;
   const sentToken = accessToken;
   const headers: Record<string, string> = { Accept: "application/json" };
@@ -64,7 +66,7 @@ export async function request<T>(endpoint: string, options: RequestOptions = {})
   const timer = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, REQUEST_TIMEOUT_MS);
+  }, timeoutMs);
   const onOuterAbort = () => controller.abort();
   signal?.addEventListener("abort", onOuterAbort);
 
