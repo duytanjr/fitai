@@ -1,11 +1,11 @@
 /**
- * Chi tiết một chương trình (bản native của frontend/src/components/training/ProgramDetail.tsx), lát 6a chỉ xem:
- * thông tin, tiến độ của bạn (my_enrollment), danh sách ngày (✓ ngày đã xong; bấm ngày tập → màn ngày).
- * Bắt đầu / tập lại / đánh dấu để lát 6b. Kéo để làm mới; quay lại màn thì tải lại ngầm.
+ * Chi tiết một chương trình (bản native của frontend/src/components/training/ProgramDetail.tsx): thông tin, tiến độ
+ * của bạn (my_enrollment), Bắt đầu / Chuyển sang / Tập lại, danh sách ngày (✓ ngày đã xong; bấm → màn ngày).
+ * Không có nút Dừng (backend và web cũng không có). Kéo để làm mới; quay lại màn thì tải lại ngầm.
  */
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback } from "react";
-import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { trainingApi } from "@/api/training";
 import {
@@ -18,20 +18,15 @@ import {
 } from "@/api/types/training";
 import { LoaderCard } from "@/components/overview/cards";
 import { ProgramBadges, TrainingNotices } from "@/components/training/blocks";
-import { colors, Notice, styles } from "@/components/ui";
+import { Button, colors, ErrorRetry, Notice, SmallButton, styles } from "@/components/ui";
 import { lookup, NOT_FOUND } from "@/lib/lookup";
 import { fetchProfileFacts, PROFILE_FACTS_ERROR } from "@/lib/trainingHealth";
 import { useLoader } from "@/lib/useLoader";
 import { useScreenReload } from "@/lib/useScreenReload";
+import { SYNC_FAILED, useWriteAction } from "@/lib/useWriteAction";
 
 function FollowingBox({ following }: { following: Enrollment | null }) {
-  if (!following) {
-    return (
-      <Text style={styles.muted}>
-        Bạn chưa theo chương trình này. Bắt đầu chương trình và đánh dấu ngày đã tập trên web (bản app sau sẽ có).
-      </Text>
-    );
-  }
+  if (!following) return null;
   const progress = `${following.training_days_done}/${following.training_days_total}`;
   return (
     <View style={{ gap: 6 }}>
@@ -84,7 +79,74 @@ const rowStyle = {
   borderTopColor: "#f3f4f6",
 };
 
-function ProgramBody({ program }: { program: ProgramDetail }) {
+interface ActionsProps {
+  program: ProgramDetail;
+  following: Enrollment | null;
+  /** enrollment đang active của bạn (có thể thuộc chương trình khác); undefined = chưa biết */
+  active: Enrollment | null | undefined;
+  write: ReturnType<typeof useWriteAction>;
+}
+
+/** Bắt đầu (chạy ngay) · Chuyển sang / Tập lại (hỏi trước, gửi replace=true). Câu xác nhận giống web. */
+function Actions({ program, following, active, write }: ActionsProps) {
+  const otherActive = active && active.program_slug !== program.slug ? active : null;
+  const switchMessage = otherActive
+    ? `Bạn đang theo ${otherActive.program_title}; chuyển sang chương trình này? Tiến độ cũ vẫn được lưu.`
+    : null;
+  const start = (replace: boolean) =>
+    void write.run(() => trainingApi.start(program.slug, replace), "Không bắt đầu được chương trình. Vui lòng thử lại.");
+  const confirm = (message: string, label: string) =>
+    Alert.alert(label, message, [
+      { text: "Huỷ", style: "cancel" },
+      { text: label, onPress: () => start(true) },
+    ]);
+
+  // Chưa biết enrollment đang active (đang tải / lỗi) hoặc chưa tải lại được sau lần ghi trước → khoá nút
+  const locked = active === undefined || write.needsSync;
+  let button: { title: string; onPress: () => void; variant: "primary" | "secondary" };
+  if (following) {
+    const label = "Tập lại chương trình";
+    button = {
+      title: label,
+      variant: "secondary",
+      onPress: () => confirm(switchMessage ?? "Tập lại chương trình từ đầu? Tiến độ cũ vẫn được lưu.", label),
+    };
+  } else if (switchMessage) {
+    const label = "Chuyển sang chương trình này";
+    button = { title: label, variant: "primary", onPress: () => confirm(switchMessage, label) };
+  } else {
+    button = { title: "Bắt đầu chương trình", variant: "primary", onPress: () => start(false) };
+  }
+
+  return (
+    <View style={{ gap: 8 }}>
+      <Button
+        title={button.title}
+        variant={button.variant}
+        onPress={button.onPress}
+        loading={write.busy}
+        disabled={locked}
+      />
+      {write.error ? <Notice kind="error">{write.error}</Notice> : null}
+      {write.needsSync ? (
+        <View style={{ gap: 4 }}>
+          <Text style={styles.muted}>{SYNC_FAILED}</Text>
+          <SmallButton title="Tải lại" onPress={() => void write.resync()} disabled={write.busy} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function ProgramBody({
+  program,
+  active,
+  write,
+}: {
+  program: ProgramDetail;
+  active: Enrollment | null | undefined;
+  write: ReturnType<typeof useWriteAction>;
+}) {
   const mine = program.my_enrollment;
   const following = mine && mine.status !== "abandoned" ? mine : null;
   const doneDays = new Set(following?.completed_days.map((c) => c.day_number) ?? []);
@@ -104,6 +166,7 @@ function ProgramBody({ program }: { program: ProgramDetail }) {
       </View>
 
       <FollowingBox following={following} />
+      <Actions program={program} following={following} active={active} write={write} />
 
       <View style={[styles.card, { gap: 0, paddingVertical: 4 }]}>
         <Text style={[styles.title, { paddingVertical: 10, paddingHorizontal: 4 }]}>Các ngày</Text>
@@ -129,16 +192,26 @@ export default function ProgramScreen() {
     [slug],
   );
   const program = useLoader(fetchProgram, "Không tải được chương trình. Vui lòng thử lại sau.", slug ?? "");
+  const current = useLoader(trainingApi.current, "Không tải được chương trình bạn đang theo.");
   const profile = useLoader(fetchProfileFacts, PROFILE_FACTS_ERROR);
 
-  const reloadAll = useCallback(
-    () => Promise.all([program.reload(), profile.reload()]),
-    [program.reload, profile.reload],
+  // Trạng thái thật để mở khoá nút: chi tiết chương trình (my_enrollment) + enrollment đang active
+  const syncState = useCallback(
+    async () => (await Promise.all([program.reload(), current.reload()])).every(Boolean),
+    [program.reload, current.reload],
   );
+  const write = useWriteAction(syncState);
+
+  const { synced } = write;
+  const reloadAll = useCallback(async () => {
+    const [ok] = await Promise.all([syncState(), profile.reload()]);
+    synced(ok);
+  }, [syncState, profile.reload, synced]);
   const { refreshing, onRefresh } = useScreenReload(reloadAll);
 
   // Chỉ dùng dữ liệu đúng slug hiện tại (useLoader giữ dữ liệu cũ trong lúc tải lại)
   const found = program.data?.found && program.data.value.slug === slug ? program.data.value : null;
+  const active = current.data ? current.data.enrollment : undefined;
 
   return (
     <ScrollView
@@ -149,7 +222,12 @@ export default function ProgramScreen() {
       <Stack.Screen options={{ title: found?.title ?? "Chương trình" }} />
       <TrainingNotices profile={profile} weightLoss={found?.goal_tag === "weight_loss"} />
       {found ? (
-        <ProgramBody program={found} />
+        <>
+          {current.error && !current.data ? (
+            <ErrorRetry message={current.error} onRetry={() => void current.reload()} />
+          ) : null}
+          <ProgramBody program={found} active={active} write={write} />
+        </>
       ) : program.data && !program.data.found ? (
         <Notice kind="error">Không tìm thấy chương trình.</Notice>
       ) : (

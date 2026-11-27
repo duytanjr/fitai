@@ -10,8 +10,11 @@ export interface Loader<T> {
   data: T | null;
   error: string;
   loading: boolean;
-  /** Tải lại; giữ dữ liệu cũ trong lúc tải. Trả về khi xong (dùng cho kéo để làm mới). */
-  reload: () => Promise<void>;
+  /**
+   * Tải lại; giữ dữ liệu cũ trong lúc tải. Trả về khi xong (dùng cho kéo để làm mới): true khi lần tải này nhận
+   * được dữ liệu mới, false khi lỗi hoặc đã có lần tải mới hơn.
+   */
+  reload: () => Promise<boolean>;
 }
 
 /** `key` đổi (vd. lựa chọn của người dùng) → tải lại với fetcher mới nhất. */
@@ -29,11 +32,14 @@ export function useLoader<T>(fetcher: () => Promise<T>, errorText: string, key: 
     setError("");
     try {
       const result = await fetcherRef.current();
-      if (mine === seq.current) setData(result);
+      if (mine !== seq.current) return false;
+      setData(result);
+      return true;
     } catch (err) {
-      if (mine !== seq.current) return;
-      if (err instanceof ApiError && err.status === 401) return;
+      if (mine !== seq.current) return false;
+      if (err instanceof ApiError && err.status === 401) return false;
       setError(isNetworkError(err) ? (err as ApiError).message : errorText);
+      return false;
     } finally {
       if (mine === seq.current) setLoading(false);
     }

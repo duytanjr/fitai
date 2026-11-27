@@ -27,7 +27,7 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 | Khớp tên món nhập thủ công + chống trích dẫn không nguồn | 18ab066, ff8bd0b | bóc ngoặc khẩu phần khi khớp tên món ADMIN, số theo khẩu phần giả định, bỏ lời dặn "không có món ăn hoàn chỉnh", "cháo trắng" ưu tiên món đúng tên, quy tắc trích dẫn trong chính lượt, cảnh báo frontend lib/citations.ts |
 | Bệnh lý tự khai báo trong hồ sơ | db852fa, df5807e | migration b7d4e2a9c615 (medical_conditions, medical_notes, medical_consent_at), schema + đồng ý, health_warnings, gợi ý tập chỉ mức người mới + needs_medical_clearance, quy tắc 20 của prompt, bước "Sức khỏe" ở onboarding, banner HealthNotice |
 | Đổi sang 7 nhóm bệnh + cảnh báo theo bệnh | 644d0ea (backend); nhánh nang-cap-ai, đã merge vào main: commit 644d0ea (backend) và 6b56527 (frontend, tài liệu) | 7 mã (musculoskeletal, cardiovascular, hypertension, metabolic, respiratory, stroke, other), bỏ quy tắc thận/mang thai và mục tiêu null theo từng chất, services/health_rules.py (10 cảnh báo, chỉ ý muối có nguồn WHO), migration e4c1a8f2d905 đưa khai báo cũ về rỗng, scripts/export_health_rules.py, HealthNotice lọc theo lĩnh vực kèm dòng nguồn, docker-compose mount ./docs chỉ đọc vào backend |
-| App di động (mobile/, lát 0–5) | nhánh app-mobile, commit 24f4b38, 2e56992, 70add46, b1ac396, 6614022, a7c4f2e | Expo SDK 58 + TypeScript + expo-router + expo-secure-store; đăng nhập/đăng ký, Tổng quan, Ăn uống (xem/sửa/xoá/thêm), Tập luyện (chỉ xem); chỉ gọi API backend hiện có, không sửa backend/frontend |
+| App di động (mobile/, lát 0–6b) | lát 0–5: nhánh app-mobile, commit 24f4b38, 2e56992, 70add46, b1ac396, 6614022, a7c4f2e; lát 6a: nhánh app-mobile-lat6, commit 49478cf; lát 6b: chưa commit (nhánh app-mobile-lat6) | Expo SDK 58 + TypeScript + expo-router + expo-secure-store; đăng nhập/đăng ký, Tổng quan, Ăn uống (xem/sửa/xoá/thêm), Tập luyện (gợi ý, chi tiết chương trình, ngày tập kèm video, bắt đầu/chuyển/tập lại, đánh dấu ngày); chỉ gọi API backend hiện có, không sửa backend/frontend |
 
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
@@ -437,7 +437,7 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
   thống nhất "1–3 ngày/tuần".
 - docker-compose.yml mount ./docs:/app/docs:ro vào backend để test đồng bộ tài liệu chạy trong container.
 
-### Ứng dụng di động (mobile/, nhánh app-mobile, 2026-11-26)
+### Ứng dụng di động (mobile/, nhánh app-mobile và app-mobile-lat6, cập nhật 2026-11-27)
 - Expo SDK 58 (expo ~58.0.26, react-native 0.88.1, react 19.3.0, expo-router ~58.0.32, expo-secure-store ~58.0.3),
   TypeScript; chạy bằng Expo Go. Không thêm thư viện UI, icon, biểu đồ hay quản lý trạng thái. Hướng dẫn chạy ở
   mobile/README.md.
@@ -450,13 +450,31 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
   nhận xét tuần hiện tại — ẩn khi tuần không có nhật ký và không có lần đo cân), Ăn uống (chọn ngày lùi/tiến,
   không đi quá hôm nay; sửa số gam; xoá có xác nhận; màn thêm món với đủ trạng thái tìm kiếm ok/ambiguous/raw_only/
   gợi ý/rỗng), Tập luyện (HealthNotice tập + chung từ GET /profile, câu cần gặp bác sĩ khi needs_medical_clearance,
-  gợi ý theo kinh nghiệm, thẻ "Đang tập", danh sách chương trình; chỉ xem). Mỗi khối tải độc lập, có Thử lại,
+  gợi ý theo kinh nghiệm, thẻ "Đang tập", danh sách chương trình). Mỗi khối tải độc lập, có Thử lại,
   kéo để làm mới, quay lại tab thì tải lại ngầm. GET /profile chỉ giữ tuổi và health_warnings (không đưa
   medical_notes vào state, không hiển thị).
+- Lát 6a và 6b (tập luyện, xong 2026-11-27, đã thử tay trên điện thoại):
+  - Màn program/[slug] (chi tiết chương trình, danh sách ngày, ✓ ngày đã xong từ my_enrollment) và
+    program/[slug]/day/[n] (các bài kèm thumbnail, nút "Xem video", chuyển ngày trước/sau); mở từ thẻ chương
+    trình hoặc nút "Tập ngày n" ở thẻ Đang tập. slug kiểm bằng SLUG_RE, n bằng /^\d{1,4}$/ trước khi gọi API.
+  - Cả hai màn có HealthNotice (tập + chung) và hộp lưu ý an toàn (thêm câu không hứa giảm cân khi goal_tag là
+    weight_loss); không chặn người có bệnh, như web.
+  - Video chỉ mở bằng Linking khi url qua isSafeYoutubeUrl. Thumbnail (youtubeThumbUrl, Image của react-native,
+    không thêm gói) chỉ tải khi url hợp lệ và youtube_id khớp url; ảnh lỗi thì ẩn, giữ khung. App tải thumbnail
+    TRỰC TIẾP từ i.ytimg.com giống web, nên IP người dùng được gửi tới Google khi mở màn ngày tập.
+  - Ghi: Bắt đầu (chạy ngay), "Chuyển sang chương trình này" và "Tập lại chương trình" (Alert xác nhận, câu như
+    web, replace=true); "Hoàn thành các bài tập" / "Bỏ đánh dấu" không hỏi; ngày nghỉ không có nút; khoá kèm lý
+    do khi chưa theo chương trình, available=false hoặc chương trình đã hoàn thành. Không cập nhật trước khi server
+    trả lời; khoá nút khi chờ; sau MỌI lần ghi (kể cả lỗi mạng) tải lại chi tiết + enrollment trước khi mở khoá,
+    tải lại không được thì giữ khoá kèm nút "Tải lại" (tránh tạo enrollment trùng khi bấm Chuyển lặp lại).
+  - Không có nút Dừng chương trình: backend không có endpoint dừng riêng (chỉ abandoned khi start replace=true)
+    và web cũng không có.
 - Kiểu dữ liệu và hàm thuần CHÉP TAY từ frontend/src/lib/{auth,medical,meals,progress,training}.ts sang
   mobile/src/api/types/ (đầu mỗi file ghi "Đồng bộ tay từ …"); đổi kiểu ở web/backend thì phải chép lại.
-- Kiểm tra mỗi lát: `npx tsc --noEmit`, `npx expo-doctor` (20/20), `npx expo export` bundle thử; người dùng thử tay
-  trên điện thoại sau mỗi lát 0–5. Chưa có test tự động cho mobile.
+- Kiểm tra mỗi lát: `npx tsc --noEmit`, `npx expo-doctor`, `npx expo export` bundle thử (iOS và Android); người
+  dùng thử tay trên điện thoại sau mỗi lát 0–6b. Chưa có test tự động cho mobile.
+- expo-doctor hiện 19/20 (từ lát 6a): Expo ra bản vá mới (expo cần ~58.1.0, đang 58.0.26; expo-router cần
+  ~58.0.33, đang 58.0.32); chưa nâng, nâng bằng `npx expo install --check` khi rảnh rồi chạy lại các kiểm tra.
 
 ## 3. Quy ước làm việc đã chốt
 - Không tự commit; báo danh sách file đổi để người dùng commit. Kế hoạch file trước, chờ xác nhận.
@@ -608,8 +626,9 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
 - App di động (mobile/): HTTP chữ thường trên LAN (mật khẩu và token đi dạng chữ) — chỉ để thử ở nhà, không dùng
   Wi-Fi công cộng; token 30 phút, không có refresh token nên phải đăng nhập lại; kiểu dữ liệu chép tay từ
   frontend/src/lib nên có thể lệch khi web/backend đổi; chưa có test tự động; chưa build bản phát hành (EAS).
-  Chưa có: hồ sơ (nhập trên web), chat, chi tiết chương trình/ngày tập/video/đánh dấu hoàn thành (lát 6), số đo
-  cơ thể, biểu đồ tiến độ, chọn ngày theo lịch, nút đổi tuần của nhận xét tuần, icon tab.
+  thumbnail tải trực tiếp từ i.ytimg.com (IP người dùng gửi tới Google khi mở màn ngày tập).
+  Chưa có: hồ sơ (nhập trên web), chat, nút Dừng chương trình (backend và web chưa có), số đo cơ thể, biểu đồ
+  tiến độ, chọn ngày theo lịch, nút đổi tuần của nhận xét tuần, icon tab.
 
 ## 7. Việc còn lại (thứ tự dự kiến)
 1. Thử trên trình duyệt: dashboard, /admin tab Thực phẩm và tab Tài liệu (tải lên, lập chỉ mục, xem trước, bật/tắt,
@@ -640,8 +659,10 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
    Gemini thật (nhắc gặp bác sĩ, không theo yêu cầu trong ghi chú); cân nhắc trang xem/sửa hồ sơ; gộp migration
    nếu gộp nhánh telegram (xem mục 1).
 10. Báo cáo đồ án (bảng "Trạng thái thực hiện" ở SPEC.md mục 4 là căn cứ phạm vi).
-11. App di động: lát 6 (chi tiết chương trình, ngày tập, mở video qua Linking chỉ khi qua isSafeYoutubeUrl, đánh
-    dấu hoàn thành) khi người dùng duyệt. Việc nhỏ ở web/backend phát hiện khi làm app — ĐÃ XONG (2026-11-27,
+11. App di động: lát 6a/6b ĐÃ XONG (2026-11-27, xem mục 2). Còn lại: commit lát 6b; nâng expo/expo-router bằng
+    `npx expo install --check` (expo-doctor 19/20) rồi chạy lại tsc/expo-doctor/export; nếu muốn nút Dừng thì
+    phải thêm endpoint ở backend trước (vd. POST /training/enrollments/{id}/abandon, kèm test) rồi mới làm ở web
+    và app. Việc nhỏ ở web/backend phát hiện khi làm app — ĐÃ XONG (2026-11-27,
     nhánh sua-loi-nho, đã thử tay):
     (1) nhận xét tuần (services/progress.py: weekly_notes) không chèn lại cảnh báo đã có trong health_warnings,
     chỉ còn nhận xét số liệu; schema/API không đổi, web và app không phải sửa;

@@ -48,7 +48,7 @@ Nếu app báo không kết nối được, mở màn **"Kiểm tra kết nối 
 
 ```bash
 npx tsc --noEmit    # kiểm kiểu
-npx expo-doctor     # kiểm thư viện có khớp SDK không
+npx expo-doctor     # kiểm thư viện có khớp SDK không (hiện 19/20, xem "Giới hạn đã biết")
 ```
 
 Luôn cài thư viện bằng `npx expo install <tên-gói>` để có phiên bản khớp SDK 58.
@@ -66,11 +66,15 @@ Luôn cài thư viện bằng `npx expo install <tên-gói>` để có phiên b�
   - Sửa số gam (từ 1 đến 5000, chấp nhận dấu phẩy).
   - Xoá món, có hỏi xác nhận.
   - Thêm món: tìm thực phẩm, chọn bữa, nhập số gam.
-- **Tập luyện (chỉ xem):**
-  - Cảnh báo bệnh lý về tập luyện và cảnh báo chung.
+- **Tập luyện:**
+  - Cảnh báo bệnh lý về tập luyện và cảnh báo chung, cùng hộp lưu ý an toàn, trên mọi màn tập luyện. Người có bệnh không bị chặn.
   - Gợi ý chương trình theo kinh nghiệm tập.
-  - Thẻ "Đang tập".
-  - Danh sách chương trình.
+  - Thẻ "Đang tập" có nút "Tập ngày n".
+  - Danh sách chương trình. Bấm vào một thẻ để mở chi tiết chương trình và danh sách ngày (✓ đánh dấu ngày đã xong).
+  - Ngày tập: các bài kèm ảnh xem trước và nút "Xem video". Video chỉ mở (bằng Linking) khi link qua `isSafeYoutubeUrl`.
+  - Bắt đầu chương trình. "Chuyển sang chương trình này" và "Tập lại chương trình" có hỏi xác nhận.
+  - Đánh dấu hoàn thành một ngày và bỏ đánh dấu.
+  - Sau mỗi thao tác ghi, kể cả khi lỗi, app tải lại trạng thái thật trước khi mở khoá nút.
 
 Mỗi khối dữ liệu tải riêng và có nút Thử lại. Kéo xuống để làm mới.
 
@@ -78,7 +82,7 @@ Mỗi khối dữ liệu tải riêng và có nút Thử lại. Kéo xuống đ�
 
 - Hồ sơ: nhập và sửa trên web, kể cả khai báo bệnh lý.
 - Chat.
-- Chi tiết chương trình, ngày tập, xem video và đánh dấu hoàn thành.
+- Nút Dừng chương trình (dừng mà không chuyển sang chương trình khác), vì backend và web chưa có. Hiện chỉ đổi được bằng cách chuyển chương trình hoặc tập lại.
 - Số đo cơ thể và biểu đồ tiến độ.
 - Refresh token.
 - Chọn ngày theo lịch, đổi tuần ở phần nhận xét tuần, icon cho các tab.
@@ -88,17 +92,20 @@ Mỗi khối dữ liệu tải riêng và có nút Thử lại. Kéo xuống đ�
 
 - **Mật khẩu và token gửi đi dạng chữ thường.** App gọi backend bằng HTTP trong mạng LAN, nên chỉ dùng để thử ở nhà, không dùng trên Wi-Fi công cộng.
 - **Phải đăng nhập lại sau 30 phút.** Token chỉ có hạn 30 phút và không có refresh token.
+- **Ảnh xem trước gửi IP tới Google.** App tải ảnh xem trước video trực tiếp từ `i.ytimg.com` (giống web), nên khi mở màn ngày tập, IP của điện thoại được gửi tới Google. Ảnh chỉ được tải khi link video hợp lệ.
+- **expo-doctor báo 19/20.** Check lỗi là phiên bản gói: Expo đã ra bản vá mới (`expo` 58.1.x, `expo-router` 58.0.33), app chưa nâng. Khi rảnh, nâng bằng `npx expo install --check`.
 - **Kiểu dữ liệu có thể lệch với web và backend.** Các kiểu trong `src/api/types/` được chép tay từ `frontend/src/lib/` (đầu mỗi file ghi rõ nguồn). Khi web hoặc backend đổi kiểu dữ liệu, phải chép lại bằng tay.
 
 ## Cấu trúc
 
 ```
 src/
-  app/              # màn hình (expo-router): login, register, connection, add-meal, (tabs)/{index,meals,training}
+  app/              # màn hình (expo-router): login, register, connection, add-meal, (tabs)/{index,meals,training},
+                    #   program/[slug] (chi tiết chương trình), program/[slug]/day/[n] (ngày tập)
   api/              # client.ts (fetch + Bearer + ApiError + 401), các hàm gọi API
   api/types/        # kiểu và hàm thuần chép tay từ frontend/src/lib/
   auth/             # AuthContext, lưu token
   components/       # giao diện dùng chung, ăn uống, tổng quan, tập luyện, HealthNotice
-  lib/              # ngày, số gam, useLoader, nhãn trường hồ sơ
+  lib/              # ngày, số gam, useLoader, useWriteAction, useScreenReload, nhãn trường hồ sơ
   config.ts         # đọc EXPO_PUBLIC_API_URL
 ```

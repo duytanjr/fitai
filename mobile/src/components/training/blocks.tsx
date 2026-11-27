@@ -111,7 +111,6 @@ export function EnrollmentBody({
         <Text style={styles.text}>Đã xong mọi ngày tập của chương trình.</Text>
       ) : null}
       {enrollment.message ? <Notice kind="warn">{enrollment.message}</Notice> : null}
-      <Text style={styles.muted}>Đánh dấu hoàn thành ngày tập trên web (bản app sau sẽ có).</Text>
     </View>
   );
 }
