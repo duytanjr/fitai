@@ -275,7 +275,12 @@ export function AddMealForm({ date, initialMealType, onSaved, onCancel, onUnauth
               </p>
               {selected.name_original && <p className="text-xs italic text-gray-500">{selected.name_original}</p>}
               <p className="text-xs text-gray-500">
-                {selected.source.code === "VN2007" ? "Trên 100 g phần ăn được" : "Trên 100 g (dữ liệu thực phẩm Mỹ, USDA)"}:{" "}
+                {selected.source.code === "VN2007"
+                  ? "Trên 100 g phần ăn được"
+                  : selected.source.code === "USDA_SR_LEGACY_2018"
+                    ? "Trên 100 g (dữ liệu thực phẩm Mỹ, USDA)"
+                    : "Trên 100 g"}
+                :{" "}
                 {formatValue(selected.per_100g.energy_kcal, "kcal")} · protein{" "}
                 {formatValue(selected.per_100g.protein_g, "g")} · chất béo {formatValue(selected.per_100g.fat_g, "g")} ·{" "}
                 {carbText(selected)}
@@ -343,8 +348,7 @@ export function AddMealForm({ date, initialMealType, onSaved, onCancel, onUnauth
           )}
 
           <p className="text-xs text-gray-500">
-            Số liệu tính trên 100 g phần ăn được (Bảng thành phần thực phẩm Việt Nam 2007, Viện Dinh dưỡng). Giá trị lưu
-            vào nhật ký do hệ thống tính.
+            Nguồn số liệu: {selected.source.title}. Giá trị lưu vào nhật ký do hệ thống tính.
           </p>
 
           {saveError && <p className="text-sm text-red-600">{saveError}</p>}

@@ -1,6 +1,6 @@
 # Trạng thái dự án FitAI (ghi chú bàn giao giữa các phiên)
 
-Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-26.
+Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần cuối: 2026-11-27.
 
 ## 1. Các lát đã xong (git log)
 | Lát | Commit | Nội dung chính |
@@ -32,7 +32,9 @@ Chỉ ghi những gì KHÔNG có trong SPEC.md / AGENTS.md. Cập nhật lần c
 - FR12–FR14 coi là XONG sau 9a/9b/9d; FR13 và FR14 được đơn giản hoá có chủ đích (mỗi mục là một video YouTube kèm
   label, không có nhóm cơ / lưu ý riêng từng bài / ghi từng hiệp; nhật ký tập là đánh dấu hoàn thành ngày).
 
-- pytest hiện tại: 1073 passed, 0 failed, 0 skipped (sau đổi 7 nhóm bệnh: +42 test — tests/test_medical_profile.py
+- pytest hiện tại: 1074 passed, 0 failed, 0 skipped (sau sửa nhận xét tuần không chèn cảnh báo: +1 test
+  tests/test_progress_service.py giữ nguyên toàn bộ nhận xét của người không bệnh, sửa 2 test ở
+  tests/test_medical_profile.py; trước đó 1073 sau đổi 7 nhóm bệnh: +42 test — tests/test_medical_profile.py
   59 → 90 test (hồi quy đúng 2104 kcal / protein 156 / chất béo 58 / carb 240 cho người không bệnh và từng mã),
   tests/test_health_rules.py 8 test (gồm test đồng bộ với docs/CHI_SO_CAN_CU.md, chạy được nhờ mount ./docs),
   tests/test_medical_codes_migration.py 3 test; trước đó 1031 sau phần bệnh lý: +61 test — tests/test_medical_profile.py 59 test,
@@ -416,7 +418,8 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
   {id, domain, codes, message, source, source_short, source_url}; chuỗi source và message không kèm năm.
   Bảng cho tài liệu: `docker compose exec backend python scripts/export_health_rules.py` (`--csv`).
 - health_warnings đủ mọi lĩnh vực ở GET /profile, /profile/metrics, /meals/summary, /progress, weekly-report;
-  notes của báo cáo tuần chỉ thêm cảnh báo dinh dưỡng và chung; /training/recommendation chỉ trả cảnh báo tập và
+  notes của báo cáo tuần KHÔNG chèn cảnh báo (chỉ số liệu; cảnh báo hiện riêng qua health_warnings kèm nguồn,
+  sửa 2026-11-27); /training/recommendation chỉ trả cảnh báo tập và
   chung. Không lọc bài tập theo bệnh (0/45 video published có intensity/impact).
 - recommend.py luật 0b: có bất kỳ bệnh nào → chỉ mức người mới (kể cả khi nói đã tập đều), không lùi sang trung
   bình, needs_medical_clearance=true. Chốt BMI thấp vẫn xét trước.
@@ -638,12 +641,14 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
    nếu gộp nhánh telegram (xem mục 1).
 10. Báo cáo đồ án (bảng "Trạng thái thực hiện" ở SPEC.md mục 4 là căn cứ phạm vi).
 11. App di động: lát 6 (chi tiết chương trình, ngày tập, mở video qua Linking chỉ khi qua isSafeYoutubeUrl, đánh
-    dấu hoàn thành) khi người dùng duyệt. Việc nhỏ ở web/backend phát hiện khi làm app (chưa sửa):
-    (1) web luôn ghi nguồn "Bảng thành phần thực phẩm Việt Nam 2007" ở form thêm món kể cả món USDA / quản trị viên
-    nhập (frontend/src/components/meals/AddMealForm.tsx; app dùng source.title do server trả);
-    (2) nhận xét tuần của server (services/progress.py: weekly_notes) chèn lại câu cảnh báo muối đã có trong
-    health_warnings, nên Tổng quan (web và app) hiện câu này hai lần, bản trong nhận xét không có dòng nguồn —
-    quyết định xử lý ở backend, app không lọc.
+    dấu hoàn thành) khi người dùng duyệt. Việc nhỏ ở web/backend phát hiện khi làm app — ĐÃ XONG (2026-11-27,
+    nhánh sua-loi-nho, đã thử tay):
+    (1) nhận xét tuần (services/progress.py: weekly_notes) không chèn lại cảnh báo đã có trong health_warnings,
+    chỉ còn nhận xét số liệu; schema/API không đổi, web và app không phải sửa;
+    (2) form thêm món trên web (frontend/src/components/meals/AddMealForm.tsx) hiện đúng nguồn (source.title do
+    server trả) và đơn vị theo từng món (VN 2007: phần ăn được; USDA: dữ liệu thực phẩm Mỹ; khác: trên 100 g).
+    Còn lại: lỗi ESLint "nextVitals is not iterable" có từ trước (cấu hình ESLint, chưa sửa; next build vẫn
+    xong, kiểm frontend bằng tsc và next build).
 Đã bỏ có chủ đích: gợi ý thực đơn / thay món (FR10–11 ngoài phạm vi) và bộ lọc câu hỏi y khoa riêng bằng code
 (FR7 đáp ứng bằng quy tắc prompt, dòng cảnh báo dưới ô nhập và nhóm câu hỏi E).
 Thứ tự trên là dự kiến của người dùng; chi tiết từng lát chưa chốt (chưa chắc).
