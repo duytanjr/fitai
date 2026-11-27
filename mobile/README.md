@@ -84,12 +84,13 @@ Gói đã thêm sau bộ khung ban đầu (đều cài bằng lệnh trên):
   - Cân nặng: biểu đồ đường, thay đổi trong khoảng, nút "Ghi cân nặng".
   - Báo cáo tuần: mặc định tuần trước, đổi tuần bằng ‹ ›.
   - Thẻ tập luyện tuần này.
+- **Thứ tự tab:** Tổng quan, Ăn uống, Tập luyện, Chat (giống thanh điều hướng web).
 - **Chat với AI (tab Chat):**
   - Mở màn thì nạp danh sách phiên và tin của phiên mới nhất. Nút "Lịch sử" mở danh sách phiên: chọn phiên, "Cuộc trò chuyện mới", xoá phiên (có hỏi xác nhận).
   - Tin AI hiện Markdown an toàn (tự viết, không thêm gói): liên kết chỉ mở khi là http/https, giao thức khác hiện thành chữ thường; không hiện HTML hay ảnh.
   - "Tài liệu tham khảo" kèm tin khi AI có tra cứu; cảnh báo khi câu trả lời nhắc tới nguồn mà lượt đó không ghi nhận tài liệu (như web).
   - Gửi tin: 4 câu gợi ý (chỉ điền vào ô nhập), ô nhập đếm tới 2000 ký tự, "FitAI đang suy nghĩ..." trong lúc chờ. Lỗi thì giữ chữ trong ô nhập và tải lại phiên trước khi cho gửi tiếp (tránh gửi trùng).
-  - Hai dòng lưu ý dưới ô nhập như web: FitAI có thể mắc lỗi; hội thoại có thể được quản trị viên xem ở dạng ẩn danh.
+  - Dòng lưu ý dưới ô nhập như web: "FitAI có thể mắc lỗi. Luôn tham vấn chuyên gia y tế…". (Thông báo về quản trị viên xem hội thoại ẩn danh nằm ở bước Sức khỏe của thiết lập hồ sơ.)
   - Nội dung chat chỉ nằm trong bộ nhớ của màn, không lưu vào máy.
 - **Thẻ "Hỏi AI về tiến độ"** ở cuối Tổng quan, mở tab Chat.
 - **Cân nặng:** ghi cân nặng (vòng eo tuỳ chọn) theo ngày, ghi lại cùng ngày là cập nhật; sửa, xoá có hỏi xác nhận.
@@ -99,10 +100,9 @@ Gói đã thêm sau bộ khung ban đầu (đều cài bằng lệnh trên):
   - Xoá món, có hỏi xác nhận.
   - Thêm món: tìm thực phẩm, chọn bữa, nhập số gam.
 - **Tập luyện:**
-  - Cảnh báo bệnh lý về tập luyện và cảnh báo chung, cùng hộp lưu ý an toàn, trên mọi màn tập luyện. Người có bệnh không bị chặn.
+  - Cảnh báo bệnh lý về tập luyện và cảnh báo chung trên mọi màn tập luyện, kèm dòng nhắc tập cùng người lớn khi tuổi 13–17. Người có bệnh không bị chặn. (Không có hộp lưu ý an toàn chung: đã bỏ cả ở web.)
   - Gợi ý chương trình theo kinh nghiệm tập.
-  - Thẻ "Đang tập" có nút "Tập ngày n".
-  - Danh sách chương trình. Bấm vào một thẻ để mở chi tiết chương trình và danh sách ngày (✓ đánh dấu ngày đã xong).
+  - Danh sách chương trình. Bấm vào một thẻ để mở chi tiết chương trình và danh sách ngày (✓ đánh dấu ngày đã xong). Chương trình đang theo hiện ngay trong thẻ của nó (như web): nhãn "Đang theo", "Đã xong x/y ngày", thanh tiến độ và nút "Tiếp tục" mở ngày kế tiếp. Không có ô "Đang tập" riêng.
   - Ngày tập: các bài kèm ảnh xem trước và nút "Xem video". Video chỉ mở (bằng Linking) khi link qua `isSafeYoutubeUrl`.
   - Bắt đầu chương trình. "Chuyển sang chương trình này" và "Tập lại chương trình" có hỏi xác nhận.
   - Đánh dấu hoàn thành một ngày và bỏ đánh dấu.

@@ -405,9 +405,6 @@ export default function ChatScreen() {
         <Text style={[styles.muted, styles.center, { fontSize: 11 }]}>
           FitAI có thể mắc lỗi. Luôn tham vấn chuyên gia y tế cho các vấn đề sức khỏe hay chấn thương.
         </Text>
-        <Text style={[styles.muted, styles.center, { fontSize: 11 }]}>
-          Hội thoại có thể được quản trị viên xem ở dạng ẩn danh để cải thiện chất lượng.
-        </Text>
       </View>
 
       <SessionsModal

@@ -291,7 +291,7 @@ tài liệu chưa ghi rõ có phải đơn giản hóa có chủ đích hay khô
 | FR10 | Ngoài phạm vi có chủ đích | Không làm gợi ý thực đơn ngày/tuần. | — |
 | FR11 | Ngoài phạm vi có chủ đích | Không làm thay thế món ăn tương đương. | — |
 | FR12 | Cần xác nhận | Gợi ý chương trình tập (luật do code quyết định) theo mức vận động, BMI, tuổi, mục tiêu và câu trả lời "đã tập đều / mới bắt đầu"; chỉ 2 level, 2 chương trình giảm cân. KHÔNG xét thời gian rảnh và dụng cụ. PROJECT_STATE ghi FR12 là xong. | Lát 9d; `backend/services/training/recommend.py` |
-| FR13 | Đơn giản hóa có chủ đích | Hướng dẫn bài tập bằng video YouTube theo từng ngày của chương trình; không có nhóm cơ, số hiệp/lần, lưu ý an toàn riêng từng bài (chỉ có hộp lưu ý an toàn chung). | Lát 9a; `backend/services/training/catalog.py`, `data/training/` |
+| FR13 | Đơn giản hóa có chủ đích | Hướng dẫn bài tập bằng video YouTube theo từng ngày của chương trình; không có nhóm cơ, số hiệp/lần, lưu ý an toàn riêng từng bài và không có hộp lưu ý an toàn chung (đã bỏ theo quyết định của người dùng); trang tập chỉ hiện cảnh báo theo bệnh lý tự khai báo và dòng nhắc tập cùng người lớn khi tuổi 13–17. | Lát 9a; `backend/services/training/catalog.py`, `data/training/` |
 | FR14 | Đơn giản hóa có chủ đích | Theo dõi theo ngày hoàn thành và số phút (khi video có thời lượng); không ghi số hiệp, số lần, mức tạ. | Lát 9b; `backend/services/training/progress.py` |
 | FR15 | Đã làm | Ghi cân nặng, vòng eo theo ngày. | Lát 7; `backend/services/progress.py` |
 | FR16 | Cần xác nhận | Dashboard có biểu đồ calo và cân nặng (SVG tự vẽ) và thẻ "Tập luyện tuần này"; chưa thấy biểu đồ macro theo thời gian và biểu đồ khối lượng tập. | Lát 7, 9b; `frontend/src/components/dashboard/` |

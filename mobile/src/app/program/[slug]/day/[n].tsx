@@ -176,7 +176,7 @@ export default function ProgramDayScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
       <Stack.Screen options={{ title: n !== null ? `Ngày ${n}` : "Ngày tập" }} />
-      <TrainingNotices profile={profile} weightLoss={found?.goal_tag === "weight_loss"} />
+      <TrainingNotices profile={profile} />
       {found ? (
         <DayBody
           day={found}

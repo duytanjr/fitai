@@ -356,9 +356,6 @@ export function ChatView() {
             <p className="mt-2 text-center text-xs text-gray-400">
               FitAI có thể mắc lỗi. Luôn tham vấn chuyên gia y tế cho các vấn đề sức khỏe hay chấn thương.
             </p>
-            <p className="mt-1 text-center text-xs text-gray-400">
-              Hội thoại có thể được quản trị viên xem ở dạng ẩn danh để cải thiện chất lượng.
-            </p>
           </div>
         </div>
       </div>

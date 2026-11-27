@@ -13,8 +13,7 @@ import {
   type Recommendation,
 } from "@/api/types/training";
 import { HealthNotice } from "@/components/health/HealthNotice";
-import { Badge, colors, ErrorRetry, Notice, SmallButton, styles } from "@/components/ui";
-import { fullDate } from "@/lib/dates";
+import { Badge, colors, ErrorRetry, Notice, styles } from "@/components/ui";
 import type { ProfileFacts } from "@/lib/trainingHealth";
 import type { Loader } from "@/lib/useLoader";
 
@@ -27,28 +26,26 @@ const BRAND_BADGE = { bg: "#f0fdf4", fg: "#166534" };
 const NEUTRAL_BADGE = { bg: "#f3f4f6", fg: "#374151" };
 const ACCENT_BADGE = { bg: "#fffbeb", fg: "#92400e" };
 
-/** Hộp lưu ý an toàn cố định (TrainingSafetyNotice của web). */
-export function TrainingSafetyNotice({ weightLoss = false, age }: { weightLoss?: boolean; age: number | null }) {
+/** Dòng nhắc nhỏ cho người dùng 13–17 tuổi (MinorTrainingNote của web); người lớn hoặc chưa có tuổi thì không hiện. */
+function MinorTrainingNote({ age }: { age: number | null }) {
+  if (age === null || age < 13 || age > 17) return null;
   return (
-    <Notice kind="warn">
-      Chương trình do nhóm đồ án soạn từ video công khai, không thay thế huấn luyện viên. Dừng tập nếu đau, chóng mặt
-      hay khó thở; hỏi bác sĩ nếu bạn có bệnh nền.
-      {weightLoss ? "\nMô tả không hứa kết quả giảm cân; hiệu quả phụ thuộc chế độ ăn." : ""}
-      {age !== null && age < 18 ? "\nBạn nên tập cùng người lớn hoặc hỏi huấn luyện viên." : ""}
-    </Notice>
+    <Text accessibilityRole="text" style={{ fontSize: 13, fontWeight: "600", color: colors.warnText }}>
+      Bạn nên tập cùng người lớn hoặc hỏi huấn luyện viên.
+    </Text>
   );
 }
 
 /**
- * Đầu mọi màn tập luyện (như TrainingShell của web): banner bệnh lý (chỉ lĩnh vực tập và chung) + hộp lưu ý an
- * toàn. Không chặn người có bệnh. Hồ sơ tải lỗi thì chỉ khối này báo lỗi; hộp lưu ý vẫn hiện.
+ * Đầu mọi màn tập luyện (như TrainingShell của web): banner bệnh lý (chỉ lĩnh vực tập và chung) + dòng nhắc dưới
+ * 18 tuổi. Không chặn người có bệnh. Hồ sơ tải lỗi thì chỉ khối này báo lỗi.
  */
-export function TrainingNotices({ profile, weightLoss = false }: { profile: Loader<ProfileFacts>; weightLoss?: boolean }) {
+export function TrainingNotices({ profile }: { profile: Loader<ProfileFacts> }) {
   return (
     <>
       {profile.data ? <HealthNotice warnings={profile.data.warnings} domains={TRAINING_DOMAINS} /> : null}
       {profile.error ? <ErrorRetry message={profile.error} onRetry={() => void profile.reload()} /> : null}
-      <TrainingSafetyNotice weightLoss={weightLoss} age={profile.data?.age ?? null} />
+      <MinorTrainingNote age={profile.data?.age ?? null} />
     </>
   );
 }
@@ -74,43 +71,6 @@ function Progress({ done, total, label }: { done: number; total: number; label: 
       style={{ height: 8, borderRadius: 4, backgroundColor: colors.track, overflow: "hidden" }}
     >
       <View style={{ width: `${pct}%`, height: "100%", backgroundColor: colors.brand }} />
-    </View>
-  );
-}
-
-/** Thẻ "Đang tập": chương trình đang theo, tiến độ, ngày tiếp theo, thông báo của server. */
-export function EnrollmentBody({
-  enrollment,
-  onOpenDay,
-}: {
-  enrollment: Enrollment;
-  onOpenDay: (dayNumber: number) => void;
-}) {
-  const total = enrollment.training_days_total;
-  const done = enrollment.training_days_done;
-  return (
-    <View style={{ gap: 6 }}>
-      <Text style={[styles.title, { fontSize: 17 }]}>{enrollment.program_title}</Text>
-      <Text style={styles.muted}>Bắt đầu {fullDate(enrollment.started_on)}</Text>
-      {total > 0 && (
-        <>
-          <Text style={styles.text}>
-            Đã xong <Text style={{ fontWeight: "700" }}>{done}/{total}</Text> ngày tập
-          </Text>
-          <Progress done={done} total={total} label="Tiến độ chương trình" />
-        </>
-      )}
-      {enrollment.next_day !== null ? (
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <Text style={styles.text}>Ngày tiếp theo: ngày {enrollment.next_day}</Text>
-          {enrollment.available ? (
-            <SmallButton title={`Tập ngày ${enrollment.next_day} ›`} onPress={() => onOpenDay(enrollment.next_day!)} />
-          ) : null}
-        </View>
-      ) : enrollment.available && total > 0 && done >= total ? (
-        <Text style={styles.text}>Đã xong mọi ngày tập của chương trình.</Text>
-      ) : null}
-      {enrollment.message ? <Notice kind="warn">{enrollment.message}</Notice> : null}
     </View>
   );
 }
@@ -186,11 +146,16 @@ export function ProgramCard({
   recommended,
   following,
   onPress,
+  onContinue,
 }: {
   program: ProgramSummary;
   recommended: boolean;
+  /** Enrollment active của chương trình này (null nếu không theo) */
   following: Enrollment | null;
+  /** Bấm thẻ: mở chi tiết chương trình */
   onPress: () => void;
+  /** Nút "Tiếp tục" khi đang theo: mở ngày kế tiếp, hoặc chi tiết chương trình nếu không có ngày kế tiếp */
+  onContinue: () => void;
 }) {
   const p = program;
   const minutes = p.total_minutes !== null ? minutesText(p.total_minutes, p.required_minutes, p.items_without_duration) : "";
@@ -227,7 +192,28 @@ export function ProgramCard({
           <Progress done={done} total={total} label={`Tiến độ ${p.title}`} />
         </View>
       )}
-      <Text style={[styles.link, { marginTop: 2 }]}>Xem chương trình ›</Text>
+      {/* Như thẻ chương trình của web: đang theo → nút "Tiếp tục" (vào ngày kế tiếp); không theo → "Xem chương trình" */}
+      {following ? (
+        <View style={{ alignItems: "flex-start", marginTop: 4 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={following.next_day ? `Tiếp tục, ngày ${following.next_day}` : "Tiếp tục"}
+            onPress={onContinue}
+            hitSlop={4}
+            style={({ pressed }) => ({
+              borderRadius: 10,
+              paddingHorizontal: 16,
+              paddingVertical: 9,
+              backgroundColor: colors.brand,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Text style={{ color: colors.white, fontWeight: "600" }}>Tiếp tục ›</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Text style={[styles.link, { marginTop: 2 }]}>Xem chương trình ›</Text>
+      )}
     </Pressable>
   );
 }

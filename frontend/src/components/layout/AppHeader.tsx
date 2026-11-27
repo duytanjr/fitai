@@ -19,8 +19,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
   { href: "/meals", label: "Nhật ký ăn uống", icon: UtensilsCrossed },
-  { href: "/chat", label: "Chat với AI", icon: MessageCircle },
   { href: "/training", label: "Tập luyện", icon: Dumbbell },
+  { href: "/chat", label: "Chat với AI", icon: MessageCircle },
 ];
 
 const ADMIN_ITEM: NavItem = { href: "/admin", label: "Quản trị", icon: ShieldCheck };

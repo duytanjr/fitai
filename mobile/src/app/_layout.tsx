@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { Button, CenteredLoading, Notice, styles } from "@/components/ui";
@@ -26,7 +26,11 @@ function RootNavigator() {
     <Stack screenOptions={{ headerTitleAlign: "center" }}>
       <Stack.Protected guard={signedIn} redirectTo="/login">
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="add-meal" options={{ title: "Thêm món", presentation: "modal" }} />
+        {/* iOS: header native của modal tắt ngay từ khai báo (không chờ màn đặt options) — màn tự vẽ thanh tiêu đề */}
+        <Stack.Screen
+          name="add-meal"
+          options={{ title: "Thêm món", presentation: "modal", headerShown: Platform.OS !== "ios" }}
+        />
         <Stack.Screen name="body-metrics" options={{ title: "Cân nặng", headerBackTitle: "Quay lại" }} />
         <Stack.Screen name="onboarding" options={{ title: "Thiết lập hồ sơ", headerBackTitle: "Quay lại" }} />
         <Stack.Screen name="program/[slug]/index" options={{ title: "Chương trình", headerBackTitle: "Quay lại" }} />

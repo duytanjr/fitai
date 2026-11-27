@@ -134,9 +134,10 @@ Tập luyện (lát 9a, models/training.py, services/training/{youtube,seed,cata
   ẩn và không tính phút.
 - Frontend: /training (thẻ chữ, không ảnh), /training/[slug], /training/[slug]/days/[n] (tham số đọc bằng
   useParams vì repo chưa có route động mẫu và không có node_modules/next/dist/docs). Nút "Bắt đầu" là
-  `<a target="_blank" rel="noopener noreferrer">`, client chỉ mở url đúng dạng chuẩn. Hộp lưu ý an toàn cố định;
-  goal weight_loss thêm dòng "không hứa kết quả giảm cân"; tuổi < 18 (đọc GET /profile, lỗi thì bỏ qua) thêm dòng
-  nhắc tập cùng người lớn, hiện trên mọi trang tập. Liên kết "Tập luyện" ở dashboard, nhật ký ăn uống, chat.
+  `<a target="_blank" rel="noopener noreferrer">`, client chỉ mở url đúng dạng chuẩn. Không còn hộp lưu ý an toàn
+  chung (bỏ 2026-11-27, quyết định của người dùng); mọi trang tập chỉ còn HealthNotice theo bệnh và dòng nhỏ nhắc
+  tập cùng người lớn khi tuổi 13–17 (đọc GET /profile, lỗi thì bỏ qua). Liên kết "Tập luyện" ở dashboard, nhật ký
+  ăn uống, chat.
 - Ảnh xem trước (76b89a7, chỉ frontend, ProgramDayView + `youtubeThumbUrl` trong lib/training.ts): mỗi mục của
   trang ngày tập là một thẻ, ảnh bên trái, tiêu đề và nút "Bắt đầu" bên phải. Ảnh lấy từ
   `https://i.ytimg.com/vi/<youtube_id>/hqdefault.jpg`, chỉ dựng khi youtube_id khớp `^[A-Za-z0-9_-]{11}$` (không
@@ -458,15 +459,18 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
   nhận xét tuần hiện tại — ẩn khi tuần không có nhật ký và không có lần đo cân), Ăn uống (chọn ngày lùi/tiến,
   không đi quá hôm nay; sửa số gam; xoá có xác nhận; màn thêm món với đủ trạng thái tìm kiếm ok/ambiguous/raw_only/
   gợi ý/rỗng), Tập luyện (HealthNotice tập + chung từ GET /profile, câu cần gặp bác sĩ khi needs_medical_clearance,
-  gợi ý theo kinh nghiệm, thẻ "Đang tập", danh sách chương trình). Mỗi khối tải độc lập, có Thử lại,
+  gợi ý theo kinh nghiệm, danh sách chương trình; chương trình đang theo hiện trong thẻ của nó với nhãn "Đang
+  theo", "Đã xong x/y ngày", thanh tiến độ, nút "Tiếp tục" → ngày kế tiếp, như web — ô "Đang tập" riêng đã bỏ
+  2026-11-27 vì web không có). Mỗi khối tải độc lập, có Thử lại,
   kéo để làm mới, quay lại tab thì tải lại ngầm. GET /profile chỉ giữ tuổi và health_warnings (không đưa
   medical_notes vào state, không hiển thị).
 - Lát 6a và 6b (tập luyện, xong 2026-11-27, đã thử tay trên điện thoại):
   - Màn program/[slug] (chi tiết chương trình, danh sách ngày, ✓ ngày đã xong từ my_enrollment) và
     program/[slug]/day/[n] (các bài kèm thumbnail, nút "Xem video", chuyển ngày trước/sau); mở từ thẻ chương
-    trình hoặc nút "Tập ngày n" ở thẻ Đang tập. slug kiểm bằng SLUG_RE, n bằng /^\d{1,4}$/ trước khi gọi API.
-  - Cả hai màn có HealthNotice (tập + chung) và hộp lưu ý an toàn (thêm câu không hứa giảm cân khi goal_tag là
-    weight_loss); không chặn người có bệnh, như web.
+    trình hoặc nút "Tiếp tục" trên thẻ chương trình đang theo. slug kiểm bằng SLUG_RE, n bằng /^\d{1,4}$/ trước khi
+    gọi API.
+  - Cả hai màn có HealthNotice (tập + chung) và dòng nhắc khi tuổi 13–17 (hộp lưu ý an toàn chung đã bỏ
+    2026-11-27, như web); không chặn người có bệnh, như web.
   - Video chỉ mở bằng Linking khi url qua isSafeYoutubeUrl. Thumbnail (youtubeThumbUrl, Image của react-native,
     không thêm gói) chỉ tải khi url hợp lệ và youtube_id khớp url; ảnh lỗi thì ẩn, giữ khung. App tải thumbnail
     TRỰC TIẾP từ i.ytimg.com giống web, nên IP người dùng được gửi tới Google khi mở màn ngày tập.
@@ -492,11 +496,26 @@ cảnh báo và số dòng ở docs/CHI_SO_CAN_CU.md mục c):
   - 7g Lịch chọn ngày ở Ăn uống (không chọn sau hôm nay — giới hạn của app; ô ngày của web không chặn); icon tab.
   - Chat (tab Chat + thẻ "Hỏi AI về tiến độ"): lịch sử phiên dạng modal, xoá có Alert, Markdown TỰ VIẾT
     (lib/markdown.ts; link chỉ mở qua safeHttpUrl + Linking, javascript:/data:/mailto:… hiện thành chữ, không HTML/
-    ảnh, bảng hiện thành chữ), nguồn và cảnh báo trích dẫn (citations.ts chép nguyên văn), hai dòng lưu ý như web.
+    ảnh, bảng hiện thành chữ), nguồn và cảnh báo trích dẫn (citations.ts chép nguyên văn), dòng "FitAI có thể mắc
+    lỗi…" dưới ô nhập như web.
     POST /chat chờ 60 giây (client có thời gian chờ riêng từng request; còn lại 10 giây); không streaming; sau lỗi
     gửi tải lại phiên trước khi cho gửi tiếp (tránh gửi trùng). Nội dung chat không lưu vào máy, không log.
   - Không làm trang quản trị và không có link Quản trị (chủ ý: công cụ dùng trên máy tính). Ngoài trang này, app
     đã có đủ những gì web có.
+- Chỉnh giao diện web + app (2026-11-27, nhánh sua-giao-dien, không đổi backend):
+  - App, modal thêm món trên iOS: ô tìm và dòng "Ghi vào ngày…" không còn bị thanh tiêu đề che. Cách đầu
+    (contentInsetAdjustmentBehavior="automatic") chưa đạt trên iPhone thật: inset áp dụng muộn, nội dung "nhả"
+    xuống sau một lúc. Cách đang dùng: iOS tắt header native của modal ngay trong khai báo màn (app/_layout.tsx,
+    headerShown false), màn tự vẽ thanh "Đóng" + tiêu đề trong SafeAreaView (edges top), ScrollView nằm dưới thanh
+    với contentInsetAdjustmentBehavior="never" + automaticallyAdjustKeyboardInsets. Android giữ header native.
+  - QUYẾT ĐỊNH CỦA NGƯỜI DÙNG: bỏ hộp lưu ý an toàn chung ("Chương trình do nhóm đồ án soạn…", câu không hứa giảm
+    cân) ở mọi trang tập luyện, cả web (TrainingSafetyNotice, prop weightLoss đã xoá) và app. Giữ HealthNotice theo
+    bệnh, câu cần gặp bác sĩ khi needs_medical_clearance, và riêng một dòng nhỏ "Bạn nên tập cùng người lớn hoặc hỏi
+    huấn luyện viên." khi tuổi 13–17.
+  - QUYẾT ĐỊNH CỦA NGƯỜI DÙNG: bỏ dòng "Hội thoại có thể được quản trị viên xem ở dạng ẩn danh…" dưới ô chat (web và
+    app); GIỮ thông báo về quản trị viên xem hội thoại ẩn danh ở bước Sức khỏe của onboarding (là thông báo khi đồng
+    ý khai bệnh lý). Dòng "FitAI có thể mắc lỗi…" vẫn giữ.
+  - Thứ tự điều hướng web và app: Tổng quan, Ăn uống, Tập luyện, Chat (chỉ đổi thứ tự; tên, icon, đường dẫn giữ).
 - Kiểu dữ liệu và hàm thuần CHÉP TAY từ frontend/src/lib/{auth,medical,meals,progress,training,chat,citations}.ts
   sang mobile/src/api/types/ (đầu mỗi file ghi "Đồng bộ tay từ …"), cộng các quy tắc chép theo component của web
   ở mobile/src/lib/ (onboarding, bodyMetrics, charts). Số file chép tay tăng nhiều sau đợt đồng bộ nên rủi ro lệch

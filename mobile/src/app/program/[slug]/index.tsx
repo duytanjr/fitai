@@ -220,7 +220,7 @@ export default function ProgramScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
       <Stack.Screen options={{ title: found?.title ?? "Chương trình" }} />
-      <TrainingNotices profile={profile} weightLoss={found?.goal_tag === "weight_loss"} />
+      <TrainingNotices profile={profile} />
       {found ? (
         <>
           {current.error && !current.data ? (

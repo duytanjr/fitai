@@ -1,6 +1,9 @@
 /**
- * Tập luyện: gợi ý, chương trình đang tập, danh sách (bấm thẻ → chi tiết chương trình; "Tập ngày n" → ngày tập).
- * Khối tải độc lập: hồ sơ (cảnh báo tập + chung, tuổi) · gợi ý (theo kinh nghiệm) · đang tập · danh sách chương trình.
+ * Tập luyện (như ProgramList của web): gợi ý, danh sách chương trình. Không có ô "Đang tập" riêng: chương trình đang
+ * theo hiện ngay trong thẻ của nó (nhãn "Đang theo", "Đã xong x/y ngày", thanh tiến độ, nút "Tiếp tục" → ngày kế
+ * tiếp). Bấm thẻ → chi tiết chương trình.
+ * Khối tải độc lập: hồ sơ (cảnh báo tập + chung, tuổi) · gợi ý (theo kinh nghiệm) · danh sách chương trình.
+ * Enrollment đang theo chỉ để hiện nhãn và tiến độ trên thẻ; lỗi thì bỏ qua (như web), không báo lỗi trang.
  * Kéo để làm mới; quay lại tab thì tải lại ngầm.
  */
 import { router, useFocusEffect } from "expo-router";
@@ -10,7 +13,7 @@ import { RefreshControl, ScrollView, Text, View } from "react-native";
 import { trainingApi } from "@/api/training";
 import type { Experience } from "@/api/types/training";
 import { LoaderCard } from "@/components/overview/cards";
-import { EnrollmentBody, ProgramCard, RecommendationBody, TrainingNotices } from "@/components/training/blocks";
+import { ProgramCard, RecommendationBody, TrainingNotices } from "@/components/training/blocks";
 import { colors, ErrorRetry, styles } from "@/components/ui";
 import { fetchProfileFacts, PROFILE_FACTS_ERROR } from "@/lib/trainingHealth";
 import { useLoader } from "@/lib/useLoader";
@@ -64,20 +67,6 @@ export default function TrainingScreen() {
       {/* Cảnh báo bệnh lý: chỉ lĩnh vực tập và chung (dinh dưỡng ở Tổng quan) */}
       <TrainingNotices profile={profile} />
 
-      {/* Đang tập: ẩn nếu không có (lỗi vẫn hiện để có Thử lại) */}
-      {current.data && !enrollment && !current.error ? null : (
-        <LoaderCard title="Đang tập" loader={current}>
-          {(c) =>
-            c.enrollment ? (
-              <EnrollmentBody
-                enrollment={c.enrollment}
-                onOpenDay={(n) => openDay(c.enrollment!.program_slug, n)}
-              />
-            ) : null
-          }
-        </LoaderCard>
-      )}
-
       <LoaderCard title={rec.data?.primary ? "Gợi ý cho bạn" : "Gợi ý chương trình"} loader={rec}>
         {(r) => (
           <RecommendationBody rec={r} experience={experience} onExperience={setExperience} busy={rec.loading} />
@@ -105,6 +94,9 @@ export default function TrainingScreen() {
             recommended={p.slug === recommendedSlug}
             following={enrollment && enrollment.program_slug === p.slug && enrollment.status === "active" ? enrollment : null}
             onPress={() => openProgram(p.slug)}
+            onContinue={() =>
+              enrollment?.next_day ? openDay(p.slug, enrollment.next_day) : openProgram(p.slug)
+            }
           />
         ))}
       </View>

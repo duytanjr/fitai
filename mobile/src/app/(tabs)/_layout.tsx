@@ -14,7 +14,7 @@ const tabIcon =
     <Ionicons name={focused ? filled : outline} size={size} color={focused ? colors.brand : colors.muted} />
   );
 
-/** Tab: Tổng quan, Ăn uống, Chat, Tập luyện (cùng thứ tự với thanh điều hướng web). */
+/** Tab: Tổng quan, Ăn uống, Tập luyện, Chat (cùng thứ tự với thanh điều hướng web). */
 export default function TabsLayout() {
   const { state, signOut } = useAuth();
   // Vừa đăng ký trên app: mở thiết lập hồ sơ một lần (như web chuyển sang /onboarding); màn đó tự tắt cờ
@@ -39,11 +39,11 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Tổng quan", tabBarIcon: tabIcon("grid-outline", "grid") }} />
       <Tabs.Screen name="meals" options={{ title: "Ăn uống", tabBarIcon: tabIcon("restaurant-outline", "restaurant") }} />
+      <Tabs.Screen name="training" options={{ title: "Tập luyện", tabBarIcon: tabIcon("barbell-outline", "barbell") }} />
       <Tabs.Screen
         name="chat"
         options={{ title: "Chat", tabBarIcon: tabIcon("chatbubbles-outline", "chatbubbles"), tabBarHideOnKeyboard: true }}
       />
-      <Tabs.Screen name="training" options={{ title: "Tập luyện", tabBarIcon: tabIcon("barbell-outline", "barbell") }} />
     </Tabs>
   );
 }

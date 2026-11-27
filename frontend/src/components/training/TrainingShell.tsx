@@ -33,28 +33,24 @@ function useProfileFacts(enabled: boolean): ProfileFacts {
   return facts;
 }
 
-export function TrainingSafetyNotice({ weightLoss = false, age }: { weightLoss?: boolean; age: number | null }) {
+/** Dòng nhắc nhỏ cho người dùng 13–17 tuổi (tuổi lấy từ hồ sơ); người lớn hoặc chưa có tuổi thì không hiện. */
+function MinorTrainingNote({ age }: { age: number | null }) {
+  if (age === null || age < 13 || age > 17) return null;
   return (
-    <div className="space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="note">
-      <p>
-        Chương trình do nhóm đồ án soạn từ video công khai, không thay thế huấn luyện viên. Dừng tập nếu đau, chóng
-        mặt hay khó thở; hỏi bác sĩ nếu bạn có bệnh nền.
-      </p>
-      {weightLoss && <p>Mô tả không hứa kết quả giảm cân; hiệu quả phụ thuộc chế độ ăn.</p>}
-      {age !== null && age < 18 && <p className="font-medium">Bạn nên tập cùng người lớn hoặc hỏi huấn luyện viên.</p>}
-    </div>
+    <p className="text-sm font-medium text-amber-800" role="note">
+      Bạn nên tập cùng người lớn hoặc hỏi huấn luyện viên.
+    </p>
   );
 }
 
 interface Props {
-  weightLoss?: boolean;
   /** Trang đọc dài (chi tiết, buổi tập): giữ độ rộng đọc max-w-3xl, canh trái thẳng với logo. */
   narrow?: boolean;
   children: React.ReactNode;
 }
 
-/** Khung chung các trang tập luyện: thanh điều hướng, kiểm tra đăng nhập, hộp lưu ý an toàn cố định. */
-export function TrainingShell({ weightLoss = false, narrow = false, children }: Props) {
+/** Khung chung các trang tập luyện: thanh điều hướng, kiểm tra đăng nhập, banner bệnh lý, dòng nhắc dưới 18 tuổi. */
+export function TrainingShell({ narrow = false, children }: Props) {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const { age, warnings } = useProfileFacts(isAuthenticated);
@@ -70,7 +66,7 @@ export function TrainingShell({ weightLoss = false, narrow = false, children }: 
         <div className={cn("space-y-5", narrow && "max-w-3xl")}>
           {/* Trang tập luyện: chỉ cảnh báo tập và chung (cảnh báo dinh dưỡng ở trang Tổng quan) */}
           <HealthNotice warnings={warnings} domains={TRAINING_DOMAINS} />
-          <TrainingSafetyNotice weightLoss={weightLoss} age={age} />
+          <MinorTrainingNote age={age} />
           {children}
         </div>
       </PageContainer>
